@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+dist/
+.open-next/
+test-results/
+playwright-report/
+*.tgz
+*.log
