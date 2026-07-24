@@ -12,6 +12,10 @@ await new Promise((done, reject) => {
 });
 
 await rm("dist", { recursive: true, force: true });
-await mkdir("dist", { recursive: true });
-await cp("out", "dist", { recursive: true });
-console.log("Built PACKWORKS static site in dist/");
+await mkdir("dist/assets", { recursive: true });
+await mkdir("dist/server", { recursive: true });
+await mkdir("dist/.openai", { recursive: true });
+await cp("out", "dist/assets", { recursive: true });
+await cp("worker/index.js", "dist/server/index.js");
+await cp(".openai/hosting.json", "dist/.openai/hosting.json");
+console.log("Built PACKWORKS Sites artifact in dist/");

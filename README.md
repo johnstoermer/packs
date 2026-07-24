@@ -26,4 +26,4 @@ npm run build
 npm run build:portal
 ```
 
-Both builds are written to `dist/`. The default build uses root-relative site assets, while the portal build targets `/games/packs/`.
+Both builds are written to `dist/`. The default build packages a Sites-compatible Worker plus root-relative assets, while the portal build targets `/games/packs/`.
