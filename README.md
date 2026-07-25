@@ -42,7 +42,7 @@ Cases are inventory bundles that the player can break into loose packs. Packs ha
 
 ## Rarity
 
-Every pack uses the complete 18-tier ladder, from Common at roughly 45% through Nameless at 0.0001%. Rarity is part of a card's identity: Pavement Pigeon is always Common, and What Was Never Named is always Nameless. A roll can fall back only to a lower fixed tier that exists in the selected set; it never upgrades a card. Each tier has its own border material or animation, with the upper tiers progressing through shimmer, starfield, halo, constellation, refraction, distortion, and the shifting Nameless treatment.
+Every pack uses the complete 18-tier ladder, from Common at roughly 82% and Uncommon at 18% through Nameless at 0.000001%. The average pack is four or five Commons and an Uncommon; everything Rare and above is a genuine event, and the display case verbs (Fusion, Transmute, Salvage, Mystery pity) are the intended roads to the high tiers. Rarity is part of a card's identity: Pavement Pigeon is always Common, and What Was Never Named is always Nameless. A roll can fall back only to a lower fixed tier that exists in the selected set; it never upgrades a card. Each tier has its own border material or animation, with the upper tiers progressing through shimmer, starfield, halo, constellation, refraction, distortion, and the shifting Nameless treatment.
 
 ## Opening
 

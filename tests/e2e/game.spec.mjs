@@ -264,7 +264,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await expect(detail).toBeVisible();
   await expect(detail).toContainText("Card 01");
   await expect(detail).toContainText("Common");
-  await expect(detail).toContainText("~45%");
+  await expect(detail).toContainText("~82%");
   await expect(detail).not.toContainText("Alley Sprout");
   await expect(detail.locator(".clean-detail-art.is-missing")).toBeVisible();
   await page.screenshot({ path: "test-results/clean-undiscovered-rarity.png" });
@@ -355,7 +355,7 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".loading-screen")).toHaveCount(0);
   await page.evaluate(() => {
-    Math.random = () => 0.04;
+    Math.random = () => 0.0004;
   });
   await page.getByRole("button", { name: /Open a pack/ }).click();
   expect(pageErrors).toEqual([]);
