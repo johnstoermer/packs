@@ -111,26 +111,26 @@ test("cash income is a flat one per second and the binder pays nothing", () => {
   assert.equal(Number.isInteger(ticking.coins), true);
 });
 
-test("the complete 18-tier rarity ladder uses the requested base rates", () => {
+test("the complete 18-tier rarity ladder uses the four-hour-arc base rates", () => {
   const expected = {
     common: 0.8169,
     uncommon: 0.18,
-    rare: 0.0015,
-    epic: 0.0008,
-    legendary: 0.0004,
-    mythic: 0.0002,
-    exalted: 0.0001,
-    ascendant: 0.00005,
-    celestial: 0.000025,
-    divine: 0.00001,
-    astral: 0.000005,
-    eternal: 0.000002,
-    primordial: 0.000001,
-    transcendent: 0.0000005,
-    empyrean: 0.0000002,
-    absolute: 0.0000001,
-    singularity: 0.00000005,
-    nameless: 0.00000001,
+    rare: 0.006,
+    epic: 0.0028,
+    legendary: 0.0012,
+    mythic: 0.0006,
+    exalted: 0.0003,
+    ascendant: 0.00015,
+    celestial: 0.00008,
+    divine: 0.00003,
+    astral: 0.000015,
+    eternal: 0.000006,
+    primordial: 0.000003,
+    transcendent: 0.0000015,
+    empyrean: 0.0000006,
+    absolute: 0.0000003,
+    singularity: 0.00000015,
+    nameless: 0.00000003,
   };
   assert.equal(Object.keys(RARITIES).length, 18);
   assert.deepEqual(

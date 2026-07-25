@@ -3466,10 +3466,10 @@ kbd {
 .reveal-card {
   --card-width: clamp(148px, 14.5vw, 198px);
   --card-height: calc(var(--card-width) * 1.42);
-  --card-gap: min(15.5vw, 205px);
+  --card-gap: var(--board-gap-x, min(15.5vw, 205px));
   --shrink: 1;
   --rowoff: 0;
-  --row-gap: calc(var(--card-height) * var(--shrink) + clamp(14px, 2.4vh, 28px));
+  --row-gap: var(--board-gap-y, calc(var(--card-height) * var(--shrink) + clamp(14px, 2.4vh, 28px)));
   opacity: 0;
   filter: drop-shadow(0 17px 12px rgba(0, 0, 0, 0.4));
   transform: translate(-50%, 30%) rotate(calc(var(--spread) * 8deg)) scale(0.45);
@@ -3541,7 +3541,7 @@ kbd {
 
 .reveal-card.count-5 {
   --card-width: clamp(132px, 12.8vw, 178px);
-  --card-gap: min(13.2vw, 178px);
+  --card-gap: var(--board-gap-x, min(13.2vw, 178px));
 }
 
 .reveal-card-inner {
@@ -4174,7 +4174,7 @@ kbd {
 @media (max-width: 1050px) {
   .reveal-card {
     --card-width: clamp(132px, 15.5vw, 165px);
-    --card-gap: min(17vw, 148px);
+    --card-gap: var(--board-gap-x, min(17vw, 148px));
   }
 
   .reveal-card.is-dealt,

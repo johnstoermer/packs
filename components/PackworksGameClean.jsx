@@ -28,6 +28,7 @@ import {
   displayCard,
   evaluateIdleThresholds,
   getCardSaleValue,
+  getCardValue,
   getDerived,
   getDuplicateCount,
   getDuplicateSaleValue,
@@ -59,6 +60,8 @@ import {
 import { createAudioEngine } from "../lib/audio";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
+// Auto-process thresholds, in multiples of a loose pack's price (0 = off).
+const AUTO_SELL_STEPS = [0, 1, 4, 12];
 const SHOP_PRODUCTS = PACK_PRODUCTS.filter((product) => ["loose", "case"].includes(product.id));
 const CASE_PRODUCT = PACK_PRODUCTS.find((product) => product.id === "case");
 const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
@@ -568,8 +571,8 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
           <h2>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</h2>
           <p>{count ? card.flavor : "Not found yet. Keep opening packs to reveal this card."}</p>
           {def && (
-            <div className={`clean-detail-effect${def.king || def.prestige ? " is-meta" : ""}`}>
-              <b>{def.king ? KINGS[def.king].name.toUpperCase() : def.prestige ? "THE DOOR OUT" : "DISPLAY EFFECT"}</b>
+            <div className={`clean-detail-effect${def.sig || def.prestige ? " is-meta" : ""}`}>
+              <b>{def.sig ? `${KINGS[def.sig].name.toUpperCase()} SIGNATURE` : def.prestige ? "THE DOOR OUT" : "DISPLAY EFFECT"}</b>
               <span>{describeCard(card.id)}</span>
             </div>
           )}
@@ -634,12 +637,12 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
               const rarity = RARITIES[card.rarity];
               const tally = game.triggerTallies?.[entry.id] || 0;
               return (
-                <article className={`clean-case-slot is-filled rarity-${card.rarity}${def?.king ? " is-king" : ""}`} key={`slot-${index}`} style={{ "--rarity": rarity.color }}>
+                <article className={`clean-case-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}`} key={`slot-${index}`} style={{ "--rarity": rarity.color }}>
                   <button className="clean-case-card" onClick={() => onPickCard(card.id)} aria-label={`${card.name} details`}>
                     <CardArt card={card} compact />
                   </button>
                   <div className="clean-case-slot-copy">
-                    <b>{index === 0 ? "SLOT 1 / " : ""}{card.name}{def?.king ? ` — ${KINGS[def.king].name}` : ""}</b>
+                    <b>{index === 0 ? "SLOT 1 / " : ""}{card.name}{def?.sig ? ` — ${KINGS[def.sig].name}` : ""}</b>
                     <span>{describeCard(card.id)}</span>
                     {tally > 0 && <i className="clean-case-ramp">TRIGGERED {formatNumber(tally)} TIMES</i>}
                   </div>
@@ -732,7 +735,7 @@ function CaseStrip({ game, derived, fx, onOpenCase, onOpenBinder }) {
           <button
             type="button"
             key={index}
-            className={`case-strip-slot is-filled rarity-${card.rarity}${def?.king ? " is-king" : ""}${pulse ? ` fx-${pulse.kind}` : ""}`}
+            className={`case-strip-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}${pulse ? ` fx-${pulse.kind}` : ""}`}
             style={{ "--rarity": RARITIES[card.rarity].color }}
             data-fx={pulse ? pulse.serial : undefined}
             title={card.name}
@@ -740,7 +743,7 @@ function CaseStrip({ game, derived, fx, onOpenCase, onOpenBinder }) {
             aria-label={`${card.name} — open display case`}
           >
             <CardArt card={card} compact />
-            {def?.king && <i className="case-strip-crown" aria-hidden="true" />}
+            {def?.sig && <i className="case-strip-crown" aria-hidden="true" />}
           </button>
         );
       })}
@@ -802,7 +805,7 @@ export default function PackworksGameClean() {
   const [fx, setFx] = useState({});
   const [revealEchoes, setRevealEchoes] = useState({});
   const [adminActive, setAdminActive] = useState(false);
-  const [boardNarrow, setBoardNarrow] = useState(false);
+  const [viewport, setViewport] = useState({ w: 1200, h: 800 });
   const adminActiveRef = useRef(false);
   const fxSerialRef = useRef(0);
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -879,6 +882,34 @@ export default function PackworksGameClean() {
     const sets = events.filter((event) => event.t === "setComplete");
     for (const done of sets) pushToast("SET COMPLETE", `${getSet(done.setId).name} is finished.`, "gold", 6000);
   }, [getAudio, pushToast]);
+
+  // Salvage burst: the Mystery Packs a sale or idle sweep rips open, shown
+  // as a full-screen card burst so Salvage is never a silent toast.
+  const [salvageBurst, setSalvageBurst] = useState(null);
+  const salvageBurstTimerRef = useRef(null);
+  const showSalvageBurst = useCallback((mysteryCards, packs) => {
+    if (!mysteryCards?.length || gameRef.current?.settings?.reducedEffects) return;
+    if (salvageBurstTimerRef.current !== null) window.clearTimeout(salvageBurstTimerRef.current);
+    setSalvageBurst({
+      id: Date.now(),
+      packs: Math.max(1, packs || 1),
+      cards: mysteryCards.slice(0, 9).map((pull, index) => ({
+        key: `${pull.card.id}-${index}`,
+        name: pull.card.name,
+        rarity: pull.rarity,
+        color: RARITIES[pull.rarity].color,
+        isNew: !!pull.isNew,
+      })),
+      more: Math.max(0, mysteryCards.length - 9),
+    });
+    salvageBurstTimerRef.current = window.setTimeout(() => {
+      setSalvageBurst(null);
+      salvageBurstTimerRef.current = null;
+    }, 2_800);
+  }, []);
+  useEffect(() => () => {
+    if (salvageBurstTimerRef.current !== null) window.clearTimeout(salvageBurstTimerRef.current);
+  }, []);
 
   useEffect(() => {
     let adminFlag = false;
@@ -973,10 +1004,13 @@ export default function PackworksGameClean() {
       if (swept.state !== gameRef.current) {
         commit(swept.state);
         pushFx(swept.events);
+        if (swept.mysteryCards?.length) {
+          showSalvageBurst(swept.mysteryCards, swept.events.filter((event) => event.t === "mystery").length);
+        }
       }
     }, 2_000);
     return () => window.clearInterval(interval);
-  }, [commit, pushFx, ready]);
+  }, [commit, pushFx, ready, showSalvageBurst]);
 
   const clearOpeningTimers = useCallback(() => {
     openingTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -1048,11 +1082,10 @@ export default function PackworksGameClean() {
   }, [closeOpening, commit, pushToast]);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 700px)");
-    const update = () => setBoardNarrow(media.matches);
+    const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
     update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
 
   useEffect(() => {
@@ -1073,17 +1106,37 @@ export default function PackworksGameClean() {
     getAudio().sound("signal", rarityOrder);
   }, [getAudio]);
 
+  // Grid solver: pick the columns-by-rows arrangement that keeps every card
+  // of the reveal inside the visible board area at the largest possible
+  // size. Columns grow with the pack just like rows — never scrolling.
   const boardLayout = useMemo(() => {
     const count = opening?.result?.cards?.length || 0;
-    if (!count) return { count: 0, perRow: 1, rows: 1, shrink: 1 };
-    const maxPer = boardNarrow ? 3 : 7;
-    const rows = Math.max(1, Math.ceil(count / maxPer));
-    const perRow = Math.ceil(count / rows);
-    const widthFactor = (boardNarrow ? 3.2 : 6.6) / perRow;
-    const rowsFactor = rows <= 1 ? 1 : rows === 2 ? 0.84 : rows === 3 ? 0.7 : rows === 4 ? 0.56 : 0.48;
-    const shrink = +Math.min(1, widthFactor, rowsFactor).toFixed(3);
-    return { count, perRow, rows, shrink };
-  }, [opening?.result?.cards?.length, boardNarrow]);
+    if (!count) return { count: 0, perRow: 1, rows: 1, shrink: 1, gapX: 0, gapY: 0 };
+    const { w, h } = viewport;
+    const narrow = w <= 1050;
+    const cardW = Math.min(Math.max(narrow ? 132 : 148, w * (narrow ? 0.155 : 0.145)), narrow ? 165 : 198);
+    const cardH = cardW * 1.42;
+    const gapXBase = Math.min(w * (narrow ? 0.17 : 0.155), narrow ? 148 : 205);
+    const availW = w * 0.92;
+    const availH = h * 0.58;
+    let best = { cols: 1, rows: count, s: 0 };
+    for (let cols = 1; cols <= Math.min(count, 24); cols += 1) {
+      const rows = Math.ceil(count / cols);
+      const sW = availW / ((cols - 1) * gapXBase + cardW);
+      const sH = availH / (rows * (cardH + 16));
+      const s = Math.min(1, sW, sH);
+      if (s > best.s + 1e-9 || (Math.abs(s - best.s) < 1e-9 && rows < best.rows)) best = { cols, rows, s };
+    }
+    const shrink = +Math.max(0.2, Math.min(1, best.s)).toFixed(3);
+    return {
+      count,
+      perRow: best.cols,
+      rows: best.rows,
+      shrink,
+      gapX: Math.round(gapXBase),
+      gapY: Math.round(cardH * shrink + Math.max(8, 20 * shrink)),
+    };
+  }, [opening?.result?.cards?.length, viewport]);
 
   const revealCard = useCallback((index) => {
     const currentOpening = openingRef.current;
@@ -1374,21 +1427,43 @@ export default function PackworksGameClean() {
     getAudio().sound("purchase");
   }, [commit, getAudio]);
 
-  const handleSellDuplicates = useCallback(() => {
+  const handleSellDuplicates = useCallback((maybeAuto) => {
+    const auto = maybeAuto === true;
     const count = getDuplicateCount(gameRef.current);
     const sale = sellDuplicatesDetailed(gameRef.current, {});
     if (sale.state === gameRef.current) {
-      getAudio().sound("deny");
+      if (!auto) getAudio().sound("deny");
       return;
     }
     commit(sale.state);
     pushFx(sale.events);
     getAudio().sound("purchase");
+    if (sale.salvages > 0) showSalvageBurst(sale.mysteryCards, sale.salvages);
     const mysteryNote = sale.salvages > 0
       ? ` ${sale.salvages} Salvage${sale.salvages > 1 ? "s" : ""} fired — ${sale.mysteryCards.length} mystery cards joined your binder.`
       : "";
-    pushToast("DUPLICATES SOLD", `${count} cards sold for ${money(sale.saleValue)} cash.${mysteryNote}`, sale.salvages ? "gold" : "success", sale.salvages ? 6500 : 4200);
-  }, [commit, getAudio, pushFx, pushToast]);
+    pushToast(
+      auto ? "AUTO-PROCESSED" : "DUPLICATES SOLD",
+      `${count} cards sold for ${money(sale.saleValue)} cash.${mysteryNote}`,
+      sale.salvages ? "gold" : "success",
+      sale.salvages ? 6500 : 4200,
+    );
+  }, [commit, getAudio, pushFx, pushToast, showSalvageBurst]);
+
+  // Automated processing: once the sell pile is worth the chosen number of
+  // loose packs, it sells itself. A coin threshold, never a timer.
+  const autoSellAt = AUTO_SELL_STEPS.includes(game.settings?.autoSell) ? game.settings.autoSell : 0;
+  const handleAutoSellSetting = useCallback((value) => {
+    commit((current) => ({ ...current, settings: { ...current.settings, autoSell: value } }));
+    getAudio().sound("switch");
+  }, [commit, getAudio]);
+  useEffect(() => {
+    if (!ready || !autoSellAt || openingRef.current) return;
+    const value = getDuplicateSaleValue(game);
+    if (value > 0 && value >= autoSellAt * getPackPrice(game, "loose", game.activeSet)) {
+      handleSellDuplicates(true);
+    }
+  }, [autoSellAt, game, handleSellDuplicates, ready]);
 
   const handleSet = useCallback((setId) => {
     const next = selectSet(gameRef.current, setId);
@@ -1611,7 +1686,7 @@ export default function PackworksGameClean() {
         <button
           className="clean-sell-duplicates"
           disabled={!derived.duplicateCount}
-          onClick={handleSellDuplicates}
+          onClick={() => handleSellDuplicates(false)}
         >
           <strong>SELL DUPLICATES</strong>
           <span>
@@ -1620,6 +1695,19 @@ export default function PackworksGameClean() {
               : "NO EXTRA COPIES"}
           </span>
         </button>
+
+        <div className="clean-auto-process" role="group" aria-label="Auto-process duplicates">
+          <span title="Sells the pile automatically once it's worth this many loose packs. Salvage effects still fire.">AUTO-PROCESS</span>
+          {AUTO_SELL_STEPS.map((step) => (
+            <button
+              key={`auto-${step}`}
+              className={autoSellAt === step ? "is-active" : ""}
+              onClick={() => handleAutoSellSetting(step)}
+            >
+              {step === 0 ? "OFF" : `AT ${step} PACK${step > 1 ? "S" : ""}`}
+            </button>
+          ))}
+        </div>
 
         <SetTray game={game} set={activeSet} onCard={setSelectedCard} />
 
@@ -1692,6 +1780,7 @@ export default function PackworksGameClean() {
           </div>
           <div
             className={`reveal-deck ${swipeRevealing ? "is-swipe-revealing" : ""}`}
+            style={boardLayout.count ? { "--board-gap-x": `${boardLayout.gapX}px`, "--board-gap-y": `${boardLayout.gapY}px` } : undefined}
             onPointerDown={startSwipeReveal}
             onPointerMove={continueSwipeReveal}
             onPointerUp={stopSwipeReveal}
@@ -1743,7 +1832,7 @@ export default function PackworksGameClean() {
                 <span>SELL PILE</span>
                 <strong>
                   {opening.result.cards.some((pull) => pull.revealed && !pull.isNew)
-                    ? `+${money(Math.ceil(opening.result.cards.filter((pull) => pull.revealed && !pull.isNew).reduce((sum, pull) => sum + RARITIES[pull.card.rarity].sellValue, 0) * (1 + (game.upgrades?.shelf || 0) * 0.2)))} CASH VALUE`
+                    ? `+${money(Math.ceil(opening.result.cards.filter((pull) => pull.revealed && !pull.isNew).reduce((sum, pull) => sum + getCardValue(pull.card), 0) * (1 + (game.upgrades?.shelf || 0) * 0.2)))} CASH VALUE`
                     : "NO DUPLICATES"}
                 </strong>
                 <small>
@@ -1837,6 +1926,28 @@ export default function PackworksGameClean() {
           onDisplay={handleDisplay}
           onUndisplay={handleUndisplay}
         />
+      )}
+
+      {salvageBurst && (
+        <div className="salvage-burst" key={salvageBurst.id} aria-hidden="true">
+          <div className="salvage-burst-pack">
+            <i className="salvage-burst-half is-left" />
+            <i className="salvage-burst-half is-right" />
+            <b>SALVAGE ×{salvageBurst.packs}</b>
+          </div>
+          <div className="salvage-burst-cards">
+            {salvageBurst.cards.map((card, index) => (
+              <span
+                key={card.key}
+                className={`salvage-burst-card rarity-${card.rarity}${card.isNew ? " is-new" : ""}`}
+                style={{ "--i": index, "--n": salvageBurst.cards.length, "--rarity": card.color }}
+              >
+                {card.isNew && <em>NEW</em>}
+              </span>
+            ))}
+            {salvageBurst.more > 0 && <small className="salvage-burst-more">+{salvageBurst.more} MORE</small>}
+          </div>
+        </div>
       )}
 
       <div className="clean-toasts" aria-live="polite">

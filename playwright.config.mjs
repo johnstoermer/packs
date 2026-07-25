@@ -1,4 +1,10 @@
+import { existsSync } from "node:fs";
 import { defineConfig } from "@playwright/test";
+
+// Prefer a preinstalled Chromium when one is provided (e.g. sandboxed CI
+// images), instead of downloading the revision this Playwright version pins.
+const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH
+  || (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : null);
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -9,6 +15,7 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:4317",
     browserName: "chromium",
+    ...(chromiumPath ? { launchOptions: { executablePath: chromiumPath } } : {}),
     viewport: { width: 1440, height: 900 },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

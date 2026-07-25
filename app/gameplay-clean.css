@@ -1564,12 +1564,12 @@
 
 .pw-clean .reveal-card.count-6 {
   --card-width: clamp(118px, 11.2vw, 160px);
-  --card-gap: min(11.8vw, 164px);
+  --card-gap: var(--board-gap-x, min(11.8vw, 164px));
 }
 
 .pw-clean .reveal-card.count-7 {
   --card-width: clamp(104px, 9.8vw, 142px);
-  --card-gap: min(10.3vw, 144px);
+  --card-gap: var(--board-gap-x, min(10.3vw, 144px));
 }
 
 .pw-clean .card-foot b {
@@ -2371,8 +2371,8 @@
   }
 
   .pw-clean .reveal-card {
-    --card-gap: min(30vw, 122px);
-    --row-gap: calc(var(--card-height) * var(--shrink) + clamp(12px, 2vh, 22px));
+    --card-gap: var(--board-gap-x, min(30vw, 122px));
+    --row-gap: var(--board-gap-y, calc(var(--card-height) * var(--shrink) + clamp(12px, 2vh, 22px)));
   }
 
   .pw-clean .phase-summary .reveal-deck {
@@ -2901,4 +2901,166 @@ button.clean-case-slot.is-empty:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal-echo-flash { animation-iteration-count: 1; }
+}
+
+/* --- Auto-process duplicates (threshold chips under the sell button) --- */
+
+.clean-auto-process {
+  position: absolute;
+  z-index: 8;
+  bottom: 4px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: #9aa39e;
+  white-space: nowrap;
+}
+
+.clean-auto-process > span { padding-right: 2px; }
+
+.clean-auto-process button {
+  border: 1px solid rgba(240, 233, 216, 0.16);
+  border-radius: 2px;
+  background: #131c19;
+  color: #b9c2bc;
+  font: inherit;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.clean-auto-process button:hover,
+.clean-auto-process button:focus-visible {
+  border-color: rgba(240, 233, 216, 0.4);
+  color: #efe9da;
+}
+
+.clean-auto-process button.is-active {
+  border-color: color-mix(in srgb, var(--set-a) 70%, #77817d);
+  background: color-mix(in srgb, var(--set-a) 18%, #131c19);
+  color: #efe9da;
+}
+
+/* --- Salvage burst: Mystery Packs rip open on screen --- */
+
+.salvage-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: salvage-burst-fade 2.8s ease forwards;
+}
+
+.reduced-effects .salvage-burst { display: none; }
+
+.salvage-burst-pack {
+  position: relative;
+  width: 92px;
+  height: 128px;
+}
+
+.salvage-burst-pack b {
+  position: absolute;
+  left: 50%;
+  top: -30px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: #f0d688;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+}
+
+.salvage-burst-half {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(160deg, #d9b856, #8a6b1f);
+  border: 1px solid #f2dd9a;
+  box-shadow: 0 0 22px rgba(240, 214, 136, 0.5);
+}
+
+.salvage-burst-half.is-left {
+  left: 0;
+  border-radius: 6px 0 0 6px;
+  animation: salvage-half-left 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+.salvage-burst-half.is-right {
+  right: 0;
+  border-radius: 0 6px 6px 0;
+  animation: salvage-half-right 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes salvage-half-left {
+  0% { transform: none; opacity: 1; }
+  100% { transform: translate(-74px, -16px) rotate(-24deg); opacity: 0; }
+}
+
+@keyframes salvage-half-right {
+  0% { transform: none; opacity: 1; }
+  100% { transform: translate(74px, -16px) rotate(24deg); opacity: 0; }
+}
+
+.salvage-burst-cards {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.salvage-burst-card {
+  --angle: calc((var(--i) - (var(--n) - 1) / 2) * (170deg / max(var(--n) - 1, 1)));
+  position: absolute;
+  width: 44px;
+  height: 62px;
+  border-radius: 4px;
+  border: 1px solid var(--rarity, #d9b856);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rarity, #d9b856) 45%, #101815), #0c1210);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--rarity, #d9b856) 50%, transparent);
+  opacity: 0;
+  animation: salvage-card-fly 2s cubic-bezier(0.16, 0.8, 0.3, 1) forwards;
+  animation-delay: calc(0.12s + var(--i) * 70ms);
+}
+
+.salvage-burst-card em {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.12em;
+  color: #9fe3b7;
+}
+
+.salvage-burst-more {
+  position: absolute;
+  left: 50%;
+  bottom: -46px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #cfc7b4;
+}
+
+@keyframes salvage-card-fly {
+  0% { opacity: 0; transform: rotate(var(--angle)) translateY(0) rotate(calc(var(--angle) * -1)) scale(0.4); }
+  18% { opacity: 1; }
+  62% { opacity: 1; transform: rotate(var(--angle)) translateY(-124px) rotate(calc(var(--angle) * -1)) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--angle)) translateY(-152px) rotate(calc(var(--angle) * -1)) scale(0.92); }
+}
+
+@keyframes salvage-burst-fade {
+  0%, 86% { opacity: 1; }
+  100% { opacity: 0; }
 }

@@ -40,12 +40,12 @@ const PATHS = {
   salvageRush: ["corner", "circuit", "frontier", "abyss", "crown", "verdant", "polar", "ember", "cloud", "glass", "harbor", "orchard", "hollow", "prism", "signal", "observatory", "foundry", "apocalypse", "lastlight", "unwritten"],
 };
 
-// Score a card for a build: Kings of favored verbs first, then supports whose
-// definitions reference those verbs.
+// Score a card for a build: signatures of favored verbs first, then supports
+// whose definitions reference those verbs.
 function scoreCard(id, favoredVerbs) {
   const def = getCardDef(id);
   if (!def || def.prestige) return 0;
-  if (def.king) return favoredVerbs.includes(def.king) ? 100 : 10;
+  if (def.sig) return favoredVerbs.includes(def.sig) ? 100 : 10;
   const text = JSON.stringify(def);
   let score = 1;
   for (const verb of favoredVerbs) {

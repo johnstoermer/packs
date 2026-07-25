@@ -20,44 +20,56 @@ are engine components. Every card changes how the game behaves — never just
 - **Payoff** — what ultimately happens (open packs, reveal cards, gain money,
   create Mystery Packs, upgrade rarity, trigger effects).
 
-**Kings introduce verbs. Supports modify verbs. Never the reverse.** The King
-defines what the verb *does*; supports define *when* it happens, what it
-targets, and how it scales. A verb does nothing until its King is displayed.
+**Every chance source stands alone. Pure dials modify.** A card that reads
+"+16% chance to Fracture" fractures packs all by itself — displaying it IS
+the way into a Fracture build. The chase card of each early set is that
+verb's **signature**: its biggest chance source, or its defining rule where
+one genuinely exists (Mimic, Fusion, Blueprint, Relay, Autopilot). A
+signature is never a bare "this verb is now active" gate. Dials that only
+bias, deepen, or redirect a verb (Mark targeting, Fusion depth, Mimic
+preferences) stay inert until some source feeds them — they modify, they
+don't gate.
 
-## Confirmed Kings
+## The twelve verbs and their signatures
 
-1. **Common Echo** — Common reveals have a 25% base chance to Echo: their
-   reveal triggers fire again. Chance boosts add percentage points; effective
-   chance past 100% grants guaranteed additional Echoes with the remainder
-   rolled as chance (so boosts are always live dials, never dead text).
-   Every Echo visibly replays the reveal on the card itself.
-2. **Rare Echo** — Rare-or-better reveals Echo under the same 25%-base,
-   overflow-into-extra-Echoes rules. Split from Common Echo for balance and
-   identity; never one universal Echo.
-3. **Salvage** — "Whenever you Salvage, create a Mystery Pack." Supports
-   create Salvage sources (per duplicate sold, per coins earned, per set
-   completed, per fusion). The bridge between active play and passive income.
-4. **Mark** — every pack contains one Marked card, visible before reveal.
-   Supports define what Marks do, where they appear, how they spread/chain.
-   Marks create reveal-order decisions.
-5. **Fusion** — after reveals, duplicates fuse upward (4 Commons → 2
-   Uncommons → 1 Rare → …). Each fusion reveals again. Supports add pack
-   size, fusion depth, duplicate likelihood.
-6. **Catalyst** — when a card gains a property, it may spread that property
-   to another unrevealed card. Chain reactions.
-7. **Mimic** — before reveal, one unrevealed card becomes a copy of another
-   unrevealed card. Always visibly animated. Supports bias targets.
-8. **Transmute** — when a card is revealed, another unrevealed card visibly
-   transmutes toward that rarity. Supports bias direction and targets.
-9. **Fracture** — packs fracture into additional packs that merge into the
-   current reveal. Chains build massive reveal boards. Never separate screens.
-10. **Blueprint** — behaves as an exact copy of the card in display slot 1.
-    No selection UI; position is the interface.
-11. **Relay** — whenever a displayed card triggers, the displayed card
-    immediately to its right also triggers if able. Positional chains.
-12. **Autopilot (Discover automation)** — whenever you would Discover, an
-    option is chosen automatically and enhanced. High-agency manual play vs
-    high-flow automated play.
+1. **Common Echo** (signature: +50% chance) — Common reveals may Echo: their
+   reveal triggers fire again. Chance is additive from a base of zero across
+   every displayed source; effective chance past 100% grants guaranteed
+   additional Echoes with the remainder rolled as chance (so boosts are
+   always live dials, never dead text). Every Echo visibly replays the
+   reveal on the card itself.
+2. **Rare Echo** (signature: +50% chance) — Rare-or-better reveals Echo
+   under the same additive, overflow-into-extra-Echoes rules. Split from
+   Common Echo for balance and identity; never one universal Echo.
+3. **Salvage** (signature: 4% per duplicate sold) — Salvaging bursts open a
+   Mystery Pack. Any support that grants Salvage chances or events works on
+   its own (per duplicate sold, per coins earned, per set completed, per
+   fusion). The bridge between active play and passive income.
+4. **Mark** (signature: one Marked card per pack) — Marks are visible before
+   reveal and create reveal-order decisions. Any card that creates Marks
+   works alone; supports that pay on Marked reveals spend the Marks.
+5. **Fusion** (signature: the pairing rule) — after reveals, same-rarity
+   pairs fuse upward and reveal again. Solo-fusion and cross-rarity chance
+   sources work standalone; depth and foil dials modify.
+6. **Catalyst** (signature: +75% spread chance) — when a card gains a
+   property, it may spread to another unrevealed card. Chain reactions.
+7. **Mimic** (signature: the copying rule) — before reveal, one unrevealed
+   card becomes a copy of another. Always visibly animated. Supports bias
+   targets.
+8. **Transmute** (signature: +50% chance) — when a card is revealed, another
+   unrevealed card visibly transmutes toward that rarity. Chance is additive
+   from zero; supports bias direction and targets.
+9. **Fracture** (signature: +35% chance) — packs fracture into additional
+   packs that merge into the current reveal. Chains build massive reveal
+   boards. Never separate screens.
+10. **Blueprint** (signature: the copy rule) — behaves as an exact copy of
+    the card in display slot 1. No selection UI; position is the interface.
+11. **Relay** (signature: the chain rule) — whenever a displayed card
+    triggers, the displayed card immediately to its right also triggers if
+    able. Positional chains.
+12. **Autopilot** (signature: the automation rule) — whenever you would
+    Discover, an option is chosen automatically and enhanced. High-agency
+    manual play vs high-flow automated play.
 
 ## Mystery Packs
 
@@ -122,16 +134,17 @@ mirrors slot 1. Salvage = Mystery Pack bursts onto the screen. Coins = burst.
 
 Player-facing language only: "displayed cards", "display case slot 1",
 "revealed cards", "packs", "duplicates". Never "support", "King", or any
-internal term. Supports nudge — "prefer", "more likely", "+1 chance" — never
-"always" or "guaranteed".
+internal term. Chance sources state absolutes about themselves — "+16%
+chance to Fracture" — because the number IS the card. Pure dials nudge:
+"prefer", "+1 step". Supports never say "always" or "guaranteed".
 
 ## Support philosophy
 
-Supports modify verbs, bias probabilities, extend chains, and create synergy;
-they never exist as isolated percentage sticks. Commons stay valuable
-forever: Kings elevate commons, and endgame builds should naturally mix
-commons through high rarities. Builds should read as identities: "I'm playing
-Salvage", never "I stacked forty multipliers".
+Supports add chance sources, bias probabilities, extend chains, and create
+synergy; they never exist as isolated percentage sticks. Commons stay
+valuable forever: signatures elevate commons, and endgame builds should
+naturally mix commons through high rarities. Builds should read as
+identities: "I'm playing Salvage", never "I stacked forty multipliers".
 
 Uniqueness rules (enforced by tests/engine.test.mjs):
 - No two cards may ever have identical effect text.
@@ -144,9 +157,9 @@ Uniqueness rules (enforced by tests/engine.test.mjs):
   product prices — those belong to the three shop upgrades (and the rejected
   Broker direction stays rejected). Engine coins always flow through a
   visible trigger.
-- Supports keep nudge language even when powerful: "prefer", "more likely",
-  "N% chance" — a support never says "always", "never", or "guaranteed".
-  Absolutes are reserved for Kings and capstones, which define rules.
+- Supports keep nudge language even when powerful: "prefer", "+N% chance" —
+  a support never says "always", "never", or "guaranteed". Rule absolutes
+  are reserved for signatures and capstones.
 
 ## UI scaling
 
@@ -167,10 +180,12 @@ payoff is visible cause and effect, not a metaphor).
 Demoted to support space: Connected/Collector (relationship tags inside Mark
 and Mimic builds).
 
-## Set → King mapping
+## Set → signature mapping
 
-The chase card at the end of a set IS that set's King: pulling it completes
-the set and hands the player the build-around at the same moment. Kings are
-assigned to the first twelve sets in unlock-tree order; later sets' chase
-cards are cross-engine capstones (supports that fuse two verbs), and the
-final Unwritten chase card remains the prestige door.
+The chase card at the end of a set IS that set's signature: pulling it
+completes the set and hands the player the verb's biggest chance source (or
+defining rule) at the same moment. Signatures are assigned to the first
+twelve sets in unlock-tree order; later sets' chase cards are cross-engine
+capstones (supports that fuse two verbs), and the final Unwritten chase card
+remains the prestige door. Nothing is gated on a signature — every chance
+source on every support works the moment it is displayed.

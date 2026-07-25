@@ -73,30 +73,45 @@ test("every card has a verb-engine definition with player-facing text", () => {
   }
 });
 
-test("each of the twelve Kings sits on a chase card; the Nameless keeps the door", () => {
-  const kingVerbs = new Set(Object.values(SET_KINGS));
-  assert.equal(kingVerbs.size, 12);
-  assert.deepEqual([...kingVerbs].sort(), Object.keys(KINGS).sort());
+test("each of the twelve signature verbs sits on a chase card with a real effect", () => {
+  const sigVerbs = new Set(Object.values(SET_KINGS));
+  assert.equal(sigVerbs.size, 12);
+  assert.deepEqual([...sigVerbs].sort(), Object.keys(KINGS).sort());
   for (const [setId, verb] of Object.entries(SET_KINGS)) {
     const set = SETS.find((candidate) => candidate.id === setId);
     const chase = set.cards[11];
-    assert.deepEqual(getCardDef(chase.id), { king: verb }, setId);
+    const def = getCardDef(chase.id);
+    assert.equal(def.signature, true, setId);
+    assert.equal(def.sig, verb, setId);
+    // A signature is never a bare gate: it carries its own chance source or
+    // rule, plus player-facing text.
+    assert.ok(def.mod || def.on, setId);
+    assert.ok(def.note && def.note.length > 20, setId);
   }
   assert.equal(getCardDef(NAMELESS_CARD_ID).prestige, true);
 });
 
-test("verbs are inert without their King displayed", () => {
+test("chance sources stand alone: a salvage support works with no signature displayed", () => {
   const state = withSlots(createInitialState(1), ["frontier-01"]);
-  const noKing = displayCard(state, "frontier-01", 0);
+  const solo = displayCard(state, "frontier-01", 0);
   const sale = sellDuplicatesDetailed(
-    { ...noKing, collection: { ...noKing.collection, "corner-01": 500 }, duplicateBank: 499 },
+    { ...solo, collection: { ...solo.collection, "corner-01": 500 }, duplicateBank: 499 },
     { rng: () => 0.0001 },
   );
-  assert.equal(sale.salvages, 0);
-  assert.equal(sale.mysteryCards.length, 0);
+  assert.ok(sale.salvages > 0);
+  assert.ok(sale.mysteryCards.length >= 4);
 });
 
-test("Salvage King turns duplicate sales into Mystery Packs", () => {
+test("pure dials stay inert without a source: fusion depth alone fuses nothing", () => {
+  const base = withSlots(createInitialState(1), ["verdant-04"]);
+  const built = displayAll(base, ["verdant-04"]);
+  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
+  const all = revealAll(opened.state, opened.result.cards, () => 0.99);
+  const fusion = resolveFusions(all.state, all.cards, { rng: () => 0.99 });
+  assert.equal(fusion.fused, false);
+});
+
+test("Salvage signature turns duplicate sales into Mystery Packs", () => {
   const base = withSlots(createInitialState(1), ["frontier-12", "frontier-01"]);
   const built = displayAll(base, ["frontier-12", "frontier-01"]);
   const loaded = {
@@ -128,7 +143,7 @@ test("coin thresholds fire from any income source, never from timers", () => {
   assert.equal(evaluateIdleThresholds(drained, { rng: () => 0.5 }).events.length, 0);
 });
 
-test("Mark King marks a visible card before reveal and marked reveals pay", () => {
+test("Mark signature marks a visible card before reveal and marked reveals pay", () => {
   const base = withSlots(createInitialState(1), ["circuit-12", "circuit-02"]);
   const built = displayAll(base, ["circuit-12", "circuit-02"]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.4 });
@@ -140,11 +155,11 @@ test("Mark King marks a visible card before reveal and marked reveals pay", () =
   assert.ok(step.state.coins > coinsBefore);
 });
 
-test("Echo has a real base chance, boosts matter, and overflow doubles payoffs", () => {
+test("Echo chance is additive from zero, boosts matter, and overflow doubles payoffs", () => {
   const base = withSlots(createInitialState(1), ["corner-12", "corner-02", "lastlight-01"]);
 
-  // King alone: 25% base chance — a high roll does NOT echo, so chance
-  // boosts have real room to work in.
+  // Signature alone: +50% chance — a high roll does NOT echo, so further
+  // chance sources have real room to work in.
   const kingOnly = displayAll(base, ["corner-12", "corner-02"]);
   const openedKing = openPack(kingOnly, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const kingIndex = openedKing.result.cards.findIndex((pull) => pull.rarity === "common");
@@ -152,9 +167,9 @@ test("Echo has a real base chance, boosts matter, and overflow doubles payoffs",
   assert.ok(!kingStep.events.some((event) => event.t === "echo"));
   const plainGain = kingStep.state.coins - openedKing.state.coins;
 
-  // King + Matchstick Moth (+100%): 125% -> exactly one guaranteed Echo on
-  // the same high roll, doubling the reveal payoff. The echo event carries
-  // the King's card id so the case strip can pulse it.
+  // Signature + Matchstick Moth (+100%): 150% -> exactly one guaranteed Echo
+  // on the same high roll, doubling the reveal payoff. The echo event carries
+  // the signature's card id so the case strip can pulse it.
   const boosted = displayAll(base, ["corner-12", "corner-02", "lastlight-01"]);
   const openedEcho = openPack(boosted, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const echoIndex = openedEcho.result.cards.findIndex((pull) => pull.rarity === "common");
@@ -166,7 +181,7 @@ test("Echo has a real base chance, boosts matter, and overflow doubles payoffs",
   assert.equal(echoGain, plainGain * 2);
 });
 
-test("Fusion King fuses same-rarity pairs upward and they reveal again", () => {
+test("Fusion signature fuses same-rarity pairs upward and they reveal again", () => {
   const base = withSlots(createInitialState(1), ["verdant-12"]);
   const built = displayAll(base, ["verdant-12"]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
@@ -181,7 +196,7 @@ test("Fusion King fuses same-rarity pairs upward and they reveal again", () => {
   assert.equal(consumed, newCards.length * 2);
 });
 
-test("Fracture King spills extra packs into the same reveal", () => {
+test("Fracture signature spills extra packs into the same reveal", () => {
   const base = withSlots(createInitialState(1), ["ember-12", "ember-01"]);
   const built = displayAll(base, ["ember-12", "ember-01"]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.01 });
@@ -190,7 +205,23 @@ test("Fracture King spills extra packs into the same reveal", () => {
   assert.ok(opened.result.packsInReveal >= 2);
 });
 
-test("Mimic King copies one unrevealed card before reveal", () => {
+test("every pack carries at least one Uncommon-or-better from its set", () => {
+  let state = withSlots(createInitialState(1), []);
+  const rng = seededRandom(7);
+  const floor = RARITIES.uncommon.order;
+  for (let round = 0; round < 80; round += 1) {
+    const opened = openPack(state, { manual: true, free: true, now: 5_000 + round, rng });
+    state = opened.state;
+    const lifted = opened.result.cards.filter((pull) => RARITIES[pull.rarity].order >= floor);
+    assert.ok(lifted.length >= 1, `pack ${round} was all Common`);
+    assert.ok(
+      lifted.some((pull) => pull.card.setId === opened.result.set.id),
+      `pack ${round} uncommon came from outside the set`,
+    );
+  }
+});
+
+test("Mimic signature copies one unrevealed card before reveal", () => {
   const base = withSlots(createInitialState(1), ["abyss-12"]);
   const built = displayAll(base, ["abyss-12"]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.7 });
@@ -202,7 +233,7 @@ test("Mimic King copies one unrevealed card before reveal", () => {
   );
 });
 
-test("Transmute King morphs an unrevealed card toward the revealed rarity", () => {
+test("Transmute signature morphs an unrevealed card toward the revealed rarity", () => {
   const base = withSlots(createInitialState(1), ["polar-12", "polar-04"]);
   const built = displayAll(base, ["polar-12", "polar-04"]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.3 });
@@ -307,7 +338,7 @@ test("template families stay small: numbers-stripped text repeats at most 3 time
   const families = new Map();
   for (const card of ALL_CARDS) {
     const def = getCardDef(card.id);
-    if (def?.king || def?.capstone || def?.prestige) continue;
+    if (def?.sig || def?.capstone || def?.prestige) continue;
     const norm = describeCard(card.id).replace(/\d+(\.\d+)?[KMB]?/g, "N");
     families.set(norm, [...(families.get(norm) || []), card.id]);
   }
@@ -322,7 +353,7 @@ test("template families stay small: numbers-stripped text repeats at most 3 time
 test("supports keep nudge language and never touch sale value or prices", () => {
   for (const card of ALL_CARDS) {
     const def = getCardDef(card.id);
-    if (def?.king || def?.capstone || def?.prestige) continue;
+    if (def?.sig || def?.capstone || def?.prestige) continue;
     const text = describeCard(card.id);
     assert.ok(
       !/\b(always|never|guaranteed)\b/i.test(text),
@@ -401,8 +432,8 @@ test("audit: markSpread dial is live — revealed Marks spread more with it disp
 test("audit: transmute chance past 100% is guaranteed and hits extra cards", () => {
   const ids = ["polar-12", "lastlight-05"];
   const built = displayAll(withSlots(createInitialState(1), ids), ids);
-  // 20 base + 100 boost = 120%: rng 0.97 would have failed the old capped
-  // roll (0.97 > 0.95) — now one Transmute is guaranteed.
+  // 50 signature + 100 boost = 150%: rng 0.97 would have failed the old
+  // capped roll (0.97 > 0.95) — now one Transmute is guaranteed.
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.97 });
   const step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0.97 });
   assert.ok(step.events.some((event) => event.t === "transmute"));
@@ -414,8 +445,8 @@ test("audit: catalyst spread past 100% can spread twice", () => {
   const built = displayAll(withSlots(createInitialState(1), [...ids, ...SETS[2].cards.map((c) => c.id)], {
     collection: Object.fromEntries([...SETS[1].cards, ...SETS[2].cards, ...SETS[13].cards, ...SETS[17].cards, ...SETS[9].cards].map((c) => [c.id, 1])),
   }), ids);
-  // catalystChance 25 + 50 + 100 = 175: one guaranteed spread plus 75% of a
-  // second. rng 0.5 -> 50 < 75, so the Mark King's mark spreads twice.
+  // catalystChance 75 + 50 + 100 = 225: two guaranteed spreads (capped at
+  // two per event), so the Mark signature's mark spreads twice.
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
   const markEvents = opened.result.events.filter((event) => event.t === "mark");
   assert.ok(markEvents.length >= 3, `expected 3+ marks, got ${markEvents.length}`);
