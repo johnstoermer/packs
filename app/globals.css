@@ -1519,7 +1519,7 @@ kbd {
 
 .pack-series {
   position: absolute;
-  top: 34px;
+  bottom: 30px;
   color: color-mix(in srgb, var(--pack-a) 70%, white);
   font: 800 7px/1 Consolas, monospace;
   letter-spacing: 0.14em;

@@ -97,10 +97,10 @@ function PackFace({ set, small = false }) {
       }}
     >
       <span className="pack-crimp top" />
-      <span className="pack-series">PACKWORKS / {set.short}</span>
       <strong>{set.name}</strong>
       <span className="pack-glyph"><i /><i /><i /></span>
       <span className="pack-count">6 CARDS</span>
+      <span className="pack-series">PACKWORKS / {set.short}</span>
       <span className="pack-crimp bottom" />
     </span>
   );
