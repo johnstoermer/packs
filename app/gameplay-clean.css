@@ -196,7 +196,7 @@
 .clean-set-title {
   position: absolute;
   z-index: 3;
-  top: clamp(24px, 5vh, 55px);
+  top: clamp(66px, 9vh, 100px);
   left: 50%;
   display: flex;
   flex-direction: column;
@@ -1978,7 +1978,7 @@
   }
 
   .clean-set-title {
-    top: 18px;
+    top: 60px;
   }
 
   .clean-simple-stats {
@@ -1992,7 +1992,7 @@
 
 @media (max-height: 500px) and (min-width: 701px) {
   .clean-set-title {
-    top: 11px;
+    top: 56px;
   }
 
   .clean-set-title strong {
@@ -2137,7 +2137,7 @@
   }
 
   .clean-set-title {
-    top: 20px;
+    top: 60px;
   }
 
   .clean-simple-stats {
@@ -2804,4 +2804,34 @@
   .case-strip-slot { width: 24px; height: 32px; }
   .stage-case-dock { top: 6px; }
   .discover-options { grid-template-columns: 1fr; }
+}
+
+.case-strip-slot,
+.case-strip-label {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.case-strip-label {
+  border: 0;
+  background: transparent;
+}
+
+.case-strip-slot.is-empty:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #aeb8b2;
+}
+
+button.clean-case-slot {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.clean-case-slot.is-empty:hover {
+  border-color: rgba(255, 255, 255, 0.35);
 }

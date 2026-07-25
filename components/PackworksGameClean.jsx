@@ -550,7 +550,7 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
           <p>{count ? card.flavor : "Not found yet. Keep opening packs to reveal this card."}</p>
           {def && (
             <div className={`clean-detail-effect${def.king || def.prestige ? " is-meta" : ""}`}>
-              <b>{def.king ? `KING / ${KINGS[def.king].name.toUpperCase()}` : def.prestige ? "THE DOOR OUT" : "DISPLAY EFFECT"}</b>
+              <b>{def.king ? KINGS[def.king].name.toUpperCase() : def.prestige ? "THE DOOR OUT" : "DISPLAY EFFECT"}</b>
               <span>{describeCard(card.id)}</span>
             </div>
           )}
@@ -591,18 +591,18 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
   );
 }
 
-function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onRewrite, rewriteArmed }) {
+function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBinder, onRewrite, rewriteArmed }) {
   const rewriteReady = canRewrite(game);
   const inscriptionsPreview = rewriteReady ? getInscriptionsEarned(game) : 0;
   return (
     <aside className="clean-drawer clean-case" aria-label="Display case">
       <header>
-        <div><span>DISPLAY CASE</span><h2>Your engine</h2></div>
+        <div><span>DISPLAY CASE</span><h2>On display</h2></div>
         <button onClick={onClose} aria-label="Close display case">CLOSE</button>
       </header>
       <div className="clean-drawer-scroll">
         <p className="clean-case-note">
-          Displayed cards are your engine — they trigger live while you play.
+          Displayed cards work for you while you play — their effects fire live.
           Editing the case sells your duplicate stack first.
           {" "}{derived.displayedEntries.length}/{derived.caseSlots} slots filled.
         </p>
@@ -620,7 +620,7 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onRewrite
                     <CardArt card={card} compact />
                   </button>
                   <div className="clean-case-slot-copy">
-                    <b>{index === 0 ? "SLOT 1 / " : ""}{card.name}{def?.king ? ` — ${KINGS[def.king].name} King` : ""}</b>
+                    <b>{index === 0 ? "SLOT 1 / " : ""}{card.name}{def?.king ? ` — ${KINGS[def.king].name}` : ""}</b>
                     <span>{describeCard(card.id)}</span>
                     {tally > 0 && <i className="clean-case-ramp">TRIGGERED {formatNumber(tally)} TIMES</i>}
                   </div>
@@ -630,13 +630,19 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onRewrite
             }
             if (index < derived.caseSlots) {
               return (
-                <article className="clean-case-slot is-empty" key={`slot-${index}`}>
+                <button
+                  type="button"
+                  className="clean-case-slot is-empty"
+                  key={`slot-${index}`}
+                  onClick={onOpenBinder}
+                  aria-label={`Empty slot ${index + 1} — open binder`}
+                >
                   <span className="clean-case-empty-mark">+</span>
                   <div className="clean-case-slot-copy">
                     <b>Empty slot {index + 1}</b>
-                    <span>Open the binder and pick a card to display.</span>
+                    <span>Tap to open the binder and pick a card.</span>
                   </div>
-                </article>
+                </button>
               );
             }
             const milestone = derived.caseMilestones[index];
@@ -681,33 +687,46 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onRewrite
   );
 }
 
-function CaseStrip({ game, derived, fx, onOpenCase }) {
+function CaseStrip({ game, derived, fx, onOpenCase, onOpenBinder }) {
   return (
-    <button className="case-strip" onClick={onOpenCase} aria-label="Open display case">
+    <div className="case-strip">
       {Array.from({ length: CASE_SIZE }, (_, index) => {
         const entry = derived.displayedEntries[index];
         if (!entry) {
           const locked = index >= derived.caseSlots;
-          return <span key={index} className={`case-strip-slot ${locked ? "is-locked" : "is-empty"}`}>{locked ? "×" : "+"}</span>;
+          return (
+            <button
+              type="button"
+              key={index}
+              className={`case-strip-slot ${locked ? "is-locked" : "is-empty"}`}
+              onClick={locked ? onOpenCase : onOpenBinder}
+              aria-label={locked ? "Locked slot — open display case" : "Empty slot — open binder"}
+            >
+              {locked ? "×" : "+"}
+            </button>
+          );
         }
         const card = getCard(entry.id);
         const def = getCardDef(entry.id);
         const pulse = fx[entry.id];
         return (
-          <span
+          <button
+            type="button"
             key={index}
             className={`case-strip-slot is-filled rarity-${card.rarity}${def?.king ? " is-king" : ""}${pulse ? ` fx-${pulse.kind}` : ""}`}
             style={{ "--rarity": RARITIES[card.rarity].color }}
             data-fx={pulse ? pulse.serial : undefined}
             title={card.name}
+            onClick={onOpenCase}
+            aria-label={`${card.name} — open display case`}
           >
             <CardArt card={card} compact />
             {def?.king && <i className="case-strip-crown" aria-hidden="true" />}
-          </span>
+          </button>
         );
       })}
-      <span className="case-strip-label">CASE</span>
-    </button>
+      <button type="button" className="case-strip-label" onClick={onOpenCase} aria-label="Open display case">CASE</button>
+    </div>
   );
 }
 
@@ -1390,7 +1409,7 @@ export default function PackworksGameClean() {
         <div className="clean-stage-light" />
         <div className="clean-floor"><i /><i /><i /><i /><i /></div>
         <div className="stage-case-dock">
-          <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
+          <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} onOpenBinder={() => setDrawer("binder")} />
           {Object.keys(game.discoverStack || {}).length > 0 && (
             <div className="discover-stack" aria-label="Pending Discover stacks">
               {Object.entries(game.discoverStack).map(([id, count]) => {
@@ -1484,6 +1503,7 @@ export default function PackworksGameClean() {
           onClose={() => { setRewriteArmed(false); setDrawer(null); }}
           onUndisplay={handleUndisplay}
           onPickCard={setSelectedCard}
+          onOpenBinder={() => setDrawer("binder")}
           onRewrite={handleRewrite}
           rewriteArmed={rewriteArmed}
         />
@@ -1510,7 +1530,7 @@ export default function PackworksGameClean() {
         >
           <div className="opening-haze" />
           <div className="opening-topline">
-            <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
+            <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} onOpenBinder={() => setDrawer("binder")} />
             <small>
               {opening.result.cards.filter((pull) => pull.revealed).length}
               {" / "}

@@ -1519,10 +1519,13 @@ kbd {
 
 .pack-series {
   position: absolute;
-  bottom: 30px;
+  right: 0;
+  bottom: 27px;
+  left: 0;
   color: color-mix(in srgb, var(--pack-a) 70%, white);
   font: 800 7px/1 Consolas, monospace;
   letter-spacing: 0.14em;
+  text-align: center;
 }
 
 .pack-face > strong {
@@ -1572,9 +1575,14 @@ kbd {
 }
 
 .pack-count {
+  position: absolute;
+  right: 0;
+  bottom: 41px;
+  left: 0;
   color: rgba(255, 255, 255, 0.64);
   font: 700 7px/1 Consolas, monospace;
   letter-spacing: 0.12em;
+  text-align: center;
 }
 
 .pack-crimp {
@@ -4397,4 +4405,9 @@ kbd {
       rotate(var(--mobile-r))
       scale(0.88);
   }
+}
+
+.pack-face.small .pack-count,
+.pack-face.small .pack-series {
+  display: none;
 }
