@@ -199,7 +199,7 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await expect(stockRow("Abyssal Bloom")).toContainText("Finish Gilded Frontier 0/12");
   await expect(stockRow("Crownfall")).toContainText("Finish Abyssal Bloom 0/12");
   await expect(stockRow("Unwritten")).toContainText("Finish Last Light 0/12");
-  await expect(stockRow("Unwritten")).toContainText("Nameless chase");
+  await expect(stockRow("Unwritten")).not.toContainText("chase");
   await expect(page.getByText("Booster box")).toHaveCount(0);
   await expect(page.getByText("THREE SIMPLE TRACKS")).toHaveCount(0);
   await expect(page.locator(".clean-upgrades")).toContainText("Open 5 more packs");
@@ -225,7 +225,7 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await page.screenshot({ path: "test-results/clean-shop.png" });
 });
 
-test("the empty mobile table points to Shop without covering the pack label", async ({ page }) => {
+test("the empty table shows no shop cue overlay, only the pack label", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
   state.sealed.corner.loose = 0;
@@ -234,26 +234,38 @@ test("the empty mobile table points to Shop without covering the pack label", as
   await seedState(page, state);
   await page.goto("/");
 
-  const cue = page.locator(".clean-shop-cue");
-  const shop = page.getByRole("button", { name: "SHOP", exact: true });
-  const openCopy = page.locator(".clean-open-copy");
-  await expect(cue).toBeVisible();
-  await expect(cue).toContainText("PACKS IN SHOP");
+  await expect(page.locator(".clean-open-copy")).toContainText("PACKS AVAILABLE IN SHOP");
+  await expect(page.locator(".clean-shop-cue")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Buy .* pack/i })).toHaveCount(0);
 
-  const [cueBox, shopBox, openBox] = await Promise.all([
-    cue.boundingBox(),
-    shop.boundingBox(),
-    openCopy.boundingBox(),
-  ]);
-  expect(Math.abs((cueBox.x + cueBox.width / 2) - (shopBox.x + shopBox.width / 2))).toBeLessThan(8);
-  expect(cueBox.y + cueBox.height).toBeLessThan(openBox.y);
-  expect(await cue.locator("i").evaluate((node) => getComputedStyle(node).animationName))
-    .toContain("clean-shop-cue-arrow");
-
-  await page.screenshot({ path: "test-results/clean-mobile-shop-cue.png" });
-  await shop.click();
+  await page.screenshot({ path: "test-results/clean-mobile-no-shop-cue.png" });
+  await page.getByRole("button", { name: "SHOP", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Pack shop" })).toBeVisible();
+});
+
+test("clicking an undiscovered card shows its rarity without spoiling the card", async ({ page }) => {
+  const state = createInitialState(Date.now());
+  state.settings.sound = false;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Missing card 1, show rarity" }).first().click();
+  const detail = page.locator(".clean-card-detail");
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText("Card 01");
+  await expect(detail).toContainText("Common");
+  await expect(detail).toContainText("~45%");
+  await expect(detail).not.toContainText("Alley Sprout");
+  await expect(detail.locator(".clean-detail-art.is-missing")).toBeVisible();
+  await page.screenshot({ path: "test-results/clean-undiscovered-rarity.png" });
+  await detail.getByRole("button", { name: "CLOSE" }).click();
+  await expect(detail).toHaveCount(0);
+
+  await page.getByRole("button", { name: "BINDER", exact: true }).click();
+  await page.locator(".clean-binder-grid > button.missing").last().click();
+  await expect(page.locator(".clean-card-detail")).toContainText("Card 12");
+  await expect(page.locator(".clean-card-detail .clean-detail-art.is-missing")).toBeVisible();
 });
 
 test("holding a shop pack price rapidly buys that selected set and stops on release", async ({ page }) => {

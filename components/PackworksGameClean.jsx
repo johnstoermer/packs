@@ -360,9 +360,6 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
             const price = getPackPrice(game, "loose", set.id);
             const owned = getProductCount(game, set.id, "loose");
             const found = set.cards.filter((card) => game.collection[card.id]).length;
-            const chase = set.cards.reduce((highest, card) => (
-              RARITIES[card.rarity].order > RARITIES[highest].order ? card.rarity : highest
-            ), "common");
             const unmet = status.requirements.filter((requirement) => !requirement.met);
             return (
               <article
@@ -380,8 +377,8 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
                   <h3>{set.name}</h3>
                   <p>
                     {unlocked
-                      ? `${found}/12 found / ${RARITIES[chase].label} chase${set.id === game.activeSet ? " / selected" : ""}`
-                      : `${unmet.map((requirement) => `${requirement.label} ${requirement.current}/${requirement.target}`).join(" / ")} / ${RARITIES[chase].label} chase`}
+                      ? `${found}/12 found${set.id === game.activeSet ? " / selected" : ""}`
+                      : unmet.map((requirement) => `${requirement.label} ${requirement.current}/${requirement.target}`).join(" / ")}
                   </p>
                 </button>
                 <span className="clean-owned">{owned ? `${owned} owned` : ""}</span>
@@ -493,10 +490,9 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard }) {
             <button
               key={card.id}
               className={`${count ? "found" : "missing"} rarity-${rarityId}`}
-              disabled={!count}
-              onClick={() => count && onCard(card.id)}
+              onClick={() => onCard(card.id)}
               style={{ "--rarity": rarity.color }}
-              aria-label={count ? `${card.name}, ${count} copies` : `Missing card ${card.number}`}
+              aria-label={count ? `${card.name}, ${count} copies` : `Missing card ${card.number}, show rarity`}
             >
               {count ? <CardArt card={card} compact /> : <span className="clean-missing-card">PW</span>}
               <span className="clean-binder-card-copy">
@@ -522,16 +518,29 @@ function CardDetail({ game, cardId, onClose }) {
     <div className="clean-modal-scrim" onMouseDown={onClose}>
       <article className={`clean-card-detail rarity-${rarityId}`} onMouseDown={(event) => event.stopPropagation()} style={{ "--rarity": rarity.color }}>
         <button onClick={onClose}>CLOSE</button>
-        <div className="clean-detail-art"><CardArt card={card} /></div>
+        <div className={`clean-detail-art${count ? "" : " is-missing"}`}>
+          {count ? <CardArt card={card} /> : <span aria-hidden="true">PW</span>}
+        </div>
         <div className="clean-detail-copy">
           <span style={{ color: rarity.color }}>{rarity.label} / {rarity.rateLabel} BASE PULL</span>
-          <h2>{card.name}</h2>
-          <p>{card.flavor}</p>
-          <dl>
-            <div><dt>COPIES</dt><dd>{count}</dd></div>
-            <div><dt>EACH EXTRA</dt><dd>{money(duplicateValue)}</dd></div>
-          </dl>
-          <small>Selling duplicates always keeps one copy. This card is permanently {rarity.label}.</small>
+          <h2>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</h2>
+          <p>{count ? card.flavor : "Not found yet. Keep opening packs to reveal this card."}</p>
+          {count ? (
+            <dl>
+              <div><dt>COPIES</dt><dd>{count}</dd></div>
+              <div><dt>EACH EXTRA</dt><dd>{money(duplicateValue)}</dd></div>
+            </dl>
+          ) : (
+            <dl>
+              <div><dt>RARITY</dt><dd style={{ color: rarity.color }}>{rarity.label}</dd></div>
+              <div><dt>BASE PULL</dt><dd>{rarity.rateLabel}</dd></div>
+            </dl>
+          )}
+          {count ? (
+            <small>Selling duplicates always keeps one copy. This card is permanently {rarity.label}.</small>
+          ) : (
+            <small>This card is permanently {rarity.label}. Its art and name stay hidden until you pull it.</small>
+          )}
         </div>
       </article>
     </div>
@@ -552,10 +561,9 @@ function SetTray({ game, set, onCard }) {
             <button
               key={card.id}
               className={`${count ? "found" : "missing"} rarity-${rarityId}`}
-              disabled={!count}
-              onClick={() => count && onCard(card.id)}
+              onClick={() => onCard(card.id)}
               style={{ "--rarity": rarity.color }}
-              aria-label={count ? `${card.name}, ${rarity.label}` : `Missing card ${card.number}`}
+              aria-label={count ? `${card.name}, ${rarity.label}` : `Missing card ${card.number}, show rarity`}
             >
               {count ? <CardArt card={card} compact /> : <span>PW</span>}
             </button>
@@ -1125,14 +1133,6 @@ export default function PackworksGameClean() {
             BREAK {breakableProduct.label.toUpperCase()}
             <span>{breakableProduct.packs} PACKS</span>
           </button>
-        )}
-
-        {!loosePacks && !breakableProduct && (
-          <div className="clean-shop-cue" aria-label="Packs are available from the Shop tab">
-            <i aria-hidden="true" />
-            <strong>PACKS IN SHOP</strong>
-            <span>USE THE SHOP TAB ABOVE</span>
-          </div>
         )}
 
         <button
