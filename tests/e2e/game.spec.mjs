@@ -134,7 +134,7 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
 });
 
 test("the clean table remains usable inside the compact game frame", async ({ page }) => {
-  await page.setViewportSize({ width: 820, height: 560 });
+  await page.setViewportSize({ width: 800, height: 450 });
   const state = createInitialState(Date.now());
   state.packsOpened = 3;
   state.collection = { "corner-01": 2, "corner-02": 1, "corner-06": 1 };
@@ -146,7 +146,7 @@ test("the clean table remains usable inside the compact game frame", async ({ pa
   await expect(page.locator(".clean-simple-stats")).toBeVisible();
   const packBounds = await page.locator(".clean-pack-clicker").boundingBox();
   expect(packBounds.x).toBeGreaterThanOrEqual(0);
-  expect(packBounds.x + packBounds.width).toBeLessThanOrEqual(820);
-  expect(packBounds.y + packBounds.height).toBeLessThanOrEqual(560);
+  expect(packBounds.x + packBounds.width).toBeLessThanOrEqual(800);
+  expect(packBounds.y + packBounds.height).toBeLessThanOrEqual(450);
   await page.screenshot({ path: "test-results/clean-compact.png" });
 });
