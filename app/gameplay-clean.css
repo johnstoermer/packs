@@ -2719,77 +2719,207 @@
 
 /* --- Discover ------------------------------------------------------------- */
 
-.discover-modal {
+.discover-scrim {
+  background: rgba(4, 7, 6, 0.78);
+}
+
+.discover-stage {
   display: flex;
-  width: min(520px, 94vw);
   flex-direction: column;
-  gap: 10px;
-  padding: 22px;
-  border: 1px solid #7a5f96;
-  border-radius: 4px;
-  background: #ebe7dc;
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
-  color: #17201d;
+  align-items: center;
+  gap: 18px;
+  max-width: 96vw;
 }
 
-.discover-modal > b {
-  color: #4a3564;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+.discover-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
 }
 
-.discover-modal > p {
+.discover-head b {
+  color: #d3a341;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.22em;
+  text-shadow: 0 0 18px rgba(211, 163, 65, 0.45);
+}
+
+.discover-head p {
   margin: 0;
-  color: #5d6763;
+  color: #97a19b;
   font-size: 11px;
   line-height: 1.4;
 }
 
-.discover-options {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.discover-options button {
+.discover-fan {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 8px 6px;
+}
+
+.discover-card {
+  --card-tint: #d3a341;
+  position: relative;
+  display: flex;
+  width: clamp(128px, 17vw, 168px);
+  aspect-ratio: 5 / 7;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 10px;
-  border: 1px solid rgba(74, 53, 100, 0.4);
-  background: rgba(255, 255, 255, 0.55);
+  gap: 8px;
+  padding: 11px 12px 10px;
+  margin: 0 -10px;
+  border: 1px solid color-mix(in srgb, var(--card-tint) 55%, #2c332f);
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 50% 24%, color-mix(in srgb, var(--card-tint) 26%, transparent), transparent 62%),
+    linear-gradient(168deg, #1c2421, #101614 58%, #151d1a);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.04),
+    inset 0 0 26px rgba(0, 0, 0, 0.5),
+    0 16px 34px rgba(0, 0, 0, 0.55);
+  color: #e8e4d8;
   cursor: pointer;
-  text-align: left;
+  text-align: center;
+  transform: translateY(calc(var(--spread) * var(--spread) * 7px)) rotate(calc(var(--spread) * 5deg));
+  transform-origin: 50% 118%;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  animation: discover-deal 0.5s cubic-bezier(0.2, 1.15, 0.35, 1) both;
+  animation-delay: var(--deal, 0ms);
 }
 
-.discover-options button:hover {
-  border-color: #7a5f96;
-  background: #fff;
-  transform: translateY(-2px);
+.discover-card:hover,
+.discover-card:focus-visible {
+  z-index: 2;
+  border-color: var(--card-tint);
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--card-tint) 26%, transparent),
+    0 22px 44px rgba(0, 0, 0, 0.65),
+    0 0 26px color-mix(in srgb, var(--card-tint) 38%, transparent);
+  outline: none;
+  transform: translateY(calc(var(--spread) * var(--spread) * 7px - 16px)) rotate(calc(var(--spread) * 2deg)) scale(1.05);
 }
 
-.discover-options strong {
-  color: #4a3564;
-  font-size: 11px;
+@keyframes discover-deal {
+  from {
+    opacity: 0;
+    transform: translateY(70px) rotate(calc(var(--spread) * 10deg)) scale(0.82);
+  }
+}
+
+.discover-card-head {
+  display: flex;
+  justify-content: space-between;
+  color: color-mix(in srgb, var(--card-tint) 72%, #b9c0ba);
+  font-size: 6.5px;
   font-weight: 800;
+  letter-spacing: 0.16em;
 }
 
-.discover-options span {
-  color: #5d6763;
+.discover-card-glyph {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  margin: 8px auto 2px;
+}
+
+.discover-card-glyph i {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--card-tint);
+  opacity: 0.9;
+}
+
+.option-insight { --card-tint: #ffd15c; }
+.option-insight .discover-card-glyph i { border-radius: 2px; transform: rotate(45deg) scale(0.72); }
+.option-insight .discover-card-glyph i:nth-child(2) { transform: rotate(45deg) scale(0.44); background: color-mix(in srgb, var(--card-tint) 35%, transparent); }
+.option-insight .discover-card-glyph i:nth-child(3) { transform: rotate(45deg) scale(1); opacity: 0.35; }
+
+.option-resonance { --card-tint: #62cf86; }
+.option-resonance .discover-card-glyph i { border-radius: 50%; transform: scale(0.42); }
+.option-resonance .discover-card-glyph i:nth-child(2) { transform: scale(0.72); opacity: 0.6; }
+.option-resonance .discover-card-glyph i:nth-child(3) { transform: scale(1); opacity: 0.3; }
+
+.option-catalyst { --card-tint: #b475ff; }
+.option-catalyst .discover-card-glyph i { clip-path: polygon(50% 0, 100% 100%, 0 100%); border: 0; background: color-mix(in srgb, var(--card-tint) 75%, transparent); transform: scale(0.6) translateY(-16%); }
+.option-catalyst .discover-card-glyph i:nth-child(2) { transform: scale(0.6) translateY(18%) rotate(180deg); opacity: 0.55; }
+.option-catalyst .discover-card-glyph i:nth-child(3) { transform: scale(1.02); background: none; border: 2px solid var(--card-tint); opacity: 0.3; border-radius: 50%; clip-path: none; }
+
+.option-reflection { --card-tint: #8cc9ff; }
+.option-reflection .discover-card-glyph i { clip-path: polygon(0 0, 100% 0, 50% 100%); border: 0; background: color-mix(in srgb, var(--card-tint) 70%, transparent); transform: scale(0.52) translateX(-34%); }
+.option-reflection .discover-card-glyph i:nth-child(2) { transform: scale(0.52) translateX(34%) rotate(180deg); opacity: 0.6; }
+.option-reflection .discover-card-glyph i:nth-child(3) { clip-path: none; background: none; border-left: 2px solid var(--card-tint); width: 0; left: 50%; opacity: 0.5; }
+
+.option-acceleration { --card-tint: #ff934d; }
+.option-acceleration .discover-card-glyph i { clip-path: polygon(0 0, 60% 50%, 0 100%); border: 0; background: color-mix(in srgb, var(--card-tint) 80%, transparent); transform: scale(0.62) translateX(-26%); }
+.option-acceleration .discover-card-glyph i:nth-child(2) { transform: scale(0.62) translateX(8%); opacity: 0.65; }
+.option-acceleration .discover-card-glyph i:nth-child(3) { transform: scale(0.62) translateX(42%); opacity: 0.35; }
+
+.discover-card > strong {
+  color: color-mix(in srgb, var(--card-tint) 80%, #f2eee2);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.discover-card-text {
+  flex: 1;
+  color: #a7b0aa;
   font-size: 9px;
-  line-height: 1.35;
+  line-height: 1.45;
+}
+
+.discover-card-foot {
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  color: color-mix(in srgb, var(--card-tint) 60%, #7d8680);
+  font-size: 6.5px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.discover-card:hover .discover-card-foot,
+.discover-card:focus-visible .discover-card-foot {
+  opacity: 1;
 }
 
 .discover-skip {
-  align-self: flex-end;
-  padding: 7px 10px;
-  border: 1px solid rgba(21, 33, 29, 0.25);
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   background: none;
   color: #7d8680;
   cursor: pointer;
   font-size: 8px;
   font-weight: 750;
+  letter-spacing: 0.14em;
+}
+
+.discover-skip:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #b9c0ba;
+}
+
+@media (max-width: 620px) {
+  .discover-card {
+    width: clamp(96px, 27vw, 128px);
+    margin: 0 -14px;
+    padding: 9px 9px 8px;
+  }
+
+  .discover-card-text {
+    font-size: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-card {
+    animation: none;
+  }
 }
 
 .discover-stack {

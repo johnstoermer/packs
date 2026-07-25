@@ -1758,29 +1758,41 @@ export default function PackworksGameClean() {
       )}
 
       {game.discoverOffer && (
-        <div className="clean-modal-scrim">
-          <article className="discover-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <b>DISCOVER</b>
-            <p>Choose one. Choices stack, and the stack spends on the next matching moment.</p>
-            <div className="discover-options">
-              {game.discoverOffer.map((id) => {
+        <div className="clean-modal-scrim discover-scrim">
+          <div className="discover-stage" onMouseDown={(event) => event.stopPropagation()}>
+            <header className="discover-head">
+              <b>DISCOVER</b>
+              <p>Pick a card. Picks stack, and the stack spends on the next matching moment.</p>
+            </header>
+            <div className={`discover-fan count-${game.discoverOffer.length}`}>
+              {game.discoverOffer.map((id, index) => {
                 const option = DISCOVER_POOL.find((candidate) => candidate.id === id);
+                const spread = index - (game.discoverOffer.length - 1) / 2;
                 return (
                   <button
                     key={id}
+                    type="button"
+                    className={`discover-card option-${id}`}
+                    style={{ "--spread": spread, "--deal": `${index * 95}ms` }}
                     onClick={() => {
                       commit(chooseDiscoverOption(gameRef.current, id));
                       getAudio().sound("switch");
                     }}
                   >
+                    <span className="discover-card-head">
+                      <span>DISCOVER</span>
+                      <b>{"I".repeat(index + 1)}</b>
+                    </span>
+                    <span className="discover-card-glyph" aria-hidden="true"><i /><i /><i /></span>
                     <strong>{option?.name}</strong>
-                    <span>{option?.text}</span>
+                    <span className="discover-card-text">{option?.text}</span>
+                    <span className="discover-card-foot">TAKE THIS</span>
                   </button>
                 );
               })}
             </div>
             <button className="discover-skip" onClick={() => commit(dismissDiscoverOffer(gameRef.current))}>SKIP</button>
-          </article>
+          </div>
         </div>
       )}
 
