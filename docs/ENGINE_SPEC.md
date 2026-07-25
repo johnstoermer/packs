@@ -135,6 +135,13 @@ Uniqueness rules (enforced by tests/engine.test.mjs):
   restatement, a late capper). Everything else gets a one-of-a-kind effect.
 - When adding a card, prefer inventing a new trigger, payoff, or knob over
   re-numbering an existing template.
+- No economy sticks: displayed cards never modify duplicate sale value or
+  product prices — those belong to the three shop upgrades (and the rejected
+  Broker direction stays rejected). Engine coins always flow through a
+  visible trigger.
+- Supports keep nudge language even when powerful: "prefer", "more likely",
+  "N% chance" — a support never says "always", "never", or "guaranteed".
+  Absolutes are reserved for Kings and capstones, which define rules.
 
 ## UI scaling
 

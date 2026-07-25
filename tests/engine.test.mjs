@@ -309,3 +309,19 @@ test("template families stay small: numbers-stripped text repeats at most 3 time
   }
   assert.ok(inFamilies <= 90, `${inFamilies} cards share templates (want <= 90)`);
 });
+
+test("supports keep nudge language and never touch sale value or prices", () => {
+  for (const card of ALL_CARDS) {
+    const def = getCardDef(card.id);
+    if (def?.king || def?.capstone || def?.prestige) continue;
+    const text = describeCard(card.id);
+    assert.ok(
+      !/\b(always|never|guaranteed)\b/i.test(text),
+      `support uses absolute language: ${card.id}: "${text}"`,
+    );
+    assert.ok(
+      !/sell for \d+% more|cost \d+% less|sale is worth \d+% more/i.test(text),
+      `support is an economy stick (rejected Broker direction): ${card.id}: "${text}"`,
+    );
+  }
+});
