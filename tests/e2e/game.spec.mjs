@@ -274,7 +274,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
   await page.locator(".clean-binder-grid > button.missing").last().click();
   await expect(page.locator(".clean-card-detail")).toContainText("Card 12");
-  await expect(page.locator(".clean-card-detail")).toContainText("DISPLAY EFFECT");
+  await expect(page.locator(".clean-card-detail .clean-detail-effect")).toBeVisible();
   await expect(page.locator(".clean-card-detail .clean-detail-art.is-missing")).toBeVisible();
 });
 
@@ -287,17 +287,18 @@ test("the display case holds cards whose unique effects augment the game", async
   await seedState(page, state);
   await page.goto("/");
 
-  await expect(page.locator(".clean-wallet")).toContainText("+1 PER SECOND");
+  await expect(page.locator(".case-strip").first()).toBeVisible();
 
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
   await page.getByRole("button", { name: "Pavement Pigeon, 2 copies" }).click();
   const detail = page.locator(".clean-card-detail");
   await expect(detail).toContainText("DISPLAY EFFECT");
-  await expect(detail).toContainText("+1/s cash while displayed");
+  await expect(detail).toContainText("When you reveal a Common");
   await detail.getByRole("button", { name: "DISPLAY IN CASE" }).click();
   await expect(detail.getByRole("button", { name: "UNSEAT FROM CASE" })).toBeVisible();
   await detail.getByRole("button", { name: "CLOSE" }).click();
   await expect(page.locator(".clean-binder-grid")).toContainText("ON DISPLAY");
+  await expect(page.locator(".case-strip-slot.is-filled").first()).toBeVisible();
 
   await page.getByRole("button", { name: /^CASE/ }).click();
   const caseDrawer = page.locator(".clean-case");
@@ -306,12 +307,10 @@ test("the display case holds cards whose unique effects augment the game", async
   await expect(caseDrawer).toContainText("1/1 slots filled");
   await expect(caseDrawer.locator(".clean-case-slot.is-locked")).toHaveCount(5);
   await expect(caseDrawer).toContainText("Rewrite");
-  await expect(page.locator(".clean-wallet")).toContainText("+2 PER SECOND");
   await page.screenshot({ path: "test-results/clean-display-case.png" });
 
   await caseDrawer.getByRole("button", { name: "UNSEAT" }).click();
   await expect(caseDrawer).toContainText("0/1 slots filled");
-  await expect(page.locator(".clean-wallet")).toContainText("+1 PER SECOND");
 });
 
 test("holding a shop pack price rapidly buys that selected set and stops on release", async ({ page }) => {

@@ -22,6 +22,7 @@ import {
   getUpgradeCost,
   hydrateState,
   openPack,
+  revealPackCard,
   sellDuplicates,
   tickEconomy,
 } from "../lib/gameLogic.js";
@@ -29,6 +30,21 @@ import { ALL_CARDS, PACK_PRODUCTS, RARITIES, SETS, getCard } from "../lib/gameDa
 
 function clone(value) {
   return structuredClone(value);
+}
+
+
+function openAndRevealAll(state, options) {
+  const opened = openPack(state, options);
+  if (!opened.result) return opened;
+  let working = opened.state;
+  let cards = opened.result.cards;
+  for (let index = 0; index < cards.length; index += 1) {
+    if (cards[index].revealed || cards[index].fusedAway) continue;
+    const step = revealPackCard(working, cards, index, { manual: options?.manual !== false, rng: options?.rng });
+    working = step.state;
+    cards = step.cards;
+  }
+  return { state: working, result: { ...opened.result, cards }, error: null };
 }
 
 test("a new game starts with three packs and no cards", () => {
@@ -61,15 +77,19 @@ test("supplier terms reduce purchase cost", () => {
   assert.equal(Number.isInteger(getPackPrice(state, "loose")), true);
 });
 
-test("opening consumes one pack, files six cards, and grants no direct cash", () => {
+test("opening consumes one pack; cards file into the binder as they are revealed", () => {
   const state = { ...createInitialState(1), coins: 17 };
   const opened = openPack(state, { manual: true, now: 2_000, rng: () => 0.99 });
   assert.equal(opened.error, null);
   assert.equal(opened.result.cards.length, 6);
-  assert.equal(opened.state.cardsPulled, 6);
+  assert.equal(opened.state.cardsPulled, 0);
+  assert.equal(Object.keys(opened.state.collection).length, 0);
   assert.equal(getProductCount(opened.state, "corner", "loose"), 2);
-  assert.equal(opened.state.coins, 17);
-  assert.ok(Object.keys(opened.state.collection).length > 0);
+
+  const revealed = openAndRevealAll(state, { manual: true, now: 2_000, rng: () => 0.99 });
+  assert.equal(revealed.state.cardsPulled, 6);
+  assert.equal(revealed.state.coins, 17);
+  assert.ok(Object.keys(revealed.state.collection).length > 0);
 });
 
 test("cash income is a flat one per second and the binder pays nothing", () => {
@@ -168,14 +188,14 @@ test("every card keeps its authored rarity in pulls and migrated saves", () => {
   const migrated = hydrateState(state, 2);
   assert.equal(migrated.bestRarities["corner-02"], "common");
 
-  const highRoll = openPack(migrated, { manual: true, free: true, now: 2_000, rng: () => 0 });
+  const highRoll = openAndRevealAll(migrated, { manual: true, free: true, now: 2_000, rng: () => 0 });
   assert.ok(highRoll.result.cards.every((pull) => pull.rarity === pull.card.rarity));
   assert.ok(highRoll.result.cards.every((pull) => pull.rarity === "legendary"));
   assert.ok(!Object.values(highRoll.state.bestRarities).includes("nameless"));
 
   const rolls = [0.99, 0.21, 0.99, 0.99, 0.99, 0.99];
   let rollIndex = 0;
-  const commonRoll = openPack(createInitialState(1), {
+  const commonRoll = openAndRevealAll(createInitialState(1), {
     manual: true,
     free: true,
     now: 2_000,
@@ -199,7 +219,7 @@ test("manual opening retains a measured rate cap", () => {
 test("rarity signals may bluff without changing the printed pull", () => {
   const state = createInitialState(1);
   const result = openPack(state, { manual: true, free: true, rng: () => 0.01 }).result;
-  assert.ok(result.falseSignals > 0);
+  assert.ok(result.cards.some((pull) => pull.falseSignal));
   assert.ok(result.cards.some((pull) => RARITIES[pull.signalRarity].order > RARITIES[pull.rarity].order));
 });
 

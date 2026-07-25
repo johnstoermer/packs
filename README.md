@@ -7,10 +7,19 @@ PACKWORKS is a clean incremental game about opening card packs, improving a coll
 1. Open a six-card pack.
 2. Hover each card for a rarity signal, then click through it or hold Space.
 3. Earn cash every second and sell every extra copy with one button.
-4. Display up to six cards in the case; every card in the game has a unique effect that augments the shop.
+4. Build an engine in the display case: Kings introduce verbs, supports tune them.
 5. Spend cash on packs from newly unlocked sets or one of three upgrades.
 
 The display case is the core progression engine. There are no duel, filing-rule, contract, or beat dashboards.
+
+## The verb engine
+
+- The chase card of each of the first twelve sets is a **King**. Displaying a King switches on a verb: Common Echo, Mark, Salvage, Mimic, Rare Echo, Fusion, Transmute, Fracture, Catalyst, Blueprint, Relay, or Autopilot.
+- Every other card is a **support** that modifies a verb or pays out on a trigger (reveals, duplicate sales, pack opens, coin or pack thresholds). Supports that reference a verb are inert until its King is displayed.
+- Late sets carry **capstones** — cross-engine cards that bridge two verbs at once.
+- **Discover** is the universal support mechanic: qualifying triggers offer a choice of three boons (Insight, Resonance, Catalyst, Reflection, Acceleration); picks stack until an event consumes them.
+- **Salvage** converts duplicate sales into Mystery Packs that inject extra cards into the current reveal.
+- Automation runs on coin and pack **thresholds** (watermarks), never timers: displayed cards fire when totals cross their lines, including while idle.
 
 ## Progression
 
@@ -21,11 +30,13 @@ The display case is the core progression engine. There are no duel, filing-rule,
 - Inspection lamps improve premium-card weight.
 - Supplier terms reduce the purchase price of packs.
 - Booster boxes do not exist. Cases remain a late bulk option.
-- There are 20 sets and 240 unique cards, and every card carries a unique display effect.
-- The display case holds up to six cards; slots unlock through milestones, and displayed effects (income, discounts, odds, god packs, extra cards, automation, interest, amplification) drive the run.
+- There are 20 sets and 240 unique cards; each is a King, a support, a capstone, or the prestige door, with player-facing rules text.
+- The display case holds up to six cards; slots unlock through milestones, and the displayed Kings-plus-supports engine drives the run. Editing the case first sells that card's duplicate stack — displaying is a commitment.
 - Sets unlock along a branching print tree: finishing Neon Circuit opens Gilded Frontier, Abyssal Bloom, and Crownfall at once; most mid-game sets open from either of two parents; Sunken Signal opens only through Nocturne Harbor; Unwritten requires completing every other set.
 - Each later set introduces permanently higher-rarity chase cards, culminating in the sole Nameless card in set 20.
-- Owning What Was Never Named unlocks the Rewrite: a prestige reset that grants permanent Inscriptions, shaped by meta cards scattered throughout the sets.
+- Owning What Was Never Named unlocks the Rewrite: a prestige reset that grants permanent Inscriptions (+25% income and sale value each, doubled if the Nameless is displayed when you Rewrite).
+
+The full engine design — verbs, triggers, pipeline order, animation language, and rejected directions — lives in `docs/ENGINE_SPEC.md`.
 
 Cases are inventory bundles that the player can break into loose packs. Packs have no resale value or appreciation system. Only `openPack` can increase a collection count.
 

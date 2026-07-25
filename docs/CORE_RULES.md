@@ -4,13 +4,13 @@ Use this checklist for every reward path and system change.
 
 ## The pack is the only door
 
-- Only `openPack` may increase a binder collection count.
+- Only `openPack` may put cards in front of the player, and a card joins the binder at the moment it is revealed — never at open time.
 - Purchases and product breaks only change pack inventory.
 - The binder never produces cash on its own.
-- Passive income is the flat 1 cash per second, augmented only by displayed card effects, Inscriptions, and interest effects; balances and prices never use fractional cash.
+- Passive income is the flat 1 cash per second times the Inscription multiplier; every other coin comes from a displayed engine trigger. Balances and prices never use fractional cash.
 - Selling duplicates keeps one best printing of every card.
 - Upgrades only modify duplicate sale value, rarity weight, or purchase price. Everything else flows from the display case.
-- Offline progress only adds time-based cash (scaled by displayed offline effects).
+- Offline progress only adds time-based cash; threshold cards catch up from their watermarks when the totals are next evaluated.
 - Tutorials, fixes, and future event compensation must use packs or cash.
 
 ## Pack inventory stays simple
@@ -29,16 +29,19 @@ Use this checklist for every reward path and system change.
 - Higher rarity printings upgrade the kept binder copy.
 - Hover signals may bluff; the printed card is authoritative.
 - Heat, grade, and anomaly detection remain properties of a witnessed opening.
-- Automated opening exists only through displayed auto-open effects, opens table stock at the display case's pace, and never opens a queued god pack.
+- Extra product arrives only as Mystery Packs from the Salvage verb, and their cards merge additively into the reveal in progress — new information never invalidates what is already shown.
 
 ## The display case is the engine
 
-- Up to six owned cards can be displayed; slots unlock through milestones.
-- Every one of the 240 cards has a unique display effect; rarer cards in a school carry strictly stronger effects.
-- Verdant-style ramp effects grow to full power over 30 minutes on display and reset when unseated.
-- God packs are only created by displayed god-pack effects: the next pack's floor jumps to the set's top three tiers with one guaranteed chase-tier pull.
-- Meta cards are scattered across sets and tiers; they only shape the Rewrite loop.
-- The Rewrite (prestige) opens only by owning What Was Never Named. It resets binder, cash, and shop; Inscriptions persist and multiply income and duplicate sales by +25% each.
+- Up to six owned cards can be displayed; slots unlock through milestones. Slot 1 is always open.
+- Kings introduce verbs; supports modify them; a support that references a verb is inert until its King is displayed. The chase card of each of the first twelve sets is a King; late sets carry cross-engine capstones.
+- Discover is the universal support mechanic: three options drawn from a five-boon pool, picks stack, the next qualifying event consumes the stack. Autopilot picks automatically and enhances automatic picks.
+- Automation is thresholds, never timers: displayed cards watch coin and pack watermarks and fire when totals cross them, online or idle.
+- Editing the case sells that card's duplicate stack first — displaying is a commitment.
+- Every engine trigger animates; nothing fires silently. Card text is player-facing rules text, never internal jargon.
+- The Rewrite (prestige) opens only by owning What Was Never Named. It resets binder, cash, and shop; Inscriptions persist and multiply income and duplicate sales by +25% each, and Rewriting with the Nameless displayed doubles the Inscriptions earned.
+
+The full verb list, pipeline order, and rejected directions live in `docs/ENGINE_SPEC.md`.
 
 ## Review commands
 
