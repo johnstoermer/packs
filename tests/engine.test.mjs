@@ -336,7 +336,7 @@ test("supports keep nudge language and never touch sale value or prices", () => 
 });
 
 test("admin sandbox unlocks everything and never leaks into real saves", async () => {
-  const { ADMIN_SAVE_KEY, SAVE_KEY, createAdminState, openPack, serializeState } = await import("../lib/gameLogic.js");
+  const { ADMIN_SAVE_KEY, SAVE_KEY, applyAdminGuarantees, createAdminState, openPack, serializeState } = await import("../lib/gameLogic.js");
   const { getCaseSlots } = await import("../lib/engineCards.js");
   assert.notEqual(ADMIN_SAVE_KEY, SAVE_KEY);
 
@@ -360,6 +360,16 @@ test("admin sandbox unlocks everything and never leaks into real saves", async (
   // can never impersonate a real save.
   const roundTrip = hydrateState(JSON.parse(serializeState(admin)), 2000);
   assert.equal(roundTrip.adminMode, false);
+
+  // A stale sandbox from an older build heals on load: guarantees are
+  // re-applied, so missing cards and spent-down coins come back.
+  const stale = hydrateState(JSON.parse(serializeState({ ...createInitialState(5), coins: 12 })), 10);
+  const healed = applyAdminGuarantees(stale);
+  assert.equal(healed.adminMode, true);
+  assert.equal(Object.keys(healed.collection).length, ALL_CARDS.length);
+  assert.ok(ALL_CARDS.every((card) => healed.collection[card.id] >= 1));
+  assert.ok(healed.coins >= 1e15);
+  assert.equal(healed.unlockedSets.length, SETS.length);
 });
 
 test("audit: markSpread dial is live — revealed Marks spread more with it displayed", () => {

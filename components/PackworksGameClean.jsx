@@ -15,6 +15,7 @@ import {
   ADMIN_FLAG_KEY,
   ADMIN_SAVE_KEY,
   SAVE_KEY,
+  applyAdminGuarantees,
   applyOfflineProgress,
   createAdminState,
   breakProduct,
@@ -885,7 +886,7 @@ export default function PackworksGameClean() {
         sandbox = null;
       }
       const adminState = sandbox
-        ? { ...hydrateState(sandbox, Date.now()), adminMode: true }
+        ? applyAdminGuarantees(hydrateState(sandbox, Date.now()))
         : createAdminState(Date.now());
       adminActiveRef.current = true;
       setAdminActive(true);
@@ -1006,7 +1007,7 @@ export default function PackworksGameClean() {
           sandbox = null;
         }
         const adminState = sandbox
-          ? { ...hydrateState(sandbox, Date.now()), adminMode: true }
+          ? applyAdminGuarantees(hydrateState(sandbox, Date.now()))
           : createAdminState(Date.now());
         adminActiveRef.current = true;
         setAdminActive(true);
