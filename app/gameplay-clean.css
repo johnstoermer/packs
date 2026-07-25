@@ -2835,3 +2835,54 @@ button.clean-case-slot {
 button.clean-case-slot.is-empty:hover {
   border-color: rgba(255, 255, 255, 0.35);
 }
+
+/* Echo replay: the revealed card visibly re-fires once per Echo. */
+.reveal-echo {
+  position: absolute;
+  z-index: 7;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.reveal-echo-flash {
+  position: absolute;
+  inset: -3px;
+  border: 2px solid rgba(255, 218, 116, 0.9);
+  border-radius: 6px;
+  background: radial-gradient(circle at 50% 42%, rgba(255, 224, 138, 0.34), rgba(255, 224, 138, 0) 70%);
+  opacity: 0;
+  animation: reveal-echo-replay 0.62s ease-out var(--echo-count, 1);
+}
+
+.reveal-echo-chip {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  padding: 3px 7px;
+  border: 1px solid #d3a341;
+  border-radius: 2px;
+  background: #171410;
+  color: #ffd982;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  transform: translateX(-50%);
+  animation: reveal-echo-chip-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes reveal-echo-replay {
+  0% { opacity: 0; transform: scale(0.96); }
+  22% { opacity: 1; transform: scale(1.05); }
+  60% { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@keyframes reveal-echo-chip-pop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(7px) scale(0.6); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-echo-flash { animation-iteration-count: 1; }
+}

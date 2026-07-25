@@ -26,9 +26,14 @@ targets, and how it scales. A verb does nothing until its King is displayed.
 
 ## Confirmed Kings
 
-1. **Common Echo** — Common reveals Echo: their reveal triggers fire again.
-2. **Rare Echo** — Rare-or-better reveals Echo. Split from Common Echo for
-   balance and identity; never one universal Echo.
+1. **Common Echo** — Common reveals have a 25% base chance to Echo: their
+   reveal triggers fire again. Chance boosts add percentage points; effective
+   chance past 100% grants guaranteed additional Echoes with the remainder
+   rolled as chance (so boosts are always live dials, never dead text).
+   Every Echo visibly replays the reveal on the card itself.
+2. **Rare Echo** — Rare-or-better reveals Echo under the same 25%-base,
+   overflow-into-extra-Echoes rules. Split from Common Echo for balance and
+   identity; never one universal Echo.
 3. **Salvage** — "Whenever you Salvage, create a Mystery Pack." Supports
    create Salvage sources (per duplicate sold, per coins earned, per set
    completed, per fusion). The bridge between active play and passive income.

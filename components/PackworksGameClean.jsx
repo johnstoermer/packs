@@ -130,6 +130,7 @@ function RevealCard({
   index,
   count,
   revealed,
+  echo,
   latest,
   phase,
   onReveal,
@@ -173,6 +174,12 @@ function RevealCard({
         ? `${rarity.label} ${pull.card.name}${pull.foil ? ", foil" : ""}`
         : `Face-down card. Hover for a rarity signal, then click to reveal.`}
     >
+      {echo && (
+        <span key={echo.serial} className="reveal-echo" style={{ "--echo-count": Math.min(4, echo.count) }} aria-hidden="true">
+          <i className="reveal-echo-flash" />
+          <b className="reveal-echo-chip">ECHO{echo.count > 1 ? ` ×${echo.count}` : ""}</b>
+        </span>
+      )}
       <span className="reveal-card-inner">
         <span className="card-back">
           <span className="back-set">{set.short}</span>
@@ -781,6 +788,7 @@ export default function PackworksGameClean() {
   const [resetArmed, setResetArmed] = useState(false);
   const [rewriteArmed, setRewriteArmed] = useState(false);
   const [fx, setFx] = useState({});
+  const [revealEchoes, setRevealEchoes] = useState({});
   const fxSerialRef = useRef(0);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [mobileAutoHeld, setMobileAutoHeld] = useState(false);
@@ -967,6 +975,19 @@ export default function PackworksGameClean() {
     const outcome = revealPackCard(gameRef.current, currentOpening.result.cards, index, { manual: true });
     commit(outcome.state);
     pushFx(outcome.events);
+    const echoCount = outcome.events.filter((event) => event.t === "echo" && event.index === index).length;
+    if (echoCount > 0) {
+      const echoSerial = ++fxSerialRef.current;
+      setRevealEchoes((current) => ({ ...current, [index]: { count: echoCount, serial: echoSerial } }));
+      openingTimersRef.current.push(window.setTimeout(() => {
+        setRevealEchoes((current) => {
+          if (current[index]?.serial !== echoSerial) return current;
+          const next = { ...current };
+          delete next[index];
+          return next;
+        });
+      }, 800 + 620 * Math.min(4, echoCount)));
+    }
     const cards = outcome.cards;
     const revealedPull = cards[index];
     const rarity = RARITIES[revealedPull.rarity];
@@ -1020,6 +1041,7 @@ export default function PackworksGameClean() {
     const current = gameRef.current;
     const priorBeat = current.beat;
     const priorSets = new Set(current.unlockedSets);
+    setRevealEchoes({});
     const rolled = openPack(current, { manual: true, source: "loose", now: Date.now() });
     if (!rolled.result) {
       getAudio().sound("deny");
@@ -1558,6 +1580,7 @@ export default function PackworksGameClean() {
                 index={index}
                 count={opening.result.cards.length}
                 revealed={!!pull.revealed}
+                echo={revealEchoes[index]}
                 latest={opening.impact?.index === index}
                 phase={opening.phase}
                 onReveal={revealCard}

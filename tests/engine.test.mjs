@@ -140,20 +140,29 @@ test("Mark King marks a visible card before reveal and marked reveals pay", () =
   assert.ok(step.state.coins > coinsBefore);
 });
 
-test("Common Echo doubles reveal payoffs for commons", () => {
-  const base = withSlots(createInitialState(1), ["corner-12", "corner-02"]);
-  const noEcho = displayAll(base, ["corner-02"]);
-  const withEcho = displayAll(base, ["corner-12", "corner-02"]);
-  const openedPlain = openPack(noEcho, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
-  const commonIndex = openedPlain.result.cards.findIndex((pull) => pull.rarity === "common");
-  const plainStep = revealPackCard(openedPlain.state, openedPlain.result.cards, commonIndex, { manual: true, rng: () => 0.99 });
-  const plainGain = plainStep.state.coins - openedPlain.state.coins;
+test("Echo has a real base chance, boosts matter, and overflow doubles payoffs", () => {
+  const base = withSlots(createInitialState(1), ["corner-12", "corner-02", "lastlight-01"]);
 
-  const openedEcho = openPack(withEcho, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
+  // King alone: 25% base chance — a high roll does NOT echo, so chance
+  // boosts have real room to work in.
+  const kingOnly = displayAll(base, ["corner-12", "corner-02"]);
+  const openedKing = openPack(kingOnly, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
+  const kingIndex = openedKing.result.cards.findIndex((pull) => pull.rarity === "common");
+  const kingStep = revealPackCard(openedKing.state, openedKing.result.cards, kingIndex, { manual: true, rng: () => 0.99 });
+  assert.ok(!kingStep.events.some((event) => event.t === "echo"));
+  const plainGain = kingStep.state.coins - openedKing.state.coins;
+
+  // King + Matchstick Moth (+100%): 125% -> exactly one guaranteed Echo on
+  // the same high roll, doubling the reveal payoff. The echo event carries
+  // the King's card id so the case strip can pulse it.
+  const boosted = displayAll(base, ["corner-12", "corner-02", "lastlight-01"]);
+  const openedEcho = openPack(boosted, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const echoIndex = openedEcho.result.cards.findIndex((pull) => pull.rarity === "common");
   const echoStep = revealPackCard(openedEcho.state, openedEcho.result.cards, echoIndex, { manual: true, rng: () => 0.99 });
+  const echoEvents = echoStep.events.filter((event) => event.t === "echo");
+  assert.equal(echoEvents.length, 1);
+  assert.equal(echoEvents[0].cardId, "corner-12");
   const echoGain = echoStep.state.coins - openedEcho.state.coins;
-  assert.ok(echoStep.events.some((event) => event.t === "echo"));
   assert.equal(echoGain, plainGain * 2);
 });
 
