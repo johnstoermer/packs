@@ -824,6 +824,16 @@ export default function PackworksGameClean() {
     }
     const fractures = events.filter((event) => event.t === "fracture").length;
     if (fractures > 0) pushToast("FRACTURE", "The pack split — more cards join this reveal.", "gold");
+    const encore = events.find((event) => event.t === "encore");
+    if (encore) pushToast("ENCORE", `The pack continues — ${encore.count} bonus cards.`, "gold");
+    const freePacks = events.filter((event) => event.t === "packs").reduce((sum, event) => sum + event.count, 0);
+    if (freePacks > 0) pushToast("FREE PACKS", `${freePacks} loose pack${freePacks > 1 ? "s" : ""} added to your stock.`, "gold");
+    const surge = events.filter((event) => event.t === "saleBoost").reduce((sum, event) => sum + event.amount, 0);
+    if (surge > 0) pushToast("SALE SURGE", `Your next duplicate sale is worth ${surge}% more.`, "gold");
+    for (const boon of events.filter((event) => event.t === "boon").slice(0, 2)) {
+      const option = DISCOVER_POOL.find((candidate) => candidate.id === boon.option);
+      if (option) pushToast("BOON", `${option.name} gained.`, "success", 2200);
+    }
     const sets = events.filter((event) => event.t === "setComplete");
     for (const done of sets) pushToast("SET COMPLETE", `${getSet(done.setId).name} is finished.`, "gold", 6000);
   }, [getAudio, pushToast]);

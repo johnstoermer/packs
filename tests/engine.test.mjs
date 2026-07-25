@@ -283,3 +283,29 @@ test("saves round-trip engine state and drop unknown discover entries", () => {
   assert.equal(hydrated.prestige.inscriptions, 2);
   assert.equal(hydrated.discoverOffer, null);
 });
+
+test("no two cards share identical effect text", () => {
+  const seen = new Map();
+  for (const card of ALL_CARDS) {
+    const text = describeCard(card.id);
+    assert.ok(text.length > 0, `${card.id} has effect text`);
+    assert.ok(!seen.has(text), `${card.id} duplicates ${seen.get(text)}: "${text}"`);
+    seen.set(text, card.id);
+  }
+});
+
+test("template families stay small: numbers-stripped text repeats at most 3 times", () => {
+  const families = new Map();
+  for (const card of ALL_CARDS) {
+    const def = getCardDef(card.id);
+    if (def?.king || def?.capstone || def?.prestige) continue;
+    const norm = describeCard(card.id).replace(/\d+(\.\d+)?[KMB]?/g, "N");
+    families.set(norm, [...(families.get(norm) || []), card.id]);
+  }
+  let inFamilies = 0;
+  for (const [norm, ids] of families) {
+    assert.ok(ids.length <= 3, `template "${norm}" used by ${ids.length} cards: ${ids.join(", ")}`);
+    if (ids.length > 1) inFamilies += ids.length;
+  }
+  assert.ok(inFamilies <= 90, `${inFamilies} cards share templates (want <= 90)`);
+});

@@ -128,6 +128,14 @@ forever: Kings elevate commons, and endgame builds should naturally mix
 commons through high rarities. Builds should read as identities: "I'm playing
 Salvage", never "I stacked forty multipliers".
 
+Uniqueness rules (enforced by tests/engine.test.mjs):
+- No two cards may ever have identical effect text.
+- A numbers-stripped effect template may repeat on at most three cards, and
+  those must escalate strongly across set tiers (an early anchor, a mid
+  restatement, a late capper). Everything else gets a one-of-a-kind effect.
+- When adding a card, prefer inventing a new trigger, payoff, or knob over
+  re-numbering an existing template.
+
 ## UI scaling
 
 Packs can grow to dozens or hundreds of cards (Fracture, Mystery Packs,
