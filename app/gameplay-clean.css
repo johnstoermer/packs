@@ -2886,25 +2886,3 @@ button.clean-case-slot.is-empty:hover {
 @media (prefers-reduced-motion: reduce) {
   .reveal-echo-flash { animation-iteration-count: 1; }
 }
-
-/* Admin testing sandbox badge. */
-.clean-admin-badge {
-  flex: 0 0 auto;
-  align-self: center;
-  width: max-content;
-  margin-right: 8px;
-  padding: 3px 8px;
-  border: 1px solid #c96b3a;
-  border-radius: 2px;
-  background: #2a1509;
-  color: #ffb37a;
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: 0.14em;
-  animation: admin-badge-breathe 2.4s ease-in-out infinite;
-}
-
-@keyframes admin-badge-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 137, 74, 0.0); }
-  50% { box-shadow: 0 0 9px 0 rgba(255, 137, 74, 0.45); }
-}

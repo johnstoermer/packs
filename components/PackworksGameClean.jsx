@@ -1489,11 +1489,6 @@ export default function PackworksGameClean() {
       style={{ "--set-a": activeSet.colors[0], "--set-b": activeSet.colors[1], "--set-c": activeSet.colors[2] }}
     >
       <header className="clean-topbar">
-        {adminActive && (
-          <span className="clean-admin-badge" title="Testing sandbox — everything unlocked; your real save is untouched.">
-            ADMIN
-          </span>
-        )}
         <div className="clean-brand">
           <span className="clean-brand-mark"><i /><i /><i /></span>
           <strong>PACKWORKS</strong>

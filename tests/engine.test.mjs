@@ -343,6 +343,8 @@ test("admin sandbox unlocks everything and never leaks into real saves", async (
   const admin = createAdminState(1000);
   assert.equal(admin.adminMode, true);
   assert.equal(admin.unlockedSets.length, SETS.length);
+  assert.equal(Object.keys(admin.collection).length, ALL_CARDS.length);
+  assert.ok(ALL_CARDS.every((card) => admin.collection[card.id] === 1));
   assert.ok(admin.coins >= 1e15);
   assert.equal(admin.beat, 5);
   assert.equal(getCaseSlots(admin).slots, 6);
