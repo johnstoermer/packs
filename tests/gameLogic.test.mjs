@@ -139,11 +139,24 @@ test("twenty sequential sets contain 240 unique fixed-rarity cards and cover the
   assert.equal(SETS.at(-1).cards.at(-1).name, "What Was Never Named");
   assert.equal(SETS.at(-1).cards.at(-1).rarity, "nameless");
 
-  for (let index = 1; index < SETS.length; index += 1) {
-    assert.deepEqual(SETS[index].unlockRequirements, [
-      { type: "completeSet", setId: SETS[index - 1].id },
-    ]);
+  assert.deepEqual(SETS[0].unlockRequirements, []);
+  assert.deepEqual(SETS[1].unlockRequirements, [{ type: "completeSet", setId: "corner" }]);
+  for (const branch of ["frontier", "abyss", "crown"]) {
+    assert.deepEqual(
+      SETS.find((set) => set.id === branch).unlockRequirements,
+      [{ type: "completeSet", setId: "circuit" }],
+    );
   }
+  assert.ok(SETS.slice(1).every((set) => set.unlockRequirements.length > 0));
+
+  const signal = SETS.find((set) => set.id === "signal");
+  assert.deepEqual(signal.unlockRequirements, [{ type: "completeSet", setId: "harbor" }]);
+  const referencesHarbor = (set) => set.unlockRequirements.some((requirement) => (
+    requirement.setId === "harbor" || requirement.setIds?.includes("harbor")
+  ));
+  assert.deepEqual(SETS.filter(referencesHarbor).map((set) => set.id), ["signal"]);
+
+  assert.deepEqual(SETS.at(-1).unlockRequirements, [{ type: "completeAllSets" }]);
 });
 
 test("every card keeps its authored rarity in pulls and migrated saves", () => {
@@ -255,7 +268,7 @@ test("breaking a case moves its packs to the opening table", () => {
   assert.deepEqual(broken.collection, state.collection);
 });
 
-test("set stock unlocks only by completing the immediately previous set", () => {
+test("set stock unlocks along the branching print tree", () => {
   const state = createInitialState(1);
   assert.equal(getCurrentBeat(state), 1);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 9 }), 1);
@@ -264,32 +277,58 @@ test("set stock unlocks only by completing the immediately previous set", () => 
   assert.equal(getCurrentBeat({ ...state, packsOpened: 75 }), 4);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 150 }), 5);
 
-  const complete = (set) => Object.fromEntries(set.cards.map((card) => [card.id, 1]));
+  const setById = (id) => SETS.find((set) => set.id === id);
+  const complete = (...ids) => Object.assign(
+    {},
+    ...ids.map((id) => Object.fromEntries(setById(id).cards.map((card) => [card.id, 1]))),
+  );
   assert.equal(getSetUnlockStatus(state, "circuit").unlocked, false);
   assert.equal(getSetUnlockStatus(state, "circuit").requirements[0].label, "Finish Corner Critters");
   assert.equal(getSetUnlockStatus({ ...state, collection: { "corner-12": 1 } }, "circuit").unlocked, false);
   assert.equal(getSetUnlockStatus({ ...state, packsOpened: 25 }, "frontier").unlocked, false);
 
-  const cornerComplete = complete(SETS[0]);
-  const circuit = advanceBeat({ ...state, collection: cornerComplete });
+  const circuit = advanceBeat({ ...state, collection: complete("corner") });
   assert.equal(getSetUnlockStatus(circuit, "circuit").unlocked, true);
-  assert.ok(circuit.unlockedSets.includes("circuit"));
   assert.deepEqual(circuit.unlockedSets, ["corner", "circuit"]);
   assert.equal(getPackPrice(circuit, "loose", "circuit"), 20);
   const circuitPurchase = buyProduct({ ...circuit, coins: 20 }, "loose", "circuit");
   assert.equal(getProductCount(circuitPurchase, "circuit", "loose"), 1);
   assert.equal(circuitPurchase.activeSet, "circuit");
 
-  let collected = {};
-  let progress = state;
-  for (let index = 1; index < SETS.length; index += 1) {
-    assert.equal(getSetUnlockStatus(progress, SETS[index].id).unlocked, false);
-    collected = { ...collected, ...complete(SETS[index - 1]) };
-    progress = advanceBeat({ ...state, collection: collected });
-    assert.equal(getSetUnlockStatus(progress, SETS[index].id).unlocked, true);
-    assert.deepEqual(progress.unlockedSets, SETS.slice(0, index + 1).map((set) => set.id));
+  // Neon Circuit fans out into all three mid-game branches at once.
+  const fanned = advanceBeat({ ...state, collection: complete("corner", "circuit") });
+  for (const branch of ["frontier", "abyss", "crown"]) {
+    assert.equal(getSetUnlockStatus(fanned, branch).unlocked, true, branch);
   }
-  assert.deepEqual(progress.unlockedSets, SETS.map((set) => set.id));
+  assert.equal(getSetUnlockStatus(fanned, "verdant").unlocked, false);
+
+  // OR-requirements open the same set from different run paths.
+  const viaFrontier = advanceBeat({ ...state, collection: complete("corner", "circuit", "frontier") });
+  const viaAbyss = advanceBeat({ ...state, collection: complete("corner", "circuit", "abyss") });
+  assert.equal(getSetUnlockStatus(viaFrontier, "verdant").unlocked, true);
+  assert.equal(getSetUnlockStatus(viaAbyss, "verdant").unlocked, true);
+  assert.equal(getSetUnlockStatus(viaFrontier, "polar").unlocked, false);
+  assert.equal(getSetUnlockStatus(viaAbyss, "polar").unlocked, true);
+  assert.match(getSetUnlockStatus(state, "verdant").requirements[0].label, /Finish .* or /);
+
+  // Sunken Signal only opens through Nocturne Harbor.
+  const allButHarbor = SETS.filter((set) => set.id !== "harbor" && set.id !== "signal").map((set) => set.id);
+  const missingHarbor = advanceBeat({ ...state, collection: complete(...allButHarbor) });
+  assert.equal(getSetUnlockStatus(missingHarbor, "signal").unlocked, false);
+  const withHarbor = advanceBeat({ ...state, collection: complete("corner", "circuit", "frontier", "verdant", "cloud", "harbor") });
+  assert.equal(getSetUnlockStatus(withHarbor, "signal").unlocked, true);
+
+  // Unwritten demands every other set, no matter the route taken.
+  const allButOne = SETS.filter((set) => set.id !== "unwritten" && set.id !== "corner").map((set) => set.id);
+  const nearlyDone = advanceBeat({ ...state, collection: complete(...allButOne) });
+  assert.equal(getSetUnlockStatus(nearlyDone, "unwritten").unlocked, false);
+  const everything = SETS.filter((set) => set.id !== "unwritten").map((set) => set.id);
+  const done = advanceBeat({ ...state, collection: complete(...everything) });
+  assert.equal(getSetUnlockStatus(done, "unwritten").unlocked, true);
+  const status = getSetUnlockStatus(nearlyDone, "unwritten");
+  assert.equal(status.requirements[0].label, "Complete every other set");
+  assert.equal(status.requirements[0].current, 18);
+  assert.equal(status.requirements[0].target, 19);
 
   const legacyUnlocks = advanceBeat({ ...state, unlockedSets: SETS.map((set) => set.id) });
   assert.deepEqual(legacyUnlocks.unlockedSets, ["corner"]);

@@ -6,10 +6,11 @@ PACKWORKS is a clean incremental game about opening card packs, improving a coll
 
 1. Open a six-card pack.
 2. Hover each card for a rarity signal, then click through it or hold Space.
-3. Earn a flat 1 cash every second and sell every extra copy with one button.
-4. Spend cash on packs from newly unlocked sets or one of three upgrades.
+3. Earn cash every second and sell every extra copy with one button.
+4. Display up to six cards in the case; every card in the game has a unique effect that augments the shop.
+5. Spend cash on packs from newly unlocked sets or one of three upgrades.
 
-That is the whole visible game. There are no duel, filing-rule, automation, contract, or beat dashboards.
+The display case is the core progression engine. There are no duel, filing-rule, contract, or beat dashboards.
 
 ## Progression
 
@@ -20,9 +21,11 @@ That is the whole visible game. There are no duel, filing-rule, automation, cont
 - Inspection lamps improve premium-card weight.
 - Supplier terms reduce the purchase price of packs.
 - Booster boxes do not exist. Cases remain a late bulk option.
-- There are 20 sets and 240 unique cards.
-- Every set has the same unlock rule: complete all 12 cards in the set immediately before it.
+- There are 20 sets and 240 unique cards, and every card carries a unique display effect.
+- The display case holds up to six cards; slots unlock through milestones, and displayed effects (income, discounts, odds, god packs, extra cards, automation, interest, amplification) drive the run.
+- Sets unlock along a branching print tree: finishing Neon Circuit opens Gilded Frontier, Abyssal Bloom, and Crownfall at once; most mid-game sets open from either of two parents; Sunken Signal opens only through Nocturne Harbor; Unwritten requires completing every other set.
 - Each later set introduces permanently higher-rarity chase cards, culminating in the sole Nameless card in set 20.
+- Owning What Was Never Named unlocks the Rewrite: a prestige reset that grants permanent Inscriptions, shaped by meta cards scattered throughout the sets.
 
 Cases are inventory bundles that the player can break into loose packs. Packs have no resale value or appreciation system. Only `openPack` can increase a collection count.
 

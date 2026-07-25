@@ -196,9 +196,11 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   });
   await expect(stockRow("Neon Circuit")).toContainText("Finish Corner Critters 0/12");
   await expect(stockRow("Gilded Frontier")).toContainText("Finish Neon Circuit 0/12");
-  await expect(stockRow("Abyssal Bloom")).toContainText("Finish Gilded Frontier 0/12");
-  await expect(stockRow("Crownfall")).toContainText("Finish Abyssal Bloom 0/12");
-  await expect(stockRow("Unwritten")).toContainText("Finish Last Light 0/12");
+  await expect(stockRow("Abyssal Bloom")).toContainText("Finish Neon Circuit 0/12");
+  await expect(stockRow("Crownfall")).toContainText("Finish Neon Circuit 0/12");
+  await expect(stockRow("Verdant Machine")).toContainText("Finish Gilded Frontier or Abyssal Bloom 0/12");
+  await expect(stockRow("Sunken Signal")).toContainText("Finish Nocturne Harbor 0/12");
+  await expect(stockRow("Unwritten")).toContainText("Complete every other set 0/19");
   await expect(stockRow("Unwritten")).not.toContainText("chase");
   await expect(page.getByText("Booster box")).toHaveCount(0);
   await expect(page.getByText("THREE SIMPLE TRACKS")).toHaveCount(0);
@@ -272,7 +274,44 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
   await page.locator(".clean-binder-grid > button.missing").last().click();
   await expect(page.locator(".clean-card-detail")).toContainText("Card 12");
+  await expect(page.locator(".clean-card-detail")).toContainText("DISPLAY EFFECT");
   await expect(page.locator(".clean-card-detail .clean-detail-art.is-missing")).toBeVisible();
+});
+
+test("the display case holds cards whose unique effects augment the game", async ({ page }) => {
+  const state = createInitialState(Date.now());
+  state.collection = { "corner-01": 2 };
+  state.bestRarities = { "corner-01": "common" };
+  state.settings.sound = false;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  await expect(page.locator(".clean-wallet")).toContainText("+1 PER SECOND");
+
+  await page.getByRole("button", { name: "BINDER", exact: true }).click();
+  await page.getByRole("button", { name: "Alley Sprout, 2 copies" }).click();
+  const detail = page.locator(".clean-card-detail");
+  await expect(detail).toContainText("DISPLAY EFFECT");
+  await expect(detail).toContainText("+1/s cash while displayed");
+  await detail.getByRole("button", { name: "DISPLAY IN CASE" }).click();
+  await expect(detail.getByRole("button", { name: "UNSEAT FROM CASE" })).toBeVisible();
+  await detail.getByRole("button", { name: "CLOSE" }).click();
+  await expect(page.locator(".clean-binder-grid")).toContainText("ON DISPLAY");
+
+  await page.getByRole("button", { name: /CASE/ }).click();
+  const caseDrawer = page.locator(".clean-case");
+  await expect(caseDrawer).toBeVisible();
+  await expect(caseDrawer).toContainText("Alley Sprout");
+  await expect(caseDrawer).toContainText("1/1 slots filled");
+  await expect(caseDrawer.locator(".clean-case-slot.is-locked")).toHaveCount(5);
+  await expect(caseDrawer).toContainText("Rewrite");
+  await expect(page.locator(".clean-wallet")).toContainText("+2 PER SECOND");
+  await page.screenshot({ path: "test-results/clean-display-case.png" });
+
+  await caseDrawer.getByRole("button", { name: "UNSEAT" }).click();
+  await expect(caseDrawer).toContainText("0/1 slots filled");
+  await expect(page.locator(".clean-wallet")).toContainText("+1 PER SECOND");
 });
 
 test("holding a shop pack price rapidly buys that selected set and stops on release", async ({ page }) => {
