@@ -13,17 +13,14 @@ That is the whole visible game. There are no duel, filing-rule, automation, cont
 
 ## Progression
 
-- The player begins with three packs and earns exactly 1 cash per second online or away.
+- The player begins with three packs and earns exactly 1 whole cash per second online or away.
 - The binder is a collection view and never generates cash.
 - Selling duplicates keeps one best copy of every card and converts every extra copy into cash.
 - Dealer trays improve duplicate sale value.
 - Inspection lamps improve premium-card weight.
 - Supplier terms reduce the purchase price of packs.
 - Booster boxes do not exist. Cases remain a late bulk option.
-- Neon Circuit unlocks by owning Mayor Mooncat.
-- Gilded Frontier unlocks after 25 opened packs.
-- Abyssal Bloom unlocks by finishing Corner Critters.
-- Crownfall requires two finished sets and three Mythic-or-better cards.
+- Every set has the same unlock rule: complete all 12 cards in the set immediately before it.
 
 Cases are inventory bundles that the player can break into loose packs. Packs have no resale value or appreciation system. Only `openPack` can increase a collection count.
 
@@ -46,7 +43,9 @@ Manual opening is capped near forty packs per minute. Reduced-motion preferences
 
 ## Controls
 
+- Tap a face-down card or press and swipe across several cards to reveal them
 - Hold `Space`: open a pack, reveal its cards one by one, and continue opening while held
+- On mobile, hold the large bottom control to reveal slowly and continue into the next pack
 - `Escape`: close the current panel, card, or completed opening
 
 Progress and flat offline cash earnings are stored locally. Offline progress never buys or opens product.

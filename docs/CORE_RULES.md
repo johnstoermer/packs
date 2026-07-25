@@ -7,7 +7,7 @@ Use this checklist for every reward path and system change.
 - Only `openPack` may increase a binder collection count.
 - Purchases and product breaks only change pack inventory.
 - The binder never produces cash.
-- Online and offline time add exactly 1 cash per second.
+- Online and offline time add exactly 1 whole cash per second; balances and prices never use fractional cash.
 - Selling duplicates keeps one best printing of every card.
 - Upgrades only modify duplicate sale value, rarity weight, or purchase price.
 - Offline progress only adds the flat time-based cash.
@@ -20,6 +20,7 @@ Use this checklist for every reward path and system change.
 - Breaking a case is one-way and explicit.
 - Packs have no resale value, appreciation, or market simulation.
 - Base product prices stay stable; supplier terms apply the only discount.
+- Each new set unlocks only after all 12 cards in the immediately previous set are owned.
 
 ## Manual opening remains the game
 

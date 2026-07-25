@@ -43,9 +43,7 @@ const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
 
 function money(value) {
-  if (Math.abs(value) < 10) return Number(value).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
-  if (Math.abs(value) < 1000) return Number(value).toFixed(1).replace(/\.0$/, "");
-  return formatNumber(value);
+  return formatNumber(Math.round(Number(value) || 0));
 }
 
 function rate(value) {
@@ -138,6 +136,7 @@ function RevealCard({
   return (
     <button
       type="button"
+      data-reveal-index={index}
       className={`reveal-card count-${count} rarity-${pull.rarity} ${dealt ? "is-dealt" : ""} ${revealed ? "is-revealed" : ""} ${latest ? "is-impacting" : ""} ${canReveal ? "is-hoverable" : ""} ${pull.foil ? "is-foil" : ""} ${phase === "summary" ? "is-settled" : ""}`}
       style={{
         "--index": index,
@@ -439,7 +438,7 @@ function CardDetail({ game, cardId, onClose }) {
   const rarityId = game.bestRarities?.[card.id] || card.rarity;
   const rarity = RARITIES[rarityId];
   const count = game.collection[card.id] || 0;
-  const duplicateValue = getCardSaleValue(game, card.id) * (1 + (game.upgrades?.shelf || 0) * 0.2);
+  const duplicateValue = Math.ceil(getCardSaleValue(game, card.id) * (1 + (game.upgrades?.shelf || 0) * 0.2));
   return (
     <div className="clean-modal-scrim" onMouseDown={onClose}>
       <article className={`clean-card-detail rarity-${rarityId}`} onMouseDown={(event) => event.stopPropagation()} style={{ "--rarity": rarity.color }}>
@@ -491,9 +490,12 @@ function SetTray({ game, set, onCard }) {
 export default function PackworksGameClean() {
   const audioRef = useRef(null);
   const gameRef = useRef(createInitialState(0));
+  const openingRef = useRef(null);
   const openingTimersRef = useRef([]);
   const holdRevealTimerRef = useRef(null);
   const spaceHeldRef = useRef(false);
+  const mobileAutoPointerRef = useRef(null);
+  const swipePointerRef = useRef(null);
   const revealLocksRef = useRef(new Set());
   const impactSerialRef = useRef(0);
   const toastSerialRef = useRef(0);
@@ -508,11 +510,22 @@ export default function PackworksGameClean() {
   const [toasts, setToasts] = useState([]);
   const [resetArmed, setResetArmed] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
+  const [mobileAutoHeld, setMobileAutoHeld] = useState(false);
+  const [swipeRevealing, setSwipeRevealing] = useState(false);
 
   const commit = useCallback((nextOrUpdater) => {
     const next = typeof nextOrUpdater === "function" ? nextOrUpdater(gameRef.current) : nextOrUpdater;
     gameRef.current = next;
     setGame(next);
+    return next;
+  }, []);
+
+  const commitOpening = useCallback((nextOrUpdater) => {
+    const next = typeof nextOrUpdater === "function"
+      ? nextOrUpdater(openingRef.current)
+      : nextOrUpdater;
+    openingRef.current = next;
+    setOpening(next);
     return next;
   }, []);
 
@@ -592,9 +605,13 @@ export default function PackworksGameClean() {
   const closeOpening = useCallback(() => {
     clearOpeningTimers();
     clearHoldRevealTimer();
+    mobileAutoPointerRef.current = null;
+    swipePointerRef.current = null;
     revealLocksRef.current.clear();
-    setOpening(null);
-  }, [clearHoldRevealTimer, clearOpeningTimers]);
+    setMobileAutoHeld(false);
+    setSwipeRevealing(false);
+    commitOpening(null);
+  }, [clearHoldRevealTimer, clearOpeningTimers, commitOpening]);
 
   const signalCard = useCallback((rarityOrder) => {
     const now = performance.now();
@@ -604,23 +621,28 @@ export default function PackworksGameClean() {
   }, [getAudio]);
 
   const revealCard = useCallback((index) => {
-    if (!opening || opening.phase !== "ready" || opening.revealed.includes(index)) return;
-    const key = `${opening.id}-${index}`;
+    const currentOpening = openingRef.current;
+    if (!currentOpening || currentOpening.phase !== "ready" || currentOpening.revealed.includes(index)) return;
+    const key = `${currentOpening.id}-${index}`;
     if (revealLocksRef.current.has(key)) return;
     revealLocksRef.current.add(key);
-    const pull = opening.result.cards[index];
+    const pull = currentOpening.result.cards[index];
+    if (!pull) return;
     const rarity = RARITIES[pull.rarity];
-    const revealed = [...opening.revealed, index];
-    const isLast = revealed.length === opening.result.cards.length;
+    const revealed = [...currentOpening.revealed, index];
+    const isLast = revealed.length === currentOpening.result.cards.length;
     const impact = {
       index,
       rarity: pull.rarity,
       foil: pull.foil,
       serial: ++impactSerialRef.current,
     };
-    setOpening((current) => current?.id === opening.id
-      ? { ...current, phase: isLast ? "complete" : "ready", revealed, impact }
-      : current);
+    commitOpening({
+      ...currentOpening,
+      phase: isLast ? "complete" : "ready",
+      revealed,
+      impact,
+    });
 
     const audio = getAudio();
     audio.sound("reveal", rarity.order);
@@ -632,14 +654,17 @@ export default function PackworksGameClean() {
       const delay = rarity.order >= 4 ? 1550 : rarity.order === 3 ? 1200 : 900;
       openingTimersRef.current.push(window.setTimeout(() => {
         audio.sound("packComplete");
-        setOpening((current) => current?.id === opening.id ? { ...current, phase: "summary", impact: null } : current);
+        commitOpening((current) => current?.id === currentOpening.id
+          ? { ...current, phase: "summary", impact: null }
+          : current);
       }, delay));
     }
-  }, [getAudio, opening]);
+  }, [commitOpening, getAudio]);
 
   const beginManualOpen = useCallback(() => {
     if (!ready || drawer || selectedCard) return;
-    if (opening && opening.phase !== "summary") return;
+    const currentOpening = openingRef.current;
+    if (currentOpening && currentOpening.phase !== "summary") return;
     const current = gameRef.current;
     const priorBeat = current.beat;
     const priorSets = new Set(current.unlockedSets);
@@ -657,7 +682,9 @@ export default function PackworksGameClean() {
 
     clearOpeningTimers();
     revealLocksRef.current.clear();
-    setOpening(null);
+    swipePointerRef.current = null;
+    setSwipeRevealing(false);
+    commitOpening(null);
     commit(rolled.state);
     setBinderSetId(rolled.state.activeSet);
     const audio = getAudio();
@@ -670,23 +697,99 @@ export default function PackworksGameClean() {
     else if (unlockedSet) pushToast("NEW SET", `${unlockedSet.name} is now in print.`, "gold", 6000);
 
     const id = `${Date.now()}-${rolled.state.packsOpened}`;
-    setOpening({ id, result: rolled.result, phase: "sealed", revealed: [], impact: null });
+    commitOpening({ id, result: rolled.result, phase: "sealed", revealed: [], impact: null });
     const quick = rolled.state.settings.quickOpen || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const tearDelay = quick ? 80 : 440;
     const dealDelay = quick ? 240 : 1250;
     openingTimersRef.current.push(window.setTimeout(() => {
-      setOpening((value) => value?.id === id ? { ...value, phase: "torn" } : value);
+      commitOpening((value) => value?.id === id ? { ...value, phase: "torn" } : value);
       audio.sound("tear");
     }, tearDelay));
     openingTimersRef.current.push(window.setTimeout(() => {
-      setOpening((value) => value?.id === id ? { ...value, phase: "ready" } : value);
+      commitOpening((value) => value?.id === id ? { ...value, phase: "ready" } : value);
       audio.sound("deal");
     }, dealDelay));
-  }, [clearOpeningTimers, commit, drawer, getAudio, opening, pushToast, ready, selectedCard]);
+  }, [clearOpeningTimers, commit, commitOpening, drawer, getAudio, pushToast, ready, selectedCard]);
+
+  const startMobileAuto = useCallback((event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    mobileAutoPointerRef.current = event.pointerId;
+    setMobileAutoHeld(true);
+    getAudio().ensure();
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Some embedded mobile browsers do not expose pointer capture.
+    }
+  }, [getAudio]);
+
+  const stopMobileAuto = useCallback((event) => {
+    if (mobileAutoPointerRef.current === null) return;
+    if (
+      event?.pointerId !== undefined
+      && event.pointerId !== mobileAutoPointerRef.current
+    ) return;
+    mobileAutoPointerRef.current = null;
+    setMobileAutoHeld(false);
+    clearHoldRevealTimer();
+  }, [clearHoldRevealTimer]);
+
+  const finishMobileAuto = useCallback((event) => {
+    stopMobileAuto(event);
+    if (
+      openingRef.current?.phase === "summary"
+      && getProductCount(gameRef.current, gameRef.current.activeSet, "loose") > 0
+    ) {
+      beginManualOpen();
+    }
+  }, [beginManualOpen, stopMobileAuto]);
+
+  const startSwipeReveal = useCallback((event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    const card = event.target.closest?.("[data-reveal-index]");
+    const index = Number(card?.dataset.revealIndex);
+    const currentOpening = openingRef.current;
+    if (
+      !card
+      || !Number.isInteger(index)
+      || currentOpening?.phase !== "ready"
+      || currentOpening.revealed.includes(index)
+    ) return;
+    event.preventDefault();
+    swipePointerRef.current = event.pointerId;
+    setSwipeRevealing(true);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Hit testing below still works when pointer capture is unavailable.
+    }
+    revealCard(index);
+  }, [revealCard]);
+
+  const continueSwipeReveal = useCallback((event) => {
+    if (swipePointerRef.current === null || event.pointerId !== swipePointerRef.current) return;
+    event.preventDefault();
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const card = target?.closest?.("[data-reveal-index]");
+    const index = Number(card?.dataset.revealIndex);
+    if (Number.isInteger(index)) revealCard(index);
+  }, [revealCard]);
+
+  const stopSwipeReveal = useCallback((event) => {
+    if (
+      event?.pointerId !== undefined
+      && swipePointerRef.current !== null
+      && event.pointerId !== swipePointerRef.current
+    ) return;
+    swipePointerRef.current = null;
+    setSwipeRevealing(false);
+  }, []);
 
   useEffect(() => {
     clearHoldRevealTimer();
-    if (!spaceHeld || drawer || selectedCard || !opening) return undefined;
+    const autoOpeningHeld = spaceHeld || mobileAutoHeld;
+    if (!autoOpeningHeld || drawer || selectedCard || !opening) return undefined;
 
     if (opening.phase === "ready") {
       const nextIndex = opening.result.cards.findIndex((_, index) => !opening.revealed.includes(index));
@@ -694,7 +797,9 @@ export default function PackworksGameClean() {
         const lastIndex = opening.revealed.at(-1);
         const lastPull = Number.isInteger(lastIndex) ? opening.result.cards[lastIndex] : null;
         const lastOrder = lastPull ? RARITIES[lastPull.rarity].order : 0;
-        const delay = lastOrder >= 4 ? 1250 : lastOrder === 3 ? 900 : lastOrder === 2 ? 650 : 480;
+        const delay = mobileAutoHeld
+          ? lastOrder >= 4 ? 1500 : lastOrder === 3 ? 1180 : lastOrder === 2 ? 920 : 720
+          : lastOrder >= 4 ? 1250 : lastOrder === 3 ? 900 : lastOrder === 2 ? 650 : 480;
         holdRevealTimerRef.current = window.setTimeout(() => {
           holdRevealTimerRef.current = null;
           revealCard(nextIndex);
@@ -707,7 +812,7 @@ export default function PackworksGameClean() {
       holdRevealTimerRef.current = window.setTimeout(() => {
         holdRevealTimerRef.current = null;
         beginManualOpen();
-      }, 650);
+      }, mobileAutoHeld ? 850 : 650);
     }
 
     return clearHoldRevealTimer;
@@ -718,8 +823,28 @@ export default function PackworksGameClean() {
     opening,
     revealCard,
     selectedCard,
+    mobileAutoHeld,
     spaceHeld,
   ]);
+
+  useEffect(() => {
+    const stopPointerActions = (event) => {
+      stopMobileAuto(event);
+      stopSwipeReveal(event);
+    };
+    const stopAllPointerActions = () => {
+      stopMobileAuto();
+      stopSwipeReveal();
+    };
+    window.addEventListener("pointerup", stopPointerActions);
+    window.addEventListener("pointercancel", stopPointerActions);
+    window.addEventListener("blur", stopAllPointerActions);
+    return () => {
+      window.removeEventListener("pointerup", stopPointerActions);
+      window.removeEventListener("pointercancel", stopPointerActions);
+      window.removeEventListener("blur", stopAllPointerActions);
+    };
+  }, [stopMobileAuto, stopSwipeReveal]);
 
   const handleBuy = useCallback((productId, setId = gameRef.current.activeSet) => {
     const next = buyProduct(gameRef.current, productId, setId);
@@ -835,10 +960,21 @@ export default function PackworksGameClean() {
   const breakableProduct = SHOP_PRODUCTS.find(
     (product) => product.id !== "loose" && getProductCount(game, game.activeSet, product.id) > 0,
   );
+  const mobileAutoDisabled = opening?.phase === "summary" && loosePacks <= 0;
+  const mobileAutoTitle = mobileAutoHeld
+    ? "AUTO-OPENING"
+    : opening?.phase === "summary"
+      ? loosePacks > 0 ? "OPEN ANOTHER" : "NO PACKS READY"
+      : "HOLD TO AUTO-OPEN";
+  const mobileAutoDetail = mobileAutoHeld
+    ? "RELEASE TO STOP"
+    : opening?.phase === "summary"
+      ? loosePacks > 0 ? "TAP ONCE / HOLD TO KEEP OPENING" : "BACK TO TABLE TO BUY MORE"
+      : "SLOW REVEAL / CONTINUES INTO NEXT PACK";
 
   return (
     <main
-      className={`packworks pw2 pw-clean ${game.settings.reducedEffects ? "reduced-effects" : ""} ${opening ? "opening-active" : ""} ${spaceHeld ? "space-held" : ""}`}
+      className={`packworks pw2 pw-clean ${game.settings.reducedEffects ? "reduced-effects" : ""} ${opening ? "opening-active" : ""} ${spaceHeld ? "space-held" : ""} ${mobileAutoHeld ? "mobile-auto-held" : ""} ${swipeRevealing ? "swipe-revealing" : ""}`}
       style={{ "--set-a": activeSet.colors[0], "--set-b": activeSet.colors[1], "--set-c": activeSet.colors[2] }}
     >
       <header className="clean-topbar">
@@ -877,6 +1013,14 @@ export default function PackworksGameClean() {
         <button
           className="clean-pack-clicker"
           disabled={!loosePacks}
+          onPointerDown={(event) => {
+            if (event.pointerType === "mouse") return;
+            startMobileAuto(event);
+            beginManualOpen();
+          }}
+          onPointerUp={stopMobileAuto}
+          onPointerCancel={stopMobileAuto}
+          onContextMenu={(event) => event.preventDefault()}
           onClick={beginManualOpen}
           aria-label={loosePacks ? `Open a pack. ${loosePacks} ready.` : "No packs ready"}
         >
@@ -886,7 +1030,7 @@ export default function PackworksGameClean() {
             <strong>{loosePacks ? "OPEN PACK" : "NO PACKS READY"}</strong>
             <small>
               {loosePacks
-                ? `${loosePacks} READY / HOLD SPACE`
+                ? `${loosePacks} READY / TAP OR HOLD`
                 : breakableProduct
                   ? `${breakableProduct.label.toUpperCase()} WAITING`
                   : "BUY ONE TO KEEP OPENING"}
@@ -979,7 +1123,13 @@ export default function PackworksGameClean() {
             <span className="tear-shockwave" />
             <PackDebris />
           </div>
-          <div className="reveal-deck">
+          <div
+            className={`reveal-deck ${swipeRevealing ? "is-swipe-revealing" : ""}`}
+            onPointerDown={startSwipeReveal}
+            onPointerMove={continueSwipeReveal}
+            onPointerUp={stopSwipeReveal}
+            onPointerCancel={stopSwipeReveal}
+          >
             {opening.result.cards.map((pull, index) => (
               <RevealCard
                 key={`${pull.card.id}-${index}`}
@@ -997,12 +1147,21 @@ export default function PackworksGameClean() {
           </div>
           {(opening.phase === "ready" || opening.phase === "complete") && (
             <div className="opening-instruction clean-opening-instruction">
-              <strong>
+              <strong className="opening-instruction-desktop">
                 {opening.phase === "complete"
                   ? "PACK COMPLETE"
                   : spaceHeld
                     ? "SPACE HELD / REVEALING ONE BY ONE"
                     : "HOVER FOR RARITY / CLICK EACH CARD OR HOLD SPACE"}
+              </strong>
+              <strong className="opening-instruction-mobile">
+                {opening.phase === "complete"
+                  ? "PACK COMPLETE"
+                  : mobileAutoHeld
+                    ? "AUTO-OPENING / RELEASE BELOW TO STOP"
+                    : swipeRevealing
+                      ? "KEEP SWIPING ACROSS FACE-DOWN CARDS"
+                      : "TAP OR SWIPE ACROSS CARDS TO REVEAL"}
               </strong>
             </div>
           )}
@@ -1013,7 +1172,7 @@ export default function PackworksGameClean() {
                 <span>SELL PILE</span>
                 <strong>
                   {opening.result.duplicatesAdded
-                    ? `+${money(opening.result.duplicateValueDelta * (1 + (game.upgrades?.shelf || 0) * 0.2))} CASH VALUE`
+                    ? `+${money(Math.ceil(opening.result.duplicateValueDelta * (1 + (game.upgrades?.shelf || 0) * 0.2)))} CASH VALUE`
                     : "NO DUPLICATES"}
                 </strong>
                 <small>
@@ -1023,11 +1182,35 @@ export default function PackworksGameClean() {
               <div className="summary-actions">
                 <button className="summary-secondary" onClick={closeOpening}>BACK TO TABLE</button>
                 {getProductCount(game, game.activeSet, "loose") > 0 && (
-                  <button className="summary-primary" onClick={beginManualOpen}>OPEN ANOTHER</button>
+                  <button className="summary-primary desktop-open-another" onClick={beginManualOpen}>OPEN ANOTHER</button>
                 )}
               </div>
             </div>
           )}
+          <button
+            type="button"
+            className={`mobile-auto-control ${mobileAutoHeld ? "is-held" : ""}`}
+            disabled={mobileAutoDisabled}
+            aria-label={mobileAutoDisabled
+              ? "No packs ready"
+              : "Open another pack. Hold to reveal cards and continue opening automatically."}
+            aria-pressed={mobileAutoHeld}
+            onPointerDown={startMobileAuto}
+            onPointerUp={finishMobileAuto}
+            onPointerCancel={stopMobileAuto}
+            onLostPointerCapture={stopMobileAuto}
+            onContextMenu={(event) => event.preventDefault()}
+            onClick={() => {
+              if (
+                openingRef.current?.phase === "summary"
+                && getProductCount(gameRef.current, gameRef.current.activeSet, "loose") > 0
+              ) beginManualOpen();
+            }}
+          >
+            <span className="mobile-auto-fill" aria-hidden="true" />
+            <strong>{mobileAutoTitle}</strong>
+            <small>{mobileAutoDetail}</small>
+          </button>
         </div>
       )}
 

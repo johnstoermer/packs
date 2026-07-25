@@ -57,7 +57,8 @@ test("pack prices stay simple as opened volume grows", () => {
 
 test("supplier terms reduce purchase cost", () => {
   const state = { ...createInitialState(1), upgrades: { ...createInitialState(1).upgrades, supplier: 2 } };
-  assert.equal(getPackPrice(state, "loose"), 9.5);
+  assert.equal(getPackPrice(state, "loose"), 9);
+  assert.equal(Number.isInteger(getPackPrice(state, "loose")), true);
 });
 
 test("opening consumes one pack, files six cards, and grants no direct cash", () => {
@@ -78,6 +79,16 @@ test("cash income is a flat one per second and the binder pays nothing", () => {
   assert.equal(BINDER_PAYOUT_SCALE, 0);
   assert.equal(BASE_PASSIVE_RATE, 1);
   assert.equal(tickEconomy(opened.state, 1).coins, opened.state.coins + 1);
+
+  let ticking = opened.state;
+  for (let step = 0; step < 3; step += 1) {
+    ticking = tickEconomy(ticking, 0.25);
+    assert.equal(ticking.coins, opened.state.coins);
+    assert.equal(Number.isInteger(ticking.coins), true);
+  }
+  ticking = tickEconomy(ticking, 0.25);
+  assert.equal(ticking.coins, opened.state.coins + 1);
+  assert.equal(Number.isInteger(ticking.coins), true);
 });
 
 test("the complete 18-tier rarity ladder uses the requested base rates", () => {
@@ -157,6 +168,7 @@ test("selling duplicates keeps one of every card and pays the full sell pile", (
   const value = getDuplicateSaleValue(state);
   const sold = sellDuplicates(state);
   assert.equal(count, 4);
+  assert.equal(Number.isInteger(value), true);
   assert.equal(sold.collection["corner-01"], 1);
   assert.equal(sold.collection["corner-06"], 1);
   assert.equal(getDuplicateCount(sold), 0);
@@ -176,7 +188,8 @@ test("the three upgrade tracks unlock slowly and have one clear effect each", ()
   assert.equal(shelf.upgrades.shelf, 1);
   const withDuplicates = hydrateState({ ...base, collection: { [card.id]: 2 } }, 2);
   const dealer = buyUpgrade({ ...withDuplicates, coins: 25 }, "shelf");
-  assert.equal(getDuplicateSaleValue(dealer), getDuplicateSaleValue(withDuplicates) * 1.2);
+  assert.ok(getDuplicateSaleValue(dealer) > getDuplicateSaleValue(withDuplicates));
+  assert.equal(Number.isInteger(getDuplicateSaleValue(dealer)), true);
   assert.equal(buyUpgrade(base, "lamp"), base);
 
   const supplierReady = {
@@ -205,7 +218,7 @@ test("breaking a case moves its packs to the opening table", () => {
   assert.deepEqual(broken.collection, state.collection);
 });
 
-test("set stock unlocks from different collection characteristics", () => {
+test("set stock unlocks only by completing the immediately previous set", () => {
   const state = createInitialState(1);
   assert.equal(getCurrentBeat(state), 1);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 9 }), 1);
@@ -214,27 +227,39 @@ test("set stock unlocks from different collection characteristics", () => {
   assert.equal(getCurrentBeat({ ...state, packsOpened: 75 }), 4);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 150 }), 5);
 
-  const circuit = advanceBeat({ ...state, collection: { "corner-12": 1 } });
+  const complete = (set) => Object.fromEntries(set.cards.map((card) => [card.id, 1]));
+  assert.equal(getSetUnlockStatus(state, "circuit").unlocked, false);
+  assert.equal(getSetUnlockStatus(state, "circuit").requirements[0].label, "Finish Corner Critters");
+  assert.equal(getSetUnlockStatus({ ...state, collection: { "corner-12": 1 } }, "circuit").unlocked, false);
+  assert.equal(getSetUnlockStatus({ ...state, packsOpened: 25 }, "frontier").unlocked, false);
+
+  const cornerComplete = complete(SETS[0]);
+  const circuit = advanceBeat({ ...state, collection: cornerComplete });
   assert.equal(getSetUnlockStatus(circuit, "circuit").unlocked, true);
   assert.ok(circuit.unlockedSets.includes("circuit"));
+  assert.deepEqual(circuit.unlockedSets, ["corner", "circuit"]);
   assert.equal(getPackPrice(circuit, "loose", "circuit"), 28);
   const circuitPurchase = buyProduct({ ...circuit, coins: 28 }, "loose", "circuit");
   assert.equal(getProductCount(circuitPurchase, "circuit", "loose"), 1);
   assert.equal(circuitPurchase.activeSet, "circuit");
 
-  const frontier = advanceBeat({ ...state, packsOpened: 25 });
+  const throughCircuit = { ...cornerComplete, ...complete(SETS[1]) };
+  const frontier = advanceBeat({ ...state, collection: throughCircuit });
   assert.ok(frontier.unlockedSets.includes("frontier"));
+  assert.equal(getSetUnlockStatus(frontier, "abyss").unlocked, false);
 
-  const cornerComplete = Object.fromEntries(getCard("corner-01").setId === "corner"
-    ? SETS[0].cards.map((card) => [card.id, 1])
-    : []);
-  const abyss = advanceBeat({ ...state, collection: cornerComplete });
+  const throughFrontier = { ...throughCircuit, ...complete(SETS[2]) };
+  const abyss = advanceBeat({ ...state, collection: throughFrontier });
   assert.ok(abyss.unlockedSets.includes("abyss"));
+  assert.equal(getSetUnlockStatus(abyss, "crown").unlocked, false);
 
-  const twoSets = Object.fromEntries(SETS.slice(0, 2).flatMap((set) => set.cards.map((card) => [card.id, 1])));
-  const bestRarities = Object.fromEntries(Object.keys(twoSets).slice(0, 3).map((id) => [id, "mythic"]));
-  const crown = advanceBeat({ ...state, collection: twoSets, bestRarities });
+  const throughAbyss = { ...throughFrontier, ...complete(SETS[3]) };
+  const crown = advanceBeat({ ...state, collection: throughAbyss });
   assert.ok(crown.unlockedSets.includes("crown"));
+  assert.deepEqual(crown.unlockedSets, SETS.map((set) => set.id));
+
+  const legacyUnlocks = advanceBeat({ ...state, unlockedSets: SETS.map((set) => set.id) });
+  assert.deepEqual(legacyUnlocks.unlockedSets, ["corner"]);
 });
 
 test("economy ticks add exactly one cash per second and never buy or open product", () => {
@@ -274,7 +299,7 @@ test("offline progress pays cash but cannot source or open packs", () => {
 test("hydration migrates earlier saves without inventing cards", () => {
   const state = hydrateState({
     version: 2,
-    coins: 90,
+    coins: 90.75,
     packsOpened: 4,
     collection: { "corner-01": 2, invalid: 99 },
     activeSet: "missing",
@@ -285,6 +310,8 @@ test("hydration migrates earlier saves without inventing cards", () => {
     sealedRun: { id: "legacy-run", setId: "corner", remainingPacks: 3, pool: {}, deck: [] },
   }, 50);
   assert.equal(state.version, SAVE_VERSION);
+  assert.equal(state.coins, 90);
+  assert.ok(state.passiveCarry > 0 && state.passiveCarry < 1);
   assert.equal(state.collection["corner-01"], 2);
   assert.equal(state.collection.invalid, undefined);
   assert.equal(state.activeSet, "corner");

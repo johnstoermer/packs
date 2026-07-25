@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { SETS } from "../../lib/gameData.js";
 import { SAVE_KEY, advanceBeat, createInitialState } from "../../lib/gameLogic.js";
 
 async function seedState(page, state) {
@@ -94,6 +95,7 @@ test("all six cards remain tappable on a phone", async ({ page }) => {
   await seedState(page, state);
   await page.goto("/");
 
+  await page.screenshot({ path: "test-results/clean-mobile-table.png" });
   await page.getByRole("button", { name: /Open a pack/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
   await page.waitForTimeout(900);
@@ -112,6 +114,74 @@ test("all six cards remain tappable on a phone", async ({ page }) => {
   await page.screenshot({ path: "test-results/clean-mobile-pack.png" });
   await revealAll(page);
   await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
+  await page.screenshot({ path: "test-results/clean-mobile-summary.png" });
+});
+
+test("a held mobile swipe reveals every face-down card it crosses", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = createInitialState(Date.now());
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await page.waitForTimeout(450);
+  const cards = page.locator(".reveal-card");
+  const centers = await cards.evaluateAll((nodes) => nodes.slice(0, 4).map((node) => {
+    const bounds = node.getBoundingClientRect();
+    return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+  }));
+
+  await page.mouse.move(centers[0].x, centers[0].y);
+  await page.mouse.down();
+  await expect(page.locator(".reveal-deck")).toHaveClass(/is-swipe-revealing/);
+  for (const center of centers.slice(1)) {
+    await page.mouse.move(center.x, center.y, { steps: 4 });
+  }
+  await page.mouse.up();
+
+  expect(await page.locator(".reveal-card.is-revealed").count()).toBeGreaterThanOrEqual(4);
+  await expect(page.locator(".reveal-deck")).not.toHaveClass(/is-swipe-revealing/);
+});
+
+test("the large mobile hold control runs complete packs until released", async ({ page }) => {
+  test.setTimeout(35_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = createInitialState(Date.now());
+  state.sealed.corner.loose = 4;
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+  await page.evaluate(() => {
+    Math.random = () => 0.99;
+  });
+
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  const autoControl = page.locator(".mobile-auto-control");
+  await expect(autoControl).toBeVisible();
+  const bounds = await autoControl.boundingBox();
+  expect(bounds.width).toBeGreaterThanOrEqual(360);
+  expect(bounds.height).toBeGreaterThanOrEqual(64);
+
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await expect(autoControl).toHaveClass(/is-held/);
+  await expect(autoControl).toContainText("RELEASE TO STOP");
+  await expect(page.locator(".clean-simple-stats div").first().locator("strong")).toHaveText("2", { timeout: 15_000 });
+  await page.mouse.up();
+
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 4_000 });
+  const stoppedAt = await page.locator(".reveal-card.is-revealed").count();
+  await page.waitForTimeout(1_100);
+  await expect(page.locator(".reveal-card.is-revealed")).toHaveCount(stoppedAt);
+  await expect(autoControl).not.toHaveClass(/is-held/);
+  await page.screenshot({ path: "test-results/clean-mobile-auto.png" });
 });
 
 test("the shop reveals product and upgrade choices gradually", async ({ page }) => {
@@ -121,7 +191,13 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await expect(page.getByText("SEALED VALUE")).toHaveCount(0);
   await expect(page.locator(".clean-set-stock")).toHaveCount(5);
   await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(1);
-  await expect(page.locator(".clean-set-stock", { hasText: "Neon Circuit" })).toContainText("Own Mayor Mooncat");
+  const stockRow = (name) => page.locator(".clean-set-stock").filter({
+    has: page.getByRole("heading", { name, exact: true }),
+  });
+  await expect(stockRow("Neon Circuit")).toContainText("Finish Corner Critters 0/12");
+  await expect(stockRow("Gilded Frontier")).toContainText("Finish Neon Circuit 0/12");
+  await expect(stockRow("Abyssal Bloom")).toContainText("Finish Gilded Frontier 0/12");
+  await expect(stockRow("Crownfall")).toContainText("Finish Abyssal Bloom 0/12");
   await expect(page.getByText("Booster box")).toHaveCount(0);
   await expect(page.locator(".clean-upgrades")).toContainText("Open 5 more packs");
   await expect(page.getByText("Standing orders")).toHaveCount(0);
@@ -131,15 +207,15 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
     ...createInitialState(Date.now()),
     packsOpened: 25,
     coins: 600,
-    collection: { "corner-01": 2, "corner-06": 1, "corner-12": 1 },
-    bestRarities: { "corner-01": "common", "corner-06": "uncommon", "corner-12": "legendary" },
+    collection: Object.fromEntries(SETS[0].cards.map((card) => [card.id, 1])),
+    bestRarities: Object.fromEntries(SETS[0].cards.map((card) => [card.id, card.rarity])),
     settings: { sound: false, reducedEffects: false, quickOpen: true },
     lastSavedAt: Date.now(),
   });
   await seedState(page, state);
   await page.reload();
   await page.getByRole("button", { name: "SHOP", exact: true }).click();
-  await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(3);
+  await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(2);
   await expect(page.locator(".clean-upgrade", { hasText: "Dealer tray" })).toBeVisible();
   await page.getByRole("button", { name: "Select Neon Circuit" }).click();
   await expect(page.locator(".clean-set-title")).toContainText("Neon Circuit");
