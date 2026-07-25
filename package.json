@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A polished voxel-isometric card pack incremental game.",
+  "description": "A voxel-isometric incremental game about sealed card product, binder income, and twelve-card league play.",
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/build-static.mjs",

@@ -17,6 +17,15 @@
 
 * {
   box-sizing: border-box;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+*::before,
+*::after {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 html,

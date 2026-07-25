@@ -1,9 +1,10 @@
 import "augmented-ui/augmented-ui.min.css";
 import "./globals.css";
+import "./gameplay-v2.css";
 
 export const metadata = {
   title: "PACKWORKS",
-  description: "Crack packs, complete the binder, and build an isometric card workshop.",
+  description: "Open sealed product, build a paying binder, and take a twelve-card deck through the local league.",
   applicationName: "PACKWORKS",
 };
 
