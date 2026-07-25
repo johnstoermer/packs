@@ -11,8 +11,6 @@ import {
   formatRate,
   getCard,
   getSet,
-  hashString,
-  seededRandom,
 } from "../lib/gameData";
 import {
   SAVE_KEY,
@@ -37,121 +35,51 @@ import { createPackworksScene } from "../lib/scene";
 import { createAudioEngine } from "../lib/audio";
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
 
-function SvgCube({ x, y, z, size = 1, height = 1, colors }) {
-  const iso = (px, py, pz) => ({
-    x: 80 + (px - py) * 22,
-    y: 90 + (px + py) * 11 - pz * 18,
-  });
-  const a = iso(x, y, z + height);
-  const b = iso(x + size, y, z + height);
-  const c = iso(x + size, y + size, z + height);
-  const d = iso(x, y + size, z + height);
-  const a0 = iso(x, y, z);
-  const b0 = iso(x + size, y, z);
-  const c0 = iso(x + size, y + size, z);
-  const d0 = iso(x, y + size, z);
-  const points = (list) => list.map((point) => `${point.x},${point.y}`).join(" ");
-  return (
-    <g stroke="rgba(8,12,16,.25)" strokeWidth="0.7" strokeLinejoin="round">
-      <polygon points={points([d0, d, c, c0])} fill={colors[1]} />
-      <polygon points={points([b0, b, c, c0])} fill={colors[2]} />
-      <polygon points={points([a, b, c, d])} fill={colors[0]} />
-    </g>
-  );
+const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
+const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
+const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
+const CHARACTER_SUBJECTS = new Set([
+  "courier", "squire", "duelist", "revenant", "gardener", "page", "guard",
+  "chancellor", "executioner", "herald", "queen",
+]);
+
+function getCardPresentation(card) {
+  let kind = "CREATURE";
+  if (PLACE_SUBJECTS.has(card.subject)) kind = "LANDMARK";
+  else if (RELIC_SUBJECTS.has(card.subject)) kind = "RELIC";
+  else if (MACHINE_SUBJECTS.has(card.subject)) kind = "MACHINE";
+  else if (CHARACTER_SUBJECTS.has(card.subject)) kind = "CHARACTER";
+
+  let treatment = "specimen";
+  if (card.rarity === "legendary") treatment = "signature";
+  else if (card.rarity === "epic") treatment = "panorama";
+  else if (kind === "LANDMARK") treatment = "landmark";
+  else if (kind === "RELIC" || kind === "MACHINE") treatment = "dossier";
+  else if (card.number % 3 === 0) treatment = "story";
+
+  return {
+    kind,
+    treatment,
+    mark: String((card.number * 17 + RARITIES[card.rarity].order * 23) % 100).padStart(2, "0"),
+  };
 }
 
 function CardArt({ card, compact = false }) {
   const set = getSet(card.setId);
-  const rarity = RARITIES[card.rarity];
-  const random = useMemo(() => seededRandom(hashString(card.id)), [card.id]);
-  const blocks = useMemo(() => {
-    const generator = seededRandom(hashString(card.id) + 44);
-    const result = [];
-    const count = 5 + Math.floor(generator() * 5);
-    for (let index = 0; index < count; index += 1) {
-      const size = 0.35 + generator() * 0.7;
-      result.push({
-        key: index,
-        x: -2.3 + generator() * 4.5,
-        y: -1.8 + generator() * 3.4,
-        z: generator() > 0.72 ? 0.4 + generator() * 1.4 : 0,
-        size,
-        height: 0.35 + generator() * (1.2 + rarity.order * 0.14),
-        colorIndex: Math.floor(generator() * 3),
-      });
-    }
-    return result.sort((left, right) => (left.x + left.y) - (right.x + right.y));
-  }, [card.id, rarity.order]);
-  const skyId = `sky-${card.id}`;
-  const glowId = `glow-${card.id}`;
-  const main = set.colors[(Math.floor(random() * 10) + 1) % 3];
-  const highlight = rarity.color;
-  const faceColors = (color) => [color, `color-mix(in srgb, ${color} 50%, #061015)`, `color-mix(in srgb, ${color} 72%, #0a1114)`];
-
+  const artPath = `${ASSET_BASE}/card-art/${card.setId}/${String(card.number).padStart(2, "0")}.webp`;
   return (
-    <svg
-      className={compact ? "card-art compact" : "card-art"}
-      viewBox="0 0 160 118"
+    <span
+      className={`card-art ${compact ? "compact" : ""}`}
       role="img"
-      aria-label={`${card.name} voxel illustration`}
-      preserveAspectRatio="xMidYMid slice"
+      aria-label={`${card.name}, an original voxel illustration`}
+      style={{ "--art-a": set.colors[0], "--art-b": set.colors[1] }}
     >
-      <defs>
-        <linearGradient id={skyId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={set.colors[2]} />
-          <stop offset="100%" stopColor={`color-mix(in srgb, ${set.colors[2]} 60%, ${set.colors[1]})`} />
-        </linearGradient>
-        <radialGradient id={glowId}>
-          <stop offset="0%" stopColor={highlight} stopOpacity="0.72" />
-          <stop offset="100%" stopColor={highlight} stopOpacity="0" />
-        </radialGradient>
-        <clipPath id={`clip-${card.id}`}>
-          <rect x="0" y="0" width="160" height="118" />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#clip-${card.id})`}>
-        <rect width="160" height="118" fill={`url(#${skyId})`} />
-        <circle cx={24 + random() * 112} cy={22 + random() * 24} r={17 + rarity.order * 4} fill={`url(#${glowId})`} />
-        <path d="M0 78 L42 56 L83 75 L117 49 L160 73 L160 118 L0 118 Z" fill="rgba(5,13,17,.35)" />
-        <path d="M0 91 L55 65 L111 91 L160 70 L160 118 L0 118 Z" fill="rgba(7,17,20,.58)" />
-        <g transform="translate(0 7)">
-          <SvgCube x={-3.65} y={-0.45} z={0} size={7.1} height={0.14} colors={["#35454a", "#17252a", "#26363b"]} />
-          {blocks.map((block) => {
-            const color = block.colorIndex === 0 ? main : block.colorIndex === 1 ? set.colors[1] : highlight;
-            const { key, colorIndex, ...cube } = block;
-            return <SvgCube key={key} {...cube} colors={faceColors(color)} />;
-          })}
-          <SvgCube
-            x={-0.72}
-            y={-0.72}
-            z={0.1}
-            size={1.44}
-            height={1.4 + rarity.order * 0.16}
-            colors={faceColors(highlight)}
-          />
-          <SvgCube
-            x={-0.4}
-            y={-0.4}
-            z={1.45 + rarity.order * 0.16}
-            size={0.8}
-            height={0.58}
-            colors={faceColors("#f2e8cb")}
-          />
-          {rarity.order >= 3 && (
-            <>
-              <SvgCube x={-1.28} y={-0.2} z={0.55} size={0.42} height={1.15} colors={faceColors(set.colors[0])} />
-              <SvgCube x={0.86} y={-0.2} z={0.55} size={0.42} height={1.15} colors={faceColors(set.colors[0])} />
-            </>
-          )}
-        </g>
-        <g opacity="0.22">
-          {Array.from({ length: 22 }, (_, index) => (
-            <rect key={index} x={(index * 47) % 160} y={(index * 29) % 118} width="1" height="1" fill="#fff" />
-          ))}
-        </g>
-      </g>
-    </svg>
+      <img src={artPath} alt="" aria-hidden="true" loading={compact ? "lazy" : "eager"} decoding="async" />
+      <span className="card-art-grade" />
+      <span className="card-art-index">{set.short} / {String(card.number).padStart(2, "0")}</span>
+    </span>
   );
 }
 
@@ -179,38 +107,57 @@ function PackFace({ set, small = false }) {
   );
 }
 
-function RevealCard({ pull, index, count, revealed, phase, onSelect }) {
+function RevealCard({ pull, index, count, revealed, latest, phase, onReveal, onSelect }) {
   const rarity = RARITIES[pull.rarity];
+  const set = getSet(pull.card.setId);
+  const presentation = getCardPresentation(pull.card);
   const spread = index - (count - 1) / 2;
+  const dealt = !["sealed", "torn"].includes(phase);
+  const canReveal = phase === "ready" && !revealed;
   return (
     <button
       type="button"
-      className={`reveal-card rarity-${pull.rarity} ${revealed ? "is-revealed" : ""} ${pull.foil ? "is-foil" : ""} ${phase === "summary" ? "is-settled" : ""}`}
+      className={`reveal-card count-${count} rarity-${pull.rarity} ${dealt ? "is-dealt" : ""} ${revealed ? "is-revealed" : ""} ${latest ? "is-impacting" : ""} ${canReveal ? "is-hoverable" : ""} ${pull.foil ? "is-foil" : ""} ${phase === "summary" ? "is-settled" : ""}`}
       style={{
         "--index": index,
         "--spread": spread,
         "--rarity": rarity.color,
         "--rarity-deep": rarity.deep,
+        "--set-a": set.colors[0],
+        "--set-b": set.colors[1],
+        "--set-c": set.colors[2],
+        "--deal-delay": `${index * 75}ms`,
       }}
       onClick={(event) => {
         event.stopPropagation();
-        if (revealed && phase === "summary") onSelect(pull.card.id);
+        if (canReveal) onReveal(index);
+        else if (revealed && phase === "summary") onSelect(pull.card.id);
       }}
-      tabIndex={phase === "summary" ? 0 : -1}
-      aria-label={`${rarity.label} ${pull.card.name}${pull.foil ? ", foil" : ""}`}
+      tabIndex={canReveal || phase === "summary" ? 0 : -1}
+      aria-label={revealed
+        ? `${rarity.label} ${pull.card.name}${pull.foil ? ", foil" : ""}`
+        : `Unrevealed card with a ${rarity.label.toLowerCase()} signal. Click to reveal.`}
     >
       <span className="reveal-card-inner">
         <span className="card-back">
+          <span className="back-set">{set.short}</span>
+          <span className="back-orbit"><i /><i /><i /></span>
           <span className="back-mark">PW</span>
           <span className="back-rule" />
+          <span className="rarity-signal">
+            <i />
+            <b>{rarity.label}</b>
+            <small>CLICK TO TURN</small>
+          </span>
         </span>
-        <span className="card-front">
+        <span className={`card-front treatment-${presentation.treatment} set-${pull.card.setId}`}>
           <span className="card-head">
             <span>{pull.card.setId.toUpperCase()}-{String(pull.card.number).padStart(2, "0")}</span>
             <b>{rarity.short}</b>
           </span>
           <CardArt card={pull.card} />
           <span className="card-copy">
+            <span className="card-type-line">{presentation.kind} / MARK {presentation.mark}</span>
             <strong>{pull.card.name}</strong>
             <small>{pull.card.flavor}</small>
           </span>
@@ -220,9 +167,75 @@ function RevealCard({ pull, index, count, revealed, phase, onSelect }) {
           </span>
           {pull.foil && <span className="foil-stamp">FOIL</span>}
           <span className="foil-sheen" />
+          <span className="card-print-mark">{set.short}</span>
         </span>
       </span>
     </button>
+  );
+}
+
+function OpeningImpact({ impact }) {
+  if (!impact) return null;
+  const rarity = RARITIES[impact.rarity];
+  return (
+    <div
+      key={impact.serial}
+      className={`opening-impact impact-${impact.rarity}`}
+      style={{ "--impact-color": rarity.color }}
+      aria-live="polite"
+    >
+      <span className="impact-flash" />
+      <span className="impact-ring ring-one" />
+      <span className="impact-ring ring-two" />
+      <span className="impact-rays">
+        {Array.from({ length: 20 }, (_, ray) => (
+          <i
+            key={ray}
+            style={{
+              "--angle": `${ray * 18}deg`,
+              "--ray-delay": `${(ray % 5) * 16}ms`,
+            }}
+          />
+        ))}
+      </span>
+      <span className="impact-shards">
+        {Array.from({ length: 28 }, (_, shard) => (
+          <i
+            key={shard}
+            style={{
+              "--angle": `${shard * 12.857}deg`,
+              "--distance": `-${90 + (shard % 7) * 26}px`,
+              "--shard-delay": `${(shard % 6) * 14}ms`,
+            }}
+          />
+        ))}
+      </span>
+      <span className="impact-name">
+        <strong>{rarity.label}</strong>
+        <small>{impact.foil ? "FOIL PULL" : "CARD REVEALED"}</small>
+      </span>
+    </div>
+  );
+}
+
+function PackDebris() {
+  return (
+    <span className="pack-debris" aria-hidden="true">
+      {Array.from({ length: 18 }, (_, piece) => {
+        const direction = piece % 2 ? 1 : -1;
+        return (
+          <i
+            key={piece}
+            style={{
+              "--debris-x": `${direction * (80 + (piece % 6) * 44)}px`,
+              "--debris-y": `${-150 + (piece % 7) * 48}px`,
+              "--debris-r": `${direction * (80 + piece * 19)}deg`,
+              "--debris-delay": `${(piece % 4) * 16}ms`,
+            }}
+          />
+        );
+      })}
+    </span>
   );
 }
 
@@ -251,7 +264,7 @@ function ProgressBar({ value, max, color, label }) {
 function ShopPanel({ game, buyMode, setBuyMode, onBuy }) {
   return (
     <div className="panel-scroll shop-panel">
-      <div className="panel-intro">
+      <div className="panel-intro" data-augmented-ui="br-clip border">
         <div>
           <span className="micro-label">WORKSHOP CATALOG</span>
           <h2>Build the line</h2>
@@ -308,7 +321,7 @@ function BinderPanel({ game, binderSetId, setBinderSetId, onCard }) {
   const found = set.cards.filter((card) => game.collection[card.id]).length;
   return (
     <div className="panel-scroll binder-panel">
-      <div className="panel-intro binder-heading">
+      <div className="panel-intro binder-heading" data-augmented-ui="br-clip border">
         <div>
           <span className="micro-label">ARCHIVE DRAWER</span>
           <h2>{set.name}</h2>
@@ -370,7 +383,7 @@ function GoalsPanel({ game, onClaim, onReprint }) {
   const plateGain = getReprintGain(game);
   return (
     <div className="panel-scroll goals-panel">
-      <div className="panel-intro">
+      <div className="panel-intro" data-augmented-ui="br-clip border">
         <div>
           <span className="micro-label">SHIFT BOARD</span>
           <h2>Orders & records</h2>
@@ -450,6 +463,7 @@ function CardDetail({ cardId, game, onClose }) {
     <div className="modal-scrim card-detail-scrim" onMouseDown={onClose}>
       <article
         className="card-detail"
+        data-augmented-ui="tl-clip br-clip border"
         style={{ "--rarity": rarity.color, "--set-a": set.colors[0], "--set-b": set.colors[1] }}
         onMouseDown={(event) => event.stopPropagation()}
       >
@@ -481,6 +495,8 @@ export default function PackworksGame() {
   const audioRef = useRef(null);
   const gameRef = useRef(createInitialState(0));
   const openingTimersRef = useRef([]);
+  const openingRevealLocksRef = useRef(new Set());
+  const openingImpactSerialRef = useRef(0);
   const toastSerialRef = useRef(0);
   const [game, setGame] = useState(() => createInitialState(0));
   const [ready, setReady] = useState(false);
@@ -617,29 +633,60 @@ export default function PackworksGame() {
 
   const closeOpening = useCallback(() => {
     clearOpeningTimers();
+    openingRevealLocksRef.current.clear();
     setOpening(null);
     sceneRef.current?.setOpening(false);
   }, [clearOpeningTimers]);
 
-  const revealEverything = useCallback(() => {
-    if (!opening || opening.phase === "summary") return;
-    clearOpeningTimers();
-    const highest = opening.result.cards.reduce(
-      (best, pull) => RARITIES[pull.rarity].order > RARITIES[best.rarity].order ? pull : best,
-      opening.result.cards[0],
-    );
-    sceneRef.current?.burst(highest.rarity, 1.1);
-    getAudio().sound("reveal", RARITIES[highest.rarity].order);
-    setOpening((current) => current ? { ...current, phase: "summary", reveal: current.result.cards.length } : current);
-  }, [clearOpeningTimers, getAudio, opening]);
+  const revealCard = useCallback((index) => {
+    if (!opening || opening.phase !== "ready" || opening.revealed.includes(index)) return;
+    const revealKey = `${opening.id}-${index}`;
+    if (openingRevealLocksRef.current.has(revealKey)) return;
+    openingRevealLocksRef.current.add(revealKey);
+
+    const pull = opening.result.cards[index];
+    const rarity = RARITIES[pull.rarity];
+    const revealed = [...opening.revealed, index];
+    const isLast = revealed.length === opening.result.cards.length;
+    const impact = {
+      index,
+      rarity: pull.rarity,
+      foil: pull.foil,
+      serial: ++openingImpactSerialRef.current,
+    };
+
+    setOpening((current) => {
+      if (!current || current.id !== opening.id || current.revealed.includes(index)) return current;
+      return {
+        ...current,
+        phase: isLast ? "complete" : "ready",
+        revealed,
+        impact,
+      };
+    });
+
+    sceneRef.current?.burst(pull.rarity, rarity.order >= 3 ? 1.55 : 0.9);
+    const audio = getAudio();
+    audio.sound("reveal", rarity.order);
+    if (pull.rarity === "legendary") audio.sound("legendary");
+
+    if (isLast) {
+      const settleDelay = gameRef.current.settings.quickOpen
+        ? 220
+        : pull.rarity === "legendary" ? 1500 : pull.rarity === "epic" ? 1050 : 720;
+      openingTimersRef.current.push(window.setTimeout(() => {
+        setOpening((current) => current?.id === opening.id
+          ? { ...current, phase: "summary", impact: null }
+          : current);
+      }, settleDelay));
+    }
+  }, [getAudio, opening]);
 
   const beginManualOpen = useCallback(() => {
     if (!ready || introOpen || settingsOpen || reprintConfirm || selectedCard || offlineReport) return;
-    if (opening && opening.phase !== "summary") {
-      revealEverything();
-      return;
-    }
+    if (opening && opening.phase !== "summary") return;
     clearOpeningTimers();
+    openingRevealLocksRef.current.clear();
     const audio = getAudio();
     audio.ensure();
     audio.sound("pack");
@@ -649,29 +696,19 @@ export default function PackworksGame() {
     sceneRef.current?.packPulse();
     sceneRef.current?.setOpening(true);
     const openingId = `${Date.now()}-${rolled.state.packsOpened}`;
-    setOpening({ id: openingId, result: rolled.result, phase: "sealed", reveal: 0 });
+    setOpening({ id: openingId, result: rolled.result, phase: "sealed", revealed: [], impact: null });
 
     const quick = rolled.state.settings.quickOpen || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const tearDelay = quick ? 40 : 210;
-    const firstReveal = quick ? 100 : 570;
-    const cardGap = quick ? 70 : 310;
+    const tearDelay = quick ? 40 : 260;
+    const dealDelay = quick ? 120 : 760;
     openingTimersRef.current.push(window.setTimeout(() => {
       setOpening((current) => current?.id === openingId ? { ...current, phase: "torn" } : current);
       audio.sound("tear");
     }, tearDelay));
 
-    rolled.result.cards.forEach((pull, index) => {
-      openingTimersRef.current.push(window.setTimeout(() => {
-        setOpening((current) => current?.id === openingId ? { ...current, phase: "revealing", reveal: index + 1 } : current);
-        sceneRef.current?.burst(pull.rarity, RARITIES[pull.rarity].order >= 3 ? 1.15 : 0.7);
-        audio.sound("reveal", RARITIES[pull.rarity].order);
-        if (pull.rarity === "legendary") audio.sound("legendary");
-      }, firstReveal + index * cardGap));
-    });
-
     openingTimersRef.current.push(window.setTimeout(() => {
-      setOpening((current) => current?.id === openingId ? { ...current, phase: "summary", reveal: rolled.result.cards.length } : current);
-    }, firstReveal + rolled.result.cards.length * cardGap + (quick ? 80 : 350)));
+      setOpening((current) => current?.id === openingId ? { ...current, phase: "ready" } : current);
+    }, dealDelay));
 
     for (const achievement of rolled.result.achievements) {
       pushToast("RECORD FILED", achievement.name, "gold");
@@ -689,7 +726,6 @@ export default function PackworksGame() {
     pushToast,
     ready,
     reprintConfirm,
-    revealEverything,
     selectedCard,
     settingsOpen,
   ]);
@@ -722,13 +758,12 @@ export default function PackworksGame() {
         if (selectedCard) setSelectedCard(null);
         else if (settingsOpen) setSettingsOpen(false);
         else if (opening?.phase === "summary") closeOpening();
-        else if (opening) revealEverything();
         else setMobilePanelOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [beginManualOpen, closeOpening, commit, opening, revealEverything, selectedCard, settingsOpen]);
+  }, [beginManualOpen, closeOpening, commit, opening, selectedCard, settingsOpen]);
 
   useEffect(() => {
     audioRef.current?.setEnabled(game.settings.sound);
@@ -827,7 +862,7 @@ export default function PackworksGame() {
   }, [closeOpening, commit, eraseConfirm]);
 
   return (
-    <main className={`packworks ${game.settings.reducedEffects ? "reduced-effects" : ""}`}>
+    <main className={`packworks ${game.settings.reducedEffects ? "reduced-effects" : ""} ${opening ? "opening-active" : ""}`}>
       <header className="topbar">
         <div className="wordmark">
           <span className="wordmark-cube"><i /><i /><i /></span>
@@ -867,7 +902,10 @@ export default function PackworksGame() {
             <strong>{activeSet.name}</strong>
             <small>{activeSet.tagline}</small>
           </div>
-          <div className={`streak-panel ${activeStreak > 1 ? "active" : ""}`}>
+          <div
+            className={`streak-panel ${activeStreak > 1 ? "active" : ""}`}
+            data-augmented-ui="tl-clip br-clip border"
+          >
             <div><span>OPENING STREAK</span><strong>x{(1 + activeStreak * 0.045).toFixed(2)}</strong></div>
             <ProgressBar value={activeStreak} max={25} color={activeSet.colors[0]} />
             <small>{activeStreak ? "Open within seven seconds to keep the counter alive" : "Manual packs build a value streak"}</small>
@@ -877,7 +915,11 @@ export default function PackworksGame() {
             <span>{derived.autoRate > 0 ? "SORTING LINE RUNNING" : "SORTING LINE IDLE"}</span>
             <b>{derived.autoRate > 0 ? `${formatRate(derived.autoRate)} PACKS / SEC` : "BUILD A TABLETOP SORTER"}</b>
           </div>
-          <button className="open-pack-button" onClick={(event) => { event.stopPropagation(); beginManualOpen(); }}>
+          <button
+            className="open-pack-button"
+            data-augmented-ui="tl-clip br-clip both"
+            onClick={(event) => { event.stopPropagation(); beginManualOpen(); }}
+          >
             <span className="open-key">SPACE</span>
             <span className="open-copy"><small>MANUAL BREAK</small><strong>OPEN PACK</strong></span>
             <span className="open-value">x{derived.manualMultiplier.toFixed(2)}<small>VALUE</small></span>
@@ -932,6 +974,7 @@ export default function PackworksGame() {
             return (
               <button
                 key={set.id}
+                data-augmented-ui="tl-clip br-clip border"
                 className={`${selected ? "selected" : ""} ${unlocked ? "unlocked" : "locked"} ${game.masteredSets[set.id] ? "mastered" : ""}`}
                 style={{ "--set-a": set.colors[0], "--set-b": set.colors[1], "--set-c": set.colors[2] }}
                 onClick={() => handleSet(set.id)}
@@ -957,23 +1000,43 @@ export default function PackworksGame() {
 
       {opening && (
         <div
-          className={`opening-layer phase-${opening.phase}`}
+          className={`opening-layer phase-${opening.phase} ${opening.impact ? `screen-impact-${opening.impact.rarity}` : ""}`}
           style={{
             "--set-a": opening.result.set.colors[0],
             "--set-b": opening.result.set.colors[1],
             "--set-c": opening.result.set.colors[2],
           }}
-          onClick={opening.phase === "summary" ? undefined : revealEverything}
         >
           <div className="opening-haze" />
           <div className="opening-topline">
-            <span>{opening.result.set.name}</span>
-            <small>{opening.phase === "summary" ? "BREAK COMPLETE" : "CLICK TO REVEAL ALL"}</small>
+            <span className="opening-set-name">
+              {opening.result.set.name}<i> / FRESH BREAK</i>
+            </span>
+            <div className="opening-progress" aria-label={`${opening.revealed.length} of ${opening.result.cards.length} cards revealed`}>
+              {opening.result.cards.map((pull, index) => (
+                <i
+                  key={`${pull.card.id}-progress`}
+                  className={opening.revealed.includes(index) ? "revealed" : ""}
+                  style={{ "--dot-color": RARITIES[pull.rarity].color }}
+                />
+              ))}
+            </div>
+            <small>
+              {opening.phase === "summary"
+                ? "BREAK COMPLETE"
+                : opening.phase === "ready"
+                  ? `${opening.revealed.length}/${opening.result.cards.length} TURNED / HOVER FOR SIGNAL`
+                  : opening.phase === "complete"
+                    ? "FINAL PULL FILED"
+                    : "BREAKING FACTORY SEAL"}
+            </small>
           </div>
           <div className="foil-pack-wrap">
             <div className="foil-half foil-top"><PackFace set={opening.result.set} /></div>
             <div className="foil-half foil-bottom"><PackFace set={opening.result.set} /></div>
             <span className="tear-ribbon">PW / AUTHENTIC PRINT</span>
+            <span className="tear-shockwave" />
+            <PackDebris />
           </div>
           <div className="reveal-deck">
             {opening.result.cards.map((pull, index) => (
@@ -982,14 +1045,23 @@ export default function PackworksGame() {
                 pull={pull}
                 index={index}
                 count={opening.result.cards.length}
-                revealed={index < opening.reveal}
+                revealed={opening.revealed.includes(index)}
+                latest={opening.impact?.index === index}
                 phase={opening.phase}
+                onReveal={revealCard}
                 onSelect={setSelectedCard}
               />
             ))}
           </div>
+          {(opening.phase === "ready" || opening.phase === "complete") && (
+            <div className="opening-instruction">
+              <span>RARITY SIGNAL</span>
+              <strong>{opening.phase === "complete" ? "PACK COMPLETE" : "HOVER A CARD, THEN CLICK TO TURN"}</strong>
+            </div>
+          )}
+          <OpeningImpact impact={opening.impact} />
           {opening.phase === "summary" && (
-            <div className="opening-summary">
+            <div className="opening-summary" data-augmented-ui="tl-clip tr-clip border">
               <div className="summary-total">
                 <span>PACK VALUE</span>
                 <strong>+{formatNumber(opening.result.totalValue)}</strong>
@@ -1070,7 +1142,7 @@ export default function PackworksGame() {
                 <b>{game.settings.sound ? "ON" : "OFF"}</b>
               </button>
               <button onClick={() => toggleSetting("quickOpen")}>
-                <span><strong>Quick opening</strong><small>Shortens the pack reveal sequence</small></span>
+                <span><strong>Quick opening</strong><small>Shortens the foil break; cards still turn individually</small></span>
                 <b>{game.settings.quickOpen ? "ON" : "OFF"}</b>
               </button>
               <button onClick={() => toggleSetting("reducedEffects")}>

@@ -1,3 +1,4 @@
+import "augmented-ui/augmented-ui.min.css";
 import "./globals.css";
 
 export const metadata = {

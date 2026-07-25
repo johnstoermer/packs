@@ -5,6 +5,9 @@ const staticBuild = process.env.PACKWORKS_STATIC_BUILD === "1";
 const nextConfig = {
   output: portalBuild || staticBuild ? "export" : undefined,
   assetPrefix: portalBuild ? "/games/packs" : undefined,
+  env: {
+    NEXT_PUBLIC_PACKWORKS_BASE: portalBuild ? "/games/packs" : "",
+  },
   trailingSlash: true,
   reactStrictMode: true,
   poweredByHeader: false,

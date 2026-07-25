@@ -10,7 +10,19 @@ test("opens a pack and files the pulls into the binder", async ({ page }) => {
   await expect(page.locator(".scene-canvas")).toBeVisible();
 
   await page.getByRole("button", { name: "OPEN PACK" }).click();
-  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 4_000 });
+  await expect(page.locator(".reveal-card.is-dealt")).toHaveCount(4);
+  await page.locator(".reveal-card").first().hover();
+  await expect(page.locator(".reveal-card").first().locator(".rarity-signal")).toBeVisible();
+  await page.screenshot({ path: "test-results/pack-signals.png", fullPage: true });
+
+  for (let index = 0; index < 4; index += 1) {
+    const card = page.locator(".reveal-card").nth(index);
+    await card.click();
+    await expect(card).toHaveClass(/is-revealed/);
+  }
+
+  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 4_000 });
   await expect(page.locator(".reveal-card.is-revealed")).toHaveCount(4);
   await expect(page.locator(".summary-total strong")).toContainText("+");
 
@@ -27,6 +39,67 @@ test("workshop remains usable at a compact iframe size", async ({ page }) => {
   await expect(page.getByRole("button", { name: "OPEN PACK" })).toBeVisible();
   await expect(page.locator(".set-dock")).toBeVisible();
   await page.screenshot({ path: "test-results/workshop-compact.png", fullPage: true });
+});
+
+test("a legendary pull gets a full rarity reveal", async ({ page }) => {
+  const seeded = {
+    ...createInitialState(Date.now()),
+    packsOpened: 1,
+    runPacks: 1,
+    pityLegendary: 69,
+    settings: {
+      sound: false,
+      reducedEffects: false,
+      quickOpen: true,
+    },
+    lastSavedAt: Date.now(),
+  };
+  await page.addInitScript(({ key, value }) => {
+    localStorage.setItem(key, JSON.stringify(value));
+  }, { key: SAVE_KEY, value: seeded });
+  await page.goto("/");
+  await expect(page.locator(".intro-screen")).toBeHidden();
+  await page.getByRole("button", { name: "OPEN PACK" }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  const legendary = page.locator(".reveal-card.rarity-legendary");
+  await expect(legendary).toHaveCount(1);
+  await legendary.hover();
+  await expect(legendary.locator(".rarity-signal")).toContainText("Legendary");
+  await legendary.click();
+  await expect(page.locator(".opening-impact.impact-legendary")).toBeVisible();
+  await page.waitForTimeout(180);
+  await page.screenshot({ path: "test-results/legendary-impact.png", fullPage: true });
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: "test-results/legendary-card.png", fullPage: true });
+});
+
+test("mobile opening keeps every face-down card tappable", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const seeded = {
+    ...createInitialState(Date.now()),
+    packsOpened: 1,
+    runPacks: 1,
+    settings: {
+      sound: false,
+      reducedEffects: false,
+      quickOpen: true,
+    },
+    lastSavedAt: Date.now(),
+  };
+  await page.addInitScript(({ key, value }) => {
+    localStorage.setItem(key, JSON.stringify(value));
+  }, { key: SAVE_KEY, value: seeded });
+  await page.goto("/");
+  await page.getByRole("button", { name: "OPEN PACK" }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await expect(page.locator(".reveal-card.is-hoverable")).toHaveCount(4);
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: "test-results/mobile-pack-ready.png", fullPage: true });
+  for (let index = 0; index < 4; index += 1) {
+    await page.locator(".reveal-card").nth(index).click();
+  }
+  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible();
+  await page.screenshot({ path: "test-results/mobile-pack-summary.png", fullPage: true });
 });
 
 test("an upgraded workshop and populated binder remain legible", async ({ page }) => {
