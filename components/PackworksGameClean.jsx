@@ -35,6 +35,7 @@ import {
   selectSet,
   sellDuplicates,
   serializeState,
+  storedSaveDominates,
   tickEconomy,
   undisplayCard,
 } from "../lib/gameLogic";
@@ -770,8 +771,15 @@ export default function PackworksGameClean() {
     const offline = applyOfflineProgress(hydrated, Date.now());
     commit(offline.state);
     setBinderSetId(offline.state.activeSet);
-    if (offline.report?.coins > 0) {
-      window.setTimeout(() => pushToast("WELCOME BACK", `Time away earned ${money(offline.report.coins)} cash.`, "success", 6000), 300);
+    if (offline.report) {
+      const parts = [];
+      if (offline.report.coins > 0) parts.push(`earned ${money(offline.report.coins)} cash`);
+      if (offline.report.packsOpened > 0) {
+        parts.push(`auto-opened ${offline.report.packsOpened} pack${offline.report.packsOpened === 1 ? "" : "s"}${offline.report.newCards ? ` (${offline.report.newCards} new)` : ""}`);
+      }
+      if (parts.length) {
+        window.setTimeout(() => pushToast("WELCOME BACK", `Time away ${parts.join(" and ")}.`, "success", 6000), 300);
+      }
     }
     setReady(true);
   }, [commit, pushToast]);
@@ -780,6 +788,8 @@ export default function PackworksGameClean() {
     if (!ready) return undefined;
     const save = () => {
       try {
+        const stored = window.localStorage.getItem(SAVE_KEY);
+        if (storedSaveDominates(stored, gameRef.current)) return;
         window.localStorage.setItem(SAVE_KEY, serializeState(gameRef.current));
       } catch {
         // Local storage can be unavailable in strict privacy modes.
@@ -946,6 +956,12 @@ export default function PackworksGameClean() {
     }
     if (rolled.result.godPackQueued) pushToast("A PACK IS BLESSED", "Your display case charged the next pack into a GOD PACK.", "gold", 6000);
     if (rolled.result.freePackGranted) pushToast("FREE PACK", "The display case refunded this pack.", "success");
+    if (rolled.result.bonusCash > 0) {
+      const detail = rolled.result.bonusEvents
+        .map((event) => `${event.label} +${money(event.amount)}`)
+        .join(" / ");
+      pushToast("CASE PAYS", `${detail} cash.`, "success");
+    }
 
     const id = `${Date.now()}-${rolled.state.packsOpened}`;
     commitOpening({ id, result: rolled.result, phase: "sealed", revealed: [], impact: null });
@@ -1488,6 +1504,7 @@ export default function PackworksGameClean() {
                 </strong>
                 <small>
                   {opening.result.cards.filter((pull) => pull.isNew).length} NEW / {opening.result.duplicatesAdded} DUPLICATES
+                  {opening.result.bonusCash > 0 ? ` / +${money(opening.result.bonusCash)} CASE BONUS` : ""}
                 </small>
               </div>
               <div className="summary-actions">

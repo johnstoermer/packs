@@ -280,8 +280,8 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
 
 test("the display case holds cards whose unique effects augment the game", async ({ page }) => {
   const state = createInitialState(Date.now());
-  state.collection = { "corner-01": 2 };
-  state.bestRarities = { "corner-01": "common" };
+  state.collection = { "corner-02": 2 };
+  state.bestRarities = { "corner-02": "common" };
   state.settings.sound = false;
   state.lastSavedAt = Date.now();
   await seedState(page, state);
@@ -290,7 +290,7 @@ test("the display case holds cards whose unique effects augment the game", async
   await expect(page.locator(".clean-wallet")).toContainText("+1 PER SECOND");
 
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
-  await page.getByRole("button", { name: "Alley Sprout, 2 copies" }).click();
+  await page.getByRole("button", { name: "Pavement Pigeon, 2 copies" }).click();
   const detail = page.locator(".clean-card-detail");
   await expect(detail).toContainText("DISPLAY EFFECT");
   await expect(detail).toContainText("+1/s cash while displayed");
@@ -299,10 +299,10 @@ test("the display case holds cards whose unique effects augment the game", async
   await detail.getByRole("button", { name: "CLOSE" }).click();
   await expect(page.locator(".clean-binder-grid")).toContainText("ON DISPLAY");
 
-  await page.getByRole("button", { name: /CASE/ }).click();
+  await page.getByRole("button", { name: /^CASE/ }).click();
   const caseDrawer = page.locator(".clean-case");
   await expect(caseDrawer).toBeVisible();
-  await expect(caseDrawer).toContainText("Alley Sprout");
+  await expect(caseDrawer).toContainText("Pavement Pigeon");
   await expect(caseDrawer).toContainText("1/1 slots filled");
   await expect(caseDrawer.locator(".clean-case-slot.is-locked")).toHaveCount(5);
   await expect(caseDrawer).toContainText("Rewrite");
