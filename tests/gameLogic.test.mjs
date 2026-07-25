@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  BASE_PASSIVE_RATE,
   BINDER_PAYOUT_SCALE,
   MANUAL_RATE_CAP_MS,
   SAVE_VERSION,
@@ -11,17 +12,20 @@ import {
   buyUpgrade,
   createInitialState,
   getBinderIncome,
-  getCardIncome,
   getCurrentBeat,
+  getDuplicateCount,
+  getDuplicateSaleValue,
   getFusionLevel,
   getPackPrice,
   getProductCount,
+  getSetUnlockStatus,
   getUpgradeCost,
   hydrateState,
   openPack,
+  sellDuplicates,
   tickEconomy,
 } from "../lib/gameLogic.js";
-import { ALL_CARDS, RARITIES, getCard } from "../lib/gameData.js";
+import { ALL_CARDS, PACK_PRODUCTS, RARITIES, SETS, getCard } from "../lib/gameData.js";
 
 function clone(value) {
   return structuredClone(value);
@@ -67,22 +71,59 @@ test("opening consumes one pack, files six cards, and grants no direct cash", ()
   assert.ok(Object.keys(opened.state.collection).length > 0);
 });
 
-test("the binder pays immediately at the calmer clean-edition scale", () => {
+test("cash income is a flat one per second and the binder pays nothing", () => {
   const state = createInitialState(1);
   const opened = openPack(state, { manual: true, now: 2_000, rng: () => 0.99 });
-  const binderRate = getBinderIncome(opened.state);
-  assert.ok(binderRate > 0);
-  assert.ok(binderRate < 1);
-  assert.equal(opened.result.incomeDelta, binderRate);
-  assert.equal(BINDER_PAYOUT_SCALE, 0.02);
+  assert.equal(getBinderIncome(opened.state), 0);
+  assert.equal(BINDER_PAYOUT_SCALE, 0);
+  assert.equal(BASE_PASSIVE_RATE, 1);
+  assert.equal(tickEconomy(opened.state, 1).coins, opened.state.coins + 1);
 });
 
-test("manual misses build heat while automated pulls stay flat", () => {
-  const state = createInitialState(1);
-  const manual = openPack(state, { manual: true, free: true, now: 2, rng: () => 0.99 }).state;
-  const automatic = openPack(state, { manual: false, free: true, now: 2, rng: () => 0.99 }).state;
-  assert.equal(manual.pityLegendary, 1);
-  assert.equal(automatic.pityLegendary, 0);
+test("the complete 18-tier rarity ladder uses the requested base rates", () => {
+  const expected = {
+    common: 0.45,
+    uncommon: 0.24,
+    rare: 0.15,
+    epic: 0.08,
+    legendary: 0.04,
+    mythic: 0.02,
+    exalted: 0.01,
+    ascendant: 0.005,
+    celestial: 0.0025,
+    divine: 0.001,
+    astral: 0.0005,
+    eternal: 0.0002,
+    primordial: 0.0001,
+    transcendent: 0.00005,
+    empyrean: 0.00002,
+    absolute: 0.00001,
+    singularity: 0.000005,
+    nameless: 0.000001,
+  };
+  assert.equal(Object.keys(RARITIES).length, 18);
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(RARITIES).map(([id, rarity]) => [id, rarity.odds])),
+    expected,
+  );
+  assert.deepEqual(
+    Object.values(RARITIES).map((rarity) => rarity.order),
+    Array.from({ length: 18 }, (_, index) => index),
+  );
+  assert.ok(Object.values(RARITIES).every((rarity) => rarity.border && rarity.rateLabel));
+  assert.ok(Object.values(RARITIES).every((rarity, index, all) => index === 0 || rarity.sellValue > all[index - 1].sellValue));
+});
+
+test("a stronger printing becomes the kept copy while the displaced copy enters the sell pile", () => {
+  const state = {
+    ...createInitialState(1),
+    collection: { "corner-01": 1 },
+    bestRarities: { "corner-01": "common" },
+  };
+  const opened = openPack(state, { manual: true, free: true, now: 2_000, rng: () => 0 });
+  assert.ok(Object.values(opened.state.bestRarities).includes("nameless"));
+  assert.ok(opened.state.duplicateBank > 0);
+  assert.ok(opened.result.duplicatesAdded > 0);
 });
 
 test("manual opening retains a measured rate cap", () => {
@@ -101,15 +142,25 @@ test("rarity signals may bluff without changing the printed pull", () => {
   assert.ok(result.cards.some((pull) => RARITIES[pull.signalRarity].order > RARITIES[pull.rarity].order));
 });
 
-test("fusion milestones remain useful at 2, 4, 8, 16, and 32 copies", () => {
-  const card = getCard("corner-01");
-  const state = { ...createInitialState(1), collection: { [card.id]: 1 } };
-  const base = getCardIncome(state, card.id);
+test("duplicate counts remain explicit at the legacy collection milestones", () => {
   for (const [copies, expectedLevel] of [[2, 1], [4, 2], [8, 3], [16, 4], [32, 5]]) {
-    const next = { ...state, collection: { [card.id]: copies } };
     assert.equal(getFusionLevel(copies), expectedLevel);
-    assert.equal(getCardIncome(next, card.id), base * (1 + expectedLevel * 0.4));
   }
+});
+
+test("selling duplicates keeps one of every card and pays the full sell pile", () => {
+  const state = hydrateState({
+    ...createInitialState(1),
+    collection: { "corner-01": 4, "corner-06": 2 },
+  }, 2);
+  const count = getDuplicateCount(state);
+  const value = getDuplicateSaleValue(state);
+  const sold = sellDuplicates(state);
+  assert.equal(count, 4);
+  assert.equal(sold.collection["corner-01"], 1);
+  assert.equal(sold.collection["corner-06"], 1);
+  assert.equal(getDuplicateCount(sold), 0);
+  assert.equal(sold.coins, state.coins + value);
 });
 
 test("the three upgrade tracks unlock slowly and have one clear effect each", () => {
@@ -123,7 +174,9 @@ test("the three upgrade tracks unlock slowly and have one clear effect each", ()
   assert.equal(getUpgradeCost(base, "shelf"), 25);
   const shelf = buyUpgrade(base, "shelf");
   assert.equal(shelf.upgrades.shelf, 1);
-  assert.equal(getBinderIncome(shelf), getBinderIncome(base) * 1.2);
+  const withDuplicates = hydrateState({ ...base, collection: { [card.id]: 2 } }, 2);
+  const dealer = buyUpgrade({ ...withDuplicates, coins: 25 }, "shelf");
+  assert.equal(getDuplicateSaleValue(dealer), getDuplicateSaleValue(withDuplicates) * 1.2);
   assert.equal(buyUpgrade(base, "lamp"), base);
 
   const supplierReady = {
@@ -135,29 +188,24 @@ test("the three upgrade tracks unlock slowly and have one clear effect each", ()
   assert.ok(getPackPrice(supplier, "loose") < getPackPrice(supplierReady, "loose"));
 });
 
-test("booster boxes and cases unlock by packs opened, not side systems", () => {
+test("booster boxes are removed while cases remain a late bulk option", () => {
+  assert.equal(PACK_PRODUCTS.some((product) => product.id === "box"), false);
   const fresh = { ...createInitialState(1), coins: 10_000 };
-  assert.equal(buyProduct(fresh, "box"), fresh);
-
-  const boxReady = advanceBeat({ ...fresh, packsOpened: 10 });
-  const withBox = buyProduct(boxReady, "box");
-  assert.equal(getProductCount(withBox, "corner", "box"), 1);
-
   const caseReady = advanceBeat({ ...fresh, packsOpened: 150 });
   const withCase = buyProduct(caseReady, "case");
   assert.equal(getProductCount(withCase, "corner", "case"), 1);
 });
 
-test("breaking a product moves its packs to the opening table", () => {
-  const state = advanceBeat({ ...createInitialState(1), packsOpened: 10, coins: 1_000 });
-  const bought = buyProduct(state, "box");
-  const broken = breakProduct(bought, "box");
-  assert.equal(getProductCount(broken, "corner", "box"), 0);
-  assert.equal(getProductCount(broken, "corner", "loose"), 27);
+test("breaking a case moves its packs to the opening table", () => {
+  const state = advanceBeat({ ...createInitialState(1), packsOpened: 150, coins: 2_000 });
+  const bought = buyProduct(state, "case");
+  const broken = breakProduct(bought, "case");
+  assert.equal(getProductCount(broken, "corner", "case"), 0);
+  assert.equal(getProductCount(broken, "corner", "loose"), 147);
   assert.deepEqual(broken.collection, state.collection);
 });
 
-test("progression is a slow pack-count ladder and later sets arrive quietly", () => {
+test("set stock unlocks from different collection characteristics", () => {
   const state = createInitialState(1);
   assert.equal(getCurrentBeat(state), 1);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 9 }), 1);
@@ -166,13 +214,30 @@ test("progression is a slow pack-count ladder and later sets arrive quietly", ()
   assert.equal(getCurrentBeat({ ...state, packsOpened: 75 }), 4);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 150 }), 5);
 
-  const circuit = advanceBeat({ ...state, packsOpened: 150 });
-  const frontier = advanceBeat({ ...state, packsOpened: 500 });
-  assert.deepEqual(circuit.unlockedSets, ["corner", "circuit"]);
-  assert.deepEqual(frontier.unlockedSets, ["corner", "circuit", "frontier"]);
+  const circuit = advanceBeat({ ...state, collection: { "corner-12": 1 } });
+  assert.equal(getSetUnlockStatus(circuit, "circuit").unlocked, true);
+  assert.ok(circuit.unlockedSets.includes("circuit"));
+  assert.equal(getPackPrice(circuit, "loose", "circuit"), 28);
+  const circuitPurchase = buyProduct({ ...circuit, coins: 28 }, "loose", "circuit");
+  assert.equal(getProductCount(circuitPurchase, "circuit", "loose"), 1);
+  assert.equal(circuitPurchase.activeSet, "circuit");
+
+  const frontier = advanceBeat({ ...state, packsOpened: 25 });
+  assert.ok(frontier.unlockedSets.includes("frontier"));
+
+  const cornerComplete = Object.fromEntries(getCard("corner-01").setId === "corner"
+    ? SETS[0].cards.map((card) => [card.id, 1])
+    : []);
+  const abyss = advanceBeat({ ...state, collection: cornerComplete });
+  assert.ok(abyss.unlockedSets.includes("abyss"));
+
+  const twoSets = Object.fromEntries(SETS.slice(0, 2).flatMap((set) => set.cards.map((card) => [card.id, 1])));
+  const bestRarities = Object.fromEntries(Object.keys(twoSets).slice(0, 3).map((id) => [id, "mythic"]));
+  const crown = advanceBeat({ ...state, collection: twoSets, bestRarities });
+  assert.ok(crown.unlockedSets.includes("crown"));
 });
 
-test("economy ticks add binder cash and never buy or open product", () => {
+test("economy ticks add exactly one cash per second and never buy or open product", () => {
   const state = {
     ...createInitialState(1),
     collection: { "corner-01": 2, "corner-06": 1 },
@@ -184,7 +249,7 @@ test("economy ticks add binder cash and never buy or open product", () => {
   };
   const stockBefore = clone(state.sealed);
   const next = tickEconomy(state, 1);
-  assert.ok(next.coins > state.coins);
+  assert.equal(next.coins, state.coins + 1);
   assert.equal(next.packsOpened, 0);
   assert.deepEqual(next.sealed, stockBefore);
   assert.deepEqual(next.collection, state.collection);
@@ -199,7 +264,7 @@ test("offline progress pays cash but cannot source or open packs", () => {
   };
   const stockBefore = clone(state.sealed);
   const result = applyOfflineProgress(state, now);
-  assert.ok(result.report.coins > 0);
+  assert.equal(result.report.coins, 3_600);
   assert.equal(result.report.ordered, 0);
   assert.equal(result.state.packsOpened, 0);
   assert.deepEqual(result.state.sealed, stockBefore);
@@ -216,6 +281,7 @@ test("hydration migrates earlier saves without inventing cards", () => {
     standingOrder: { enabled: true, product: "loose" },
     filingRules: [{ id: 1, rarity: "common", threshold: 2, action: "shred", enabled: true }],
     forged: { corner: { swarm: 2 } },
+    sealed: { corner: { loose: 0, box: 1 } },
     sealedRun: { id: "legacy-run", setId: "corner", remainingPacks: 3, pool: {}, deck: [] },
   }, 50);
   assert.equal(state.version, SAVE_VERSION);
@@ -227,7 +293,9 @@ test("hydration migrates earlier saves without inventing cards", () => {
   assert.equal(state.standingOrder.enabled, false);
   assert.deepEqual(state.filingRules, []);
   assert.equal(state.sealedRun, null);
-  assert.equal(getProductCount(state, "corner", "loose"), 8);
+  assert.equal(getProductCount(state, "corner", "loose"), 29);
+  assert.equal(state.bestRarities["corner-01"], "common");
+  assert.ok(state.duplicateBank > 0);
 });
 
 test("every non-pack action preserves the collection", () => {

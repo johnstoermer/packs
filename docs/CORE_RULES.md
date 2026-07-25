@@ -6,20 +6,26 @@ Use this checklist for every reward path and system change.
 
 - Only `openPack` may increase a binder collection count.
 - Purchases and product breaks only change pack inventory.
-- Upgrades only modify income, rarity weight, or purchase price.
-- Offline progress only adds binder cash.
+- The binder never produces cash.
+- Online and offline time add exactly 1 cash per second.
+- Selling duplicates keeps one best printing of every card.
+- Upgrades only modify duplicate sale value, rarity weight, or purchase price.
+- Offline progress only adds the flat time-based cash.
 - Tutorials, fixes, and future event compensation must use packs or cash.
 
 ## Pack inventory stays simple
 
-- Loose packs, booster boxes, and cases are inventory, not investments.
-- Breaking a box or case is one-way and explicit.
+- Loose packs and cases are inventory, not investments.
+- Booster boxes do not exist.
+- Breaking a case is one-way and explicit.
 - Packs have no resale value, appreciation, or market simulation.
 - Base product prices stay stable; supplier terms apply the only discount.
 
 ## Manual opening remains the game
 
 - Every pack contains six individually revealed cards.
+- All eighteen base pull rates remain defined in `RARITIES`.
+- Higher rarity printings upgrade the kept binder copy.
 - Hover signals may bluff; the printed card is authoritative.
 - Heat, grade, and anomaly detection remain properties of a witnessed opening.
 - No current offline or automated path can open a pack.

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ALL_CARDS,
   CLEAN_UPGRADES,
-  FUSION_THRESHOLDS,
   PACK_PRODUCTS,
   RARITIES,
   SETS,
@@ -13,29 +12,32 @@ import {
   getSet,
 } from "../lib/gameData";
 import {
-  BINDER_PAYOUT_SCALE,
   SAVE_KEY,
   applyOfflineProgress,
   breakProduct,
   buyProduct,
   buyUpgrade,
   createInitialState,
-  getCardIncome,
+  getCardSaleValue,
   getDerived,
-  getFusionLevel,
+  getDuplicateCount,
+  getDuplicateSaleValue,
   getPackPrice,
   getProductCount,
+  getSetUnlockStatus,
   getUpgradeCost,
   hydrateState,
   openPack,
   selectSet,
+  sellDuplicates,
   serializeState,
   tickEconomy,
 } from "../lib/gameLogic";
 import { createAudioEngine } from "../lib/audio";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
-const SHOP_PRODUCTS = PACK_PRODUCTS.filter((product) => ["loose", "box", "case"].includes(product.id));
+const SHOP_PRODUCTS = PACK_PRODUCTS.filter((product) => ["loose", "case"].includes(product.id));
+const CASE_PRODUCT = PACK_PRODUCTS.find((product) => product.id === "case");
 const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
 const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
@@ -124,10 +126,13 @@ function RevealCard({
   const dealt = ["ready", "complete", "summary"].includes(phase);
   const canReveal = phase === "ready" && !revealed;
   const spread = index - (count - 1) / 2;
+  const rarityUpgraded = pull.rarityBefore
+    && pull.rarityAfter
+    && RARITIES[pull.rarityAfter].order > RARITIES[pull.rarityBefore].order;
   const copyLabel = pull.isNew
     ? "NEW"
-    : pull.fusionAfter > pull.fusionBefore
-      ? `STAR ${pull.fusionAfter}`
+    : rarityUpgraded
+      ? "RARITY UP"
       : "DUPLICATE";
 
   return (
@@ -166,7 +171,7 @@ function RevealCard({
           <span className="rarity-signal" style={{ "--rarity": signal.color }}>
             <i />
             <b>{signal.label}</b>
-            <small>CLICK TO REVEAL</small>
+            <small>{signal.rateLabel} BASE / CLICK TO REVEAL</small>
           </span>
         </span>
         <span className={`card-front treatment-${presentation.treatment} set-${pull.card.setId}`}>
@@ -176,7 +181,7 @@ function RevealCard({
           </span>
           <CardArt card={pull.card} />
           <span className="card-copy">
-            <span className="card-type-line">{rarity.label} / {presentation.kind}</span>
+            <span className="card-type-line">{rarity.label} / {rarity.rateLabel} / {presentation.kind}</span>
             <strong>{pull.card.name}</strong>
             <small>{pull.card.flavor}</small>
           </span>
@@ -186,6 +191,9 @@ function RevealCard({
           </span>
           {pull.misprintDetected && <span className="pw-misprint-stamp">MISPRINT</span>}
           {pull.foil && <span className="foil-stamp">FOIL</span>}
+          <span className="rarity-border-fx" aria-hidden="true">
+            {Array.from({ length: 12 }, (_, point) => <i key={point} />)}
+          </span>
           <span className="foil-sheen" />
           <span className="card-print-mark">{set.short}</span>
         </span>
@@ -253,21 +261,13 @@ function PackDebris() {
   );
 }
 
-function FusionPips({ count }) {
-  const level = getFusionLevel(count);
-  return (
-    <span className="clean-fusion-pips" aria-label={`${level} fusion stars`}>
-      {FUSION_THRESHOLDS.map((threshold, index) => <i key={threshold} className={index < level ? "filled" : ""} />)}
-    </span>
-  );
-}
-
 function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }) {
-  const availableProducts = SHOP_PRODUCTS.filter((product) => product.unlockBeat <= game.beat);
-  const nextProduct = SHOP_PRODUCTS.find((product) => product.unlockBeat > game.beat);
   const unlockedUpgrades = CLEAN_UPGRADES.filter((upgrade) => game.packsOpened >= upgrade.unlockPacks);
   const nextUpgrade = CLEAN_UPGRADES.find((upgrade) => game.packsOpened < upgrade.unlockPacks);
-  const unlockedSets = SETS.filter((set) => game.unlockedSets.includes(set.id));
+  const caseAvailable = CASE_PRODUCT && CASE_PRODUCT.unlockBeat <= game.beat;
+  const caseOwned = caseAvailable ? getProductCount(game, game.activeSet, CASE_PRODUCT.id) : 0;
+  const casePrice = caseAvailable ? getPackPrice(game, CASE_PRODUCT.id, game.activeSet) : 0;
+  const activeSet = getSet(game.activeSet);
 
   return (
     <aside className="clean-drawer" aria-label="Shop">
@@ -276,50 +276,68 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
         <button onClick={onClose} aria-label="Close shop">CLOSE</button>
       </header>
 
-      {unlockedSets.length > 1 && (
-        <div className="clean-set-picker" aria-label="Active card set">
-          {unlockedSets.map((set) => (
-            <button
-              key={set.id}
-              className={set.id === game.activeSet ? "active" : ""}
-              onClick={() => onSet(set.id)}
-            >
-              {set.short}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="clean-drawer-scroll">
-        <section className="clean-product-list">
-          {availableProducts.map((product) => {
-            const price = getPackPrice(game, product.id);
-            const owned = getProductCount(game, game.activeSet, product.id);
+        <section className="clean-product-list clean-pack-shelf">
+          <div className="clean-section-title"><h3>Pack sets</h3><span>COLLECTION UNLOCKS</span></div>
+          {SETS.map((set) => {
+            const status = getSetUnlockStatus(game, set.id);
+            const unlocked = status.unlocked;
+            const price = getPackPrice(game, "loose", set.id);
+            const owned = getProductCount(game, set.id, "loose");
+            const found = set.cards.filter((card) => game.collection[card.id]).length;
+            const unmet = status.requirements.filter((requirement) => !requirement.met);
             return (
-              <article className="clean-product" key={product.id}>
-                <div className={`clean-product-icon ${product.id}`}><i /><i /><i /></div>
-                <div>
-                  <h3>{product.label}</h3>
-                  <p>{product.packs} {product.packs === 1 ? "pack" : "packs"}</p>
-                </div>
-                <span className="clean-owned">{owned ? `${owned} owned` : ""}</span>
-                <button disabled={game.coins < price} onClick={() => onBuy(product.id)}>
-                  {money(price)}
+              <article
+                className={`clean-product clean-set-stock ${unlocked ? "is-stocked" : "is-locked"} ${set.id === game.activeSet ? "is-active" : ""}`}
+                key={set.id}
+                style={{ "--stock-a": set.colors[0], "--stock-b": set.colors[1], "--stock-c": set.colors[2] }}
+              >
+                <div className="clean-product-icon loose"><i /><i /><i /></div>
+                <button
+                  className="clean-stock-info"
+                  disabled={!unlocked}
+                  onClick={() => onSet(set.id)}
+                  aria-label={unlocked ? `Select ${set.name}` : undefined}
+                >
+                  <h3>{set.name}</h3>
+                  <p>
+                    {unlocked
+                      ? `${found}/12 found${set.id === game.activeSet ? " / selected" : ""}`
+                      : unmet.map((requirement) => `${requirement.label} ${requirement.current}/${requirement.target}`).join(" / ")}
+                  </p>
                 </button>
-                {product.id !== "loose" && owned > 0 && (
-                  <button className="clean-break" onClick={() => onBreak(product.id)}>
-                    BREAK ONE
-                  </button>
-                )}
+                <span className="clean-owned">{owned ? `${owned} owned` : ""}</span>
+                <button
+                  disabled={!unlocked || game.coins < price}
+                  onClick={() => onBuy("loose", set.id)}
+                  aria-label={unlocked ? `Buy one ${set.name} pack for ${money(price)}` : `${set.name} locked`}
+                >
+                  {unlocked ? money(price) : "LOCKED"}
+                </button>
               </article>
             );
           })}
-          {nextProduct && (
-            <p className="clean-next-unlock">
-              {nextProduct.label} unlocks after {Math.max(0, nextProduct.unlockBeat === 2 ? 10 : 150) - game.packsOpened} more packs.
-            </p>
-          )}
         </section>
+
+        {caseAvailable && (
+          <section className="clean-product-list clean-case-stock">
+            <div className="clean-section-title"><h3>Case</h3><span>{activeSet.short} / 144 PACKS</span></div>
+            <article
+              className="clean-product"
+              style={{ "--stock-a": activeSet.colors[0], "--stock-b": activeSet.colors[1], "--stock-c": activeSet.colors[2] }}
+            >
+              <div className="clean-product-icon case"><i /><i /><i /></div>
+              <div><h3>{activeSet.name} case</h3><p>144 packs</p></div>
+              <span className="clean-owned">{caseOwned ? `${caseOwned} owned` : ""}</span>
+              <button disabled={game.coins < casePrice} onClick={() => onBuy("case", game.activeSet)}>
+                {money(casePrice)}
+              </button>
+              {caseOwned > 0 && (
+                <button className="clean-break" onClick={() => onBreak("case")}>BREAK ONE</button>
+              )}
+            </article>
+          </section>
+        )}
 
         <section className="clean-upgrades">
           <div className="clean-section-title"><h3>Upgrades</h3><span>THREE SIMPLE TRACKS</span></div>
@@ -358,9 +376,8 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard }) {
   const set = getSet(setId);
   const unlockedSets = SETS.filter((candidate) => game.unlockedSets.includes(candidate.id));
   const found = set.cards.filter((card) => game.collection[card.id]).length;
-  const shelfMultiplier = 1 + (game.upgrades?.shelf || 0) * 0.2;
-  const setRate = set.cards.reduce(
-    (sum, card) => sum + getCardIncome(game, card.id) * BINDER_PAYOUT_SCALE * shelfMultiplier,
+  const setDuplicates = set.cards.reduce(
+    (sum, card) => sum + Math.max(0, (game.collection[card.id] || 0) - 1),
     0,
   );
 
@@ -386,17 +403,18 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard }) {
       <div className="clean-binder-summary">
         <strong>{found} / 12</strong>
         <span>COLLECTED</span>
-        <strong>+{rate(setRate)}/s</strong>
-        <span>FROM THIS SET</span>
+        <strong>{formatNumber(setDuplicates)}</strong>
+        <span>DUPLICATES</span>
       </div>
       <div className="clean-binder-grid">
         {set.cards.map((card) => {
           const count = game.collection[card.id] || 0;
-          const rarity = RARITIES[card.rarity];
+          const rarityId = game.bestRarities?.[card.id] || card.rarity;
+          const rarity = RARITIES[rarityId];
           return (
             <button
               key={card.id}
-              className={count ? "found" : "missing"}
+              className={`${count ? "found" : "missing"} rarity-${rarityId}`}
               disabled={!count}
               onClick={() => count && onCard(card.id)}
               style={{ "--rarity": rarity.color }}
@@ -405,8 +423,7 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard }) {
               {count ? <CardArt card={card} compact /> : <span className="clean-missing-card">PW</span>}
               <span className="clean-binder-card-copy">
                 <b>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</b>
-                <small>{count ? `${rarity.label} / ${count} ${count === 1 ? "copy" : "copies"}` : "Not found"}</small>
-                {count > 0 && <FusionPips count={count} />}
+                <small>{count ? `${rarity.label} ${rarity.rateLabel} / ${count} ${count === 1 ? "copy" : "copies"}` : "Not found"}</small>
               </span>
             </button>
           );
@@ -419,28 +436,55 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard }) {
 function CardDetail({ game, cardId, onClose }) {
   const card = getCard(cardId);
   if (!card) return null;
-  const rarity = RARITIES[card.rarity];
+  const rarityId = game.bestRarities?.[card.id] || card.rarity;
+  const rarity = RARITIES[rarityId];
   const count = game.collection[card.id] || 0;
-  const shelfMultiplier = 1 + (game.upgrades?.shelf || 0) * 0.2;
-  const cardRate = getCardIncome(game, card.id) * BINDER_PAYOUT_SCALE * shelfMultiplier;
+  const duplicateValue = getCardSaleValue(game, card.id) * (1 + (game.upgrades?.shelf || 0) * 0.2);
   return (
     <div className="clean-modal-scrim" onMouseDown={onClose}>
-      <article className="clean-card-detail" onMouseDown={(event) => event.stopPropagation()} style={{ "--rarity": rarity.color }}>
+      <article className={`clean-card-detail rarity-${rarityId}`} onMouseDown={(event) => event.stopPropagation()} style={{ "--rarity": rarity.color }}>
         <button onClick={onClose}>CLOSE</button>
         <div className="clean-detail-art"><CardArt card={card} /></div>
         <div className="clean-detail-copy">
-          <span style={{ color: rarity.color }}>{rarity.label}</span>
+          <span style={{ color: rarity.color }}>{rarity.label} / {rarity.rateLabel} BASE PULL</span>
           <h2>{card.name}</h2>
           <p>{card.flavor}</p>
           <dl>
             <div><dt>COPIES</dt><dd>{count}</dd></div>
-            <div><dt>BINDER</dt><dd>+{rate(cardRate)}/s</dd></div>
+            <div><dt>EACH EXTRA</dt><dd>{money(duplicateValue)}</dd></div>
           </dl>
-          <FusionPips count={count} />
-          <small>Duplicate milestones at 2, 4, 8, 16, and 32 copies increase this card by 40%.</small>
+          <small>Selling duplicates keeps your best copy. Higher rarity printings replace the copy shown here.</small>
         </div>
       </article>
     </div>
+  );
+}
+
+function SetTray({ game, set, onCard }) {
+  const found = set.cards.filter((card) => game.collection[card.id]).length;
+  return (
+    <section className="clean-set-tray" aria-label={`${set.name} collection, ${found} of 12 found`}>
+      <header><strong>{set.short} COLLECTION</strong><span>{found}/12</span></header>
+      <div>
+        {set.cards.map((card) => {
+          const count = game.collection[card.id] || 0;
+          const rarityId = game.bestRarities?.[card.id] || card.rarity;
+          const rarity = RARITIES[rarityId];
+          return (
+            <button
+              key={card.id}
+              className={`${count ? "found" : "missing"} rarity-${rarityId}`}
+              disabled={!count}
+              onClick={() => count && onCard(card.id)}
+              style={{ "--rarity": rarity.color }}
+              aria-label={count ? `${card.name}, ${rarity.label}` : `Missing card ${card.number}`}
+            >
+              {count ? <CardArt card={card} compact /> : <span>PW</span>}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -496,7 +540,7 @@ export default function PackworksGameClean() {
     commit(offline.state);
     setBinderSetId(offline.state.activeSet);
     if (offline.report?.coins > 0) {
-      window.setTimeout(() => pushToast("WELCOME BACK", `Your binder earned ${money(offline.report.coins)} cash.`, "success", 6000), 300);
+      window.setTimeout(() => pushToast("WELCOME BACK", `Time away earned ${money(offline.report.coins)} cash.`, "success", 6000), 300);
     }
     setReady(true);
   }, [commit, pushToast]);
@@ -582,7 +626,7 @@ export default function PackworksGameClean() {
     audio.sound("reveal", rarity.order);
     if (pull.misprintDetected) audio.sound("misprint");
     else if (pull.fusionAfter > pull.fusionBefore) audio.sound("fusion", pull.fusionAfter);
-    else if (rarity.order >= RARITIES.legendary.order) audio.sound("legendary");
+    else if (rarity.order >= RARITIES.legendary.order) audio.sound("legendary", rarity.order);
 
     if (isLast) {
       const delay = rarity.order >= 4 ? 1550 : rarity.order === 3 ? 1200 : 900;
@@ -677,13 +721,14 @@ export default function PackworksGameClean() {
     spaceHeld,
   ]);
 
-  const handleBuy = useCallback((productId) => {
-    const next = buyProduct(gameRef.current, productId);
+  const handleBuy = useCallback((productId, setId = gameRef.current.activeSet) => {
+    const next = buyProduct(gameRef.current, productId, setId);
     if (next === gameRef.current) {
       getAudio().sound("deny");
       return;
     }
     commit(next);
+    setBinderSetId(setId);
     getAudio().sound("purchase");
   }, [commit, getAudio]);
 
@@ -704,6 +749,19 @@ export default function PackworksGameClean() {
     commit(next);
     getAudio().sound("purchase");
   }, [commit, getAudio]);
+
+  const handleSellDuplicates = useCallback(() => {
+    const count = getDuplicateCount(gameRef.current);
+    const value = getDuplicateSaleValue(gameRef.current);
+    const next = sellDuplicates(gameRef.current);
+    if (next === gameRef.current) {
+      getAudio().sound("deny");
+      return;
+    }
+    commit(next);
+    getAudio().sound("purchase");
+    pushToast("DUPLICATES SOLD", `${count} cards sold for ${money(value)} cash.`, "success");
+  }, [commit, getAudio, pushToast]);
 
   const handleSet = useCallback((setId) => {
     const next = selectSet(gameRef.current, setId);
@@ -774,7 +832,6 @@ export default function PackworksGameClean() {
   const activeSet = getSet(game.activeSet);
   const loosePacks = getProductCount(game, game.activeSet, "loose");
   const packPrice = getPackPrice(game, "loose");
-  const activeSetFound = activeSet.cards.filter((card) => game.collection[card.id]).length;
   const breakableProduct = SHOP_PRODUCTS.find(
     (product) => product.id !== "loose" && getProductCount(game, game.activeSet, product.id) > 0,
   );
@@ -848,14 +905,26 @@ export default function PackworksGameClean() {
           </button>
         )}
 
+        <button
+          className="clean-sell-duplicates"
+          disabled={!derived.duplicateCount}
+          onClick={handleSellDuplicates}
+        >
+          <strong>SELL DUPLICATES</strong>
+          <span>
+            {derived.duplicateCount
+              ? `${formatNumber(derived.duplicateCount)} CARDS / +${money(derived.duplicateSaleValue)} CASH`
+              : "NO EXTRA COPIES"}
+          </span>
+        </button>
+
+        <SetTray game={game} set={activeSet} onCard={setSelectedCard} />
+
         <div className="clean-simple-stats">
-          <div><strong>{activeSetFound}/12</strong><span>THIS SET</span></div>
-          <i />
           <div><strong>{formatNumber(game.packsOpened)}</strong><span>PACKS OPENED</span></div>
           <i />
           <div><strong>{formatNumber(derived.packStock)}</strong><span>PACKS READY</span></div>
         </div>
-        <p className="clean-loop">Open cards. The binder earns cash. Cash buys more packs.</p>
       </section>
 
       {drawer && <button className="clean-drawer-scrim" aria-label="Close panel" onClick={() => setDrawer(null)} />}
@@ -941,10 +1010,14 @@ export default function PackworksGameClean() {
           {opening.phase === "summary" && (
             <div className="opening-summary pw-opening-summary clean-opening-summary">
               <div className="summary-total">
-                <span>BINDER INCOME</span>
-                <strong>+{rate(opening.result.incomeDelta)}/s</strong>
+                <span>SELL PILE</span>
+                <strong>
+                  {opening.result.duplicatesAdded
+                    ? `+${money(opening.result.duplicateValueDelta * (1 + (game.upgrades?.shelf || 0) * 0.2))} CASH VALUE`
+                    : "NO DUPLICATES"}
+                </strong>
                 <small>
-                  {opening.result.cards.filter((pull) => pull.isNew).length} NEW / {opening.result.fusionEvents.length} STAR UPGRADES
+                  {opening.result.cards.filter((pull) => pull.isNew).length} NEW / {opening.result.duplicatesAdded} DUPLICATES
                 </small>
               </div>
               <div className="summary-actions">

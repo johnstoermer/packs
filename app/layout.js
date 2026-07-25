@@ -5,7 +5,7 @@ import "./gameplay-clean.css";
 
 export const metadata = {
   title: "PACKWORKS",
-  description: "Open card packs, grow a paying binder, and buy more packs.",
+  description: "Open card packs, improve your collection, and sell duplicates.",
   applicationName: "PACKWORKS",
 };
 
