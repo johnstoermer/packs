@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A clean voxel-isometric incremental game about opening card packs and growing a paying binder.",
+  "description": "A clean incremental game about opening card packs, improving a collection, and selling duplicates.",
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/build-static.mjs",
