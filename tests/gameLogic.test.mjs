@@ -125,16 +125,53 @@ test("the complete 18-tier rarity ladder uses the requested base rates", () => {
   assert.ok(Object.values(RARITIES).every((rarity, index, all) => index === 0 || rarity.sellValue > all[index - 1].sellValue));
 });
 
-test("a stronger printing becomes the kept copy while the displaced copy enters the sell pile", () => {
+test("twenty sequential sets contain 240 unique fixed-rarity cards and cover the full ladder", () => {
+  assert.equal(SETS.length, 20);
+  assert.equal(ALL_CARDS.length, 240);
+  assert.equal(new Set(SETS.map((set) => set.id)).size, SETS.length);
+  assert.equal(new Set(ALL_CARDS.map((card) => card.id)).size, ALL_CARDS.length);
+  assert.ok(SETS.every((set) => set.cards.length === 12));
+  assert.ok(SETS.every((set) => set.cards.some((card) => card.rarity === "common")));
+  assert.deepEqual(new Set(ALL_CARDS.map((card) => card.rarity)), new Set(Object.keys(RARITIES)));
+
+  const chaseOrders = SETS.map((set) => Math.max(...set.cards.map((card) => RARITIES[card.rarity].order)));
+  assert.ok(chaseOrders.every((order, index) => index === 0 || order >= chaseOrders[index - 1]));
+  assert.equal(SETS.at(-1).cards.at(-1).name, "What Was Never Named");
+  assert.equal(SETS.at(-1).cards.at(-1).rarity, "nameless");
+
+  for (let index = 1; index < SETS.length; index += 1) {
+    assert.deepEqual(SETS[index].unlockRequirements, [
+      { type: "completeSet", setId: SETS[index - 1].id },
+    ]);
+  }
+});
+
+test("every card keeps its authored rarity in pulls and migrated saves", () => {
   const state = {
     ...createInitialState(1),
-    collection: { "corner-01": 1 },
-    bestRarities: { "corner-01": "common" },
+    collection: { "corner-02": 1 },
+    bestRarities: { "corner-02": "nameless" },
   };
-  const opened = openPack(state, { manual: true, free: true, now: 2_000, rng: () => 0 });
-  assert.ok(Object.values(opened.state.bestRarities).includes("nameless"));
-  assert.ok(opened.state.duplicateBank > 0);
-  assert.ok(opened.result.duplicatesAdded > 0);
+  const migrated = hydrateState(state, 2);
+  assert.equal(migrated.bestRarities["corner-02"], "common");
+
+  const highRoll = openPack(migrated, { manual: true, free: true, now: 2_000, rng: () => 0 });
+  assert.ok(highRoll.result.cards.every((pull) => pull.rarity === pull.card.rarity));
+  assert.ok(highRoll.result.cards.every((pull) => pull.rarity === "legendary"));
+  assert.ok(!Object.values(highRoll.state.bestRarities).includes("nameless"));
+
+  const rolls = [0.99, 0.21, 0.99, 0.99, 0.99, 0.99];
+  let rollIndex = 0;
+  const commonRoll = openPack(createInitialState(1), {
+    manual: true,
+    free: true,
+    now: 2_000,
+    rng: () => rolls[(rollIndex++) % rolls.length],
+  });
+  const pigeon = commonRoll.result.cards.find((pull) => pull.card.name === "Pavement Pigeon");
+  assert.ok(pigeon);
+  assert.equal(pigeon.rarity, "common");
+  assert.equal(commonRoll.state.bestRarities[pigeon.card.id], "common");
 });
 
 test("manual opening retains a measured rate cap", () => {
@@ -238,25 +275,21 @@ test("set stock unlocks only by completing the immediately previous set", () => 
   assert.equal(getSetUnlockStatus(circuit, "circuit").unlocked, true);
   assert.ok(circuit.unlockedSets.includes("circuit"));
   assert.deepEqual(circuit.unlockedSets, ["corner", "circuit"]);
-  assert.equal(getPackPrice(circuit, "loose", "circuit"), 28);
-  const circuitPurchase = buyProduct({ ...circuit, coins: 28 }, "loose", "circuit");
+  assert.equal(getPackPrice(circuit, "loose", "circuit"), 20);
+  const circuitPurchase = buyProduct({ ...circuit, coins: 20 }, "loose", "circuit");
   assert.equal(getProductCount(circuitPurchase, "circuit", "loose"), 1);
   assert.equal(circuitPurchase.activeSet, "circuit");
 
-  const throughCircuit = { ...cornerComplete, ...complete(SETS[1]) };
-  const frontier = advanceBeat({ ...state, collection: throughCircuit });
-  assert.ok(frontier.unlockedSets.includes("frontier"));
-  assert.equal(getSetUnlockStatus(frontier, "abyss").unlocked, false);
-
-  const throughFrontier = { ...throughCircuit, ...complete(SETS[2]) };
-  const abyss = advanceBeat({ ...state, collection: throughFrontier });
-  assert.ok(abyss.unlockedSets.includes("abyss"));
-  assert.equal(getSetUnlockStatus(abyss, "crown").unlocked, false);
-
-  const throughAbyss = { ...throughFrontier, ...complete(SETS[3]) };
-  const crown = advanceBeat({ ...state, collection: throughAbyss });
-  assert.ok(crown.unlockedSets.includes("crown"));
-  assert.deepEqual(crown.unlockedSets, SETS.map((set) => set.id));
+  let collected = {};
+  let progress = state;
+  for (let index = 1; index < SETS.length; index += 1) {
+    assert.equal(getSetUnlockStatus(progress, SETS[index].id).unlocked, false);
+    collected = { ...collected, ...complete(SETS[index - 1]) };
+    progress = advanceBeat({ ...state, collection: collected });
+    assert.equal(getSetUnlockStatus(progress, SETS[index].id).unlocked, true);
+    assert.deepEqual(progress.unlockedSets, SETS.slice(0, index + 1).map((set) => set.id));
+  }
+  assert.deepEqual(progress.unlockedSets, SETS.map((set) => set.id));
 
   const legacyUnlocks = advanceBeat({ ...state, unlockedSets: SETS.map((set) => set.id) });
   assert.deepEqual(legacyUnlocks.unlockedSets, ["corner"]);

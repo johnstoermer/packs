@@ -189,7 +189,7 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await page.getByRole("button", { name: "SHOP", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Pack shop" })).toBeVisible();
   await expect(page.getByText("SEALED VALUE")).toHaveCount(0);
-  await expect(page.locator(".clean-set-stock")).toHaveCount(5);
+  await expect(page.locator(".clean-set-stock")).toHaveCount(20);
   await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(1);
   const stockRow = (name) => page.locator(".clean-set-stock").filter({
     has: page.getByRole("heading", { name, exact: true }),
@@ -198,7 +198,10 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await expect(stockRow("Gilded Frontier")).toContainText("Finish Neon Circuit 0/12");
   await expect(stockRow("Abyssal Bloom")).toContainText("Finish Gilded Frontier 0/12");
   await expect(stockRow("Crownfall")).toContainText("Finish Abyssal Bloom 0/12");
+  await expect(stockRow("Unwritten")).toContainText("Finish Last Light 0/12");
+  await expect(stockRow("Unwritten")).toContainText("Nameless chase");
   await expect(page.getByText("Booster box")).toHaveCount(0);
+  await expect(page.getByText("THREE SIMPLE TRACKS")).toHaveCount(0);
   await expect(page.locator(".clean-upgrades")).toContainText("Open 5 more packs");
   await expect(page.getByText("Standing orders")).toHaveCount(0);
   await expect(page.getByText("Filing rules")).toHaveCount(0);
@@ -220,6 +223,65 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await page.getByRole("button", { name: "Select Neon Circuit" }).click();
   await expect(page.locator(".clean-set-title")).toContainText("Neon Circuit");
   await page.screenshot({ path: "test-results/clean-shop.png" });
+});
+
+test("the empty mobile table points to Shop without covering the pack label", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = createInitialState(Date.now());
+  state.sealed.corner.loose = 0;
+  state.settings.sound = false;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  const cue = page.locator(".clean-shop-cue");
+  const shop = page.getByRole("button", { name: "SHOP", exact: true });
+  const openCopy = page.locator(".clean-open-copy");
+  await expect(cue).toBeVisible();
+  await expect(cue).toContainText("PACKS IN SHOP");
+  await expect(page.getByRole("button", { name: /Buy .* pack/i })).toHaveCount(0);
+
+  const [cueBox, shopBox, openBox] = await Promise.all([
+    cue.boundingBox(),
+    shop.boundingBox(),
+    openCopy.boundingBox(),
+  ]);
+  expect(Math.abs((cueBox.x + cueBox.width / 2) - (shopBox.x + shopBox.width / 2))).toBeLessThan(8);
+  expect(cueBox.y + cueBox.height).toBeLessThan(openBox.y);
+  expect(await cue.locator("i").evaluate((node) => getComputedStyle(node).animationName))
+    .toContain("clean-shop-cue-arrow");
+
+  await page.screenshot({ path: "test-results/clean-mobile-shop-cue.png" });
+  await shop.click();
+  await expect(page.getByRole("heading", { name: "Pack shop" })).toBeVisible();
+});
+
+test("holding a shop pack price rapidly buys that selected set and stops on release", async ({ page }) => {
+  const state = createInitialState(Date.now());
+  state.coins = 200;
+  state.lifetimeCoins = 200;
+  state.settings.sound = false;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+  await page.getByRole("button", { name: "SHOP", exact: true }).click();
+
+  const row = page.locator(".clean-set-stock").filter({
+    has: page.getByRole("heading", { name: "Corner Critters", exact: true }),
+  });
+  const buy = row.getByRole("button", { name: /Buy Corner Critters pack/ });
+  await expect(row.locator(".clean-owned")).toHaveText("3 owned");
+  const bounds = await buy.boundingBox();
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await expect(buy).toHaveClass(/is-repeating/, { timeout: 1_000 });
+  await page.waitForTimeout(520);
+  await page.mouse.up();
+
+  const boughtCount = Number.parseInt(await row.locator(".clean-owned").innerText(), 10);
+  expect(boughtCount).toBeGreaterThan(5);
+  await page.waitForTimeout(500);
+  await expect(row.locator(".clean-owned")).toHaveText(`${boughtCount} owned`);
 });
 
 test("legendary pulls retain the full impact treatment", async ({ page }) => {
@@ -250,8 +312,15 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
 });
 
 test("the Nameless tier uses its shifting border treatment", async ({ page }) => {
-  const state = createInitialState(Date.now());
-  state.sealed.corner.loose = 1;
+  const collection = Object.fromEntries(SETS.slice(0, -1).flatMap((set) => (
+    set.cards.map((card) => [card.id, 1])
+  )));
+  const state = advanceBeat({
+    ...createInitialState(Date.now()),
+    collection,
+    activeSet: "unwritten",
+  });
+  state.sealed.unwritten.loose = 1;
   state.settings = { sound: false, reducedEffects: false, quickOpen: true };
   state.lastSavedAt = Date.now();
   await seedState(page, state);

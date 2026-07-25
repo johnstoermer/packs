@@ -76,7 +76,7 @@ function CardArt({ card, compact = false }) {
     <span
       className={`card-art ${compact ? "compact" : ""}`}
       role="img"
-      aria-label={`${card.name}, an original voxel illustration`}
+      aria-label={`${card.name}, an original card illustration`}
       style={{ "--art-a": set.colors[0], "--art-b": set.colors[1] }}
     >
       <img src={artPath} alt="" aria-hidden="true" loading={compact ? "lazy" : "eager"} decoding="async" />
@@ -124,14 +124,7 @@ function RevealCard({
   const dealt = ["ready", "complete", "summary"].includes(phase);
   const canReveal = phase === "ready" && !revealed;
   const spread = index - (count - 1) / 2;
-  const rarityUpgraded = pull.rarityBefore
-    && pull.rarityAfter
-    && RARITIES[pull.rarityAfter].order > RARITIES[pull.rarityBefore].order;
-  const copyLabel = pull.isNew
-    ? "NEW"
-    : rarityUpgraded
-      ? "RARITY UP"
-      : "DUPLICATE";
+  const copyLabel = pull.isNew ? "NEW" : "DUPLICATE";
 
   return (
     <button
@@ -260,6 +253,89 @@ function PackDebris() {
   );
 }
 
+function RepeatPurchaseButton({ disabled, onPurchase, ariaLabel, children }) {
+  const holdTimerRef = useRef(null);
+  const repeatTimerRef = useRef(null);
+  const startPointRef = useRef(null);
+  const repeatedRef = useRef(false);
+  const movedRef = useRef(false);
+  const [repeating, setRepeating] = useState(false);
+
+  const clearTimers = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (repeatTimerRef.current !== null) {
+      window.clearInterval(repeatTimerRef.current);
+      repeatTimerRef.current = null;
+    }
+    setRepeating(false);
+  }, []);
+
+  useEffect(() => clearTimers, [clearTimers]);
+
+  const stop = useCallback((event) => {
+    clearTimers();
+    if (event?.currentTarget?.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, [clearTimers]);
+
+  return (
+    <button
+      type="button"
+      className={`clean-hold-buy ${repeating ? "is-repeating" : ""}`}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      title="Tap to buy one. Hold to buy rapidly."
+      onPointerDown={(event) => {
+        if (disabled || event.button !== 0) return;
+        startPointRef.current = { x: event.clientX, y: event.clientY };
+        repeatedRef.current = false;
+        movedRef.current = false;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        holdTimerRef.current = window.setTimeout(() => {
+          repeatedRef.current = true;
+          setRepeating(true);
+          if (onPurchase(true) === false) {
+            clearTimers();
+            return;
+          }
+          repeatTimerRef.current = window.setInterval(() => {
+            if (onPurchase(true) === false) clearTimers();
+          }, 110);
+        }, 340);
+      }}
+      onPointerMove={(event) => {
+        if (!startPointRef.current || repeatedRef.current) return;
+        const distance = Math.hypot(
+          event.clientX - startPointRef.current.x,
+          event.clientY - startPointRef.current.y,
+        );
+        if (distance > 12) {
+          movedRef.current = true;
+          clearTimers();
+        }
+      }}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+      onLostPointerCapture={clearTimers}
+      onClick={(event) => {
+        if (repeatedRef.current || movedRef.current) {
+          event.preventDefault();
+          repeatedRef.current = false;
+          movedRef.current = false;
+          return;
+        }
+        onPurchase(false);
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }) {
   const unlockedUpgrades = CLEAN_UPGRADES.filter((upgrade) => game.packsOpened >= upgrade.unlockPacks);
   const nextUpgrade = CLEAN_UPGRADES.find((upgrade) => game.packsOpened < upgrade.unlockPacks);
@@ -277,13 +353,16 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
 
       <div className="clean-drawer-scroll">
         <section className="clean-product-list clean-pack-shelf">
-          <div className="clean-section-title"><h3>Pack sets</h3><span>COLLECTION UNLOCKS</span></div>
+          <div className="clean-section-title"><h3>Pack sets</h3><span>HOLD PRICE TO STOCK UP</span></div>
           {SETS.map((set) => {
             const status = getSetUnlockStatus(game, set.id);
             const unlocked = status.unlocked;
             const price = getPackPrice(game, "loose", set.id);
             const owned = getProductCount(game, set.id, "loose");
             const found = set.cards.filter((card) => game.collection[card.id]).length;
+            const chase = set.cards.reduce((highest, card) => (
+              RARITIES[card.rarity].order > RARITIES[highest].order ? card.rarity : highest
+            ), "common");
             const unmet = status.requirements.filter((requirement) => !requirement.met);
             return (
               <article
@@ -301,18 +380,18 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
                   <h3>{set.name}</h3>
                   <p>
                     {unlocked
-                      ? `${found}/12 found${set.id === game.activeSet ? " / selected" : ""}`
-                      : unmet.map((requirement) => `${requirement.label} ${requirement.current}/${requirement.target}`).join(" / ")}
+                      ? `${found}/12 found / ${RARITIES[chase].label} chase${set.id === game.activeSet ? " / selected" : ""}`
+                      : `${unmet.map((requirement) => `${requirement.label} ${requirement.current}/${requirement.target}`).join(" / ")} / ${RARITIES[chase].label} chase`}
                   </p>
                 </button>
                 <span className="clean-owned">{owned ? `${owned} owned` : ""}</span>
-                <button
+                <RepeatPurchaseButton
                   disabled={!unlocked || game.coins < price}
-                  onClick={() => onBuy("loose", set.id)}
-                  aria-label={unlocked ? `Buy one ${set.name} pack for ${money(price)}` : `${set.name} locked`}
+                  onPurchase={() => onBuy("loose", set.id)}
+                  ariaLabel={unlocked ? `Buy ${set.name} pack for ${money(price)}. Hold to buy rapidly.` : `${set.name} locked`}
                 >
                   {unlocked ? money(price) : "LOCKED"}
-                </button>
+                </RepeatPurchaseButton>
               </article>
             );
           })}
@@ -339,7 +418,7 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
         )}
 
         <section className="clean-upgrades">
-          <div className="clean-section-title"><h3>Upgrades</h3><span>THREE SIMPLE TRACKS</span></div>
+          <div className="clean-section-title"><h3>Upgrades</h3></div>
           {unlockedUpgrades.length === 0 ? (
             <p className="clean-empty">Open {Math.max(0, 5 - game.packsOpened)} more packs to unlock the first upgrade.</p>
           ) : (
@@ -408,7 +487,7 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard }) {
       <div className="clean-binder-grid">
         {set.cards.map((card) => {
           const count = game.collection[card.id] || 0;
-          const rarityId = game.bestRarities?.[card.id] || card.rarity;
+          const rarityId = card.rarity;
           const rarity = RARITIES[rarityId];
           return (
             <button
@@ -435,7 +514,7 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard }) {
 function CardDetail({ game, cardId, onClose }) {
   const card = getCard(cardId);
   if (!card) return null;
-  const rarityId = game.bestRarities?.[card.id] || card.rarity;
+  const rarityId = card.rarity;
   const rarity = RARITIES[rarityId];
   const count = game.collection[card.id] || 0;
   const duplicateValue = Math.ceil(getCardSaleValue(game, card.id) * (1 + (game.upgrades?.shelf || 0) * 0.2));
@@ -452,7 +531,7 @@ function CardDetail({ game, cardId, onClose }) {
             <div><dt>COPIES</dt><dd>{count}</dd></div>
             <div><dt>EACH EXTRA</dt><dd>{money(duplicateValue)}</dd></div>
           </dl>
-          <small>Selling duplicates keeps your best copy. Higher rarity printings replace the copy shown here.</small>
+          <small>Selling duplicates always keeps one copy. This card is permanently {rarity.label}.</small>
         </div>
       </article>
     </div>
@@ -467,7 +546,7 @@ function SetTray({ game, set, onCard }) {
       <div>
         {set.cards.map((card) => {
           const count = game.collection[card.id] || 0;
-          const rarityId = game.bestRarities?.[card.id] || card.rarity;
+          const rarityId = card.rarity;
           const rarity = RARITIES[rarityId];
           return (
             <button
@@ -850,11 +929,12 @@ export default function PackworksGameClean() {
     const next = buyProduct(gameRef.current, productId, setId);
     if (next === gameRef.current) {
       getAudio().sound("deny");
-      return;
+      return false;
     }
     commit(next);
     setBinderSetId(setId);
     getAudio().sound("purchase");
+    return true;
   }, [commit, getAudio]);
 
   const handleBreak = useCallback((productId) => {
@@ -956,7 +1036,6 @@ export default function PackworksGameClean() {
   const derived = useMemo(() => getDerived(game), [game]);
   const activeSet = getSet(game.activeSet);
   const loosePacks = getProductCount(game, game.activeSet, "loose");
-  const packPrice = getPackPrice(game, "loose");
   const breakableProduct = SHOP_PRODUCTS.find(
     (product) => product.id !== "loose" && getProductCount(game, game.activeSet, product.id) > 0,
   );
@@ -1033,20 +1112,27 @@ export default function PackworksGameClean() {
                 ? `${loosePacks} READY / TAP OR HOLD`
                 : breakableProduct
                   ? `${breakableProduct.label.toUpperCase()} WAITING`
-                  : "BUY ONE TO KEEP OPENING"}
+                  : "PACKS AVAILABLE IN SHOP"}
             </small>
           </span>
         </button>
 
-        {!loosePacks && (
+        {!loosePacks && breakableProduct && (
           <button
             className="clean-buy-one"
-            disabled={!breakableProduct && game.coins < packPrice}
-            onClick={() => breakableProduct ? handleBreak(breakableProduct.id) : handleBuy("loose")}
+            onClick={() => handleBreak(breakableProduct.id)}
           >
-            {breakableProduct ? `BREAK ${breakableProduct.label.toUpperCase()}` : "BUY A PACK"}
-            <span>{breakableProduct ? `${breakableProduct.packs} PACKS` : `${money(packPrice)} CASH`}</span>
+            BREAK {breakableProduct.label.toUpperCase()}
+            <span>{breakableProduct.packs} PACKS</span>
           </button>
+        )}
+
+        {!loosePacks && !breakableProduct && (
+          <div className="clean-shop-cue" aria-label="Packs are available from the Shop tab">
+            <i aria-hidden="true" />
+            <strong>PACKS IN SHOP</strong>
+            <span>USE THE SHOP TAB ABOVE</span>
+          </div>
         )}
 
         <button
