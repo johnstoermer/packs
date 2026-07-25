@@ -2687,14 +2687,22 @@
 }
 
 .pw-clean .reveal-card.is-transmuted:not(.is-revealed) {
-  animation: transmute-morph 0.9s ease-out;
   filter: hue-rotate(18deg);
 }
 
-@keyframes transmute-morph {
-  0% { transform: translate(-50%, -50%) rotate(var(--fan-rotate, 0deg)) scale(1); filter: brightness(1); }
-  40% { filter: brightness(2.2) saturate(2); }
-  100% { filter: brightness(1) hue-rotate(18deg); }
+.pw-clean .reveal-card.is-transmuted:not(.is-revealed) .reveal-card-inner {
+  animation: transmute-shake 0.62s ease-in-out;
+}
+
+@keyframes transmute-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); filter: brightness(1); }
+  12% { transform: translateX(-5px) rotate(-2.4deg); filter: brightness(1.6) saturate(1.7); }
+  26% { transform: translateX(5px) rotate(2.4deg); }
+  40% { transform: translateX(-4px) rotate(-1.9deg); filter: brightness(2.1) saturate(2); }
+  55% { transform: translateX(4px) rotate(1.6deg); }
+  70% { transform: translateX(-3px) rotate(-1.1deg); filter: brightness(1.5); }
+  84% { transform: translateX(2px) rotate(0.6deg); }
+  94% { transform: translateX(-1px) rotate(-0.3deg); }
 }
 
 .pw-clean .reveal-card.is-fused-away {

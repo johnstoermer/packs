@@ -1128,7 +1128,7 @@ export default function PackworksGameClean() {
   }, [commit, commitOpening, getAudio, pushFx, pushToast]);
 
   const beginManualOpen = useCallback(() => {
-    if (!ready || drawer || selectedCard) return;
+    if (!ready || drawer || selectedCard || gameRef.current.discoverOffer) return;
     const currentOpening = openingRef.current;
     if (currentOpening && currentOpening.phase !== "summary") return;
     const current = gameRef.current;
@@ -1257,7 +1257,7 @@ export default function PackworksGameClean() {
   useEffect(() => {
     clearHoldRevealTimer();
     const autoOpeningHeld = spaceHeld || mobileAutoHeld;
-    if (!autoOpeningHeld || drawer || selectedCard || !opening) return undefined;
+    if (!autoOpeningHeld || drawer || selectedCard || !opening || game.discoverOffer) return undefined;
 
     if (opening.phase === "ready") {
       const nextIndex = opening.result.cards.findIndex((_, index) => !opening.revealed.includes(index));
@@ -1293,6 +1293,7 @@ export default function PackworksGameClean() {
     selectedCard,
     mobileAutoHeld,
     spaceHeld,
+    game.discoverOffer,
   ]);
 
   useEffect(() => {
@@ -1427,6 +1428,7 @@ export default function PackworksGameClean() {
     const onKeyDown = (event) => {
       if (event.code === "Space" && !drawer && !selectedCard) {
         event.preventDefault();
+        if (gameRef.current.discoverOffer) return;
         if (event.repeat || spaceHeldRef.current) return;
         spaceHeldRef.current = true;
         setSpaceHeld(true);
@@ -1755,7 +1757,7 @@ export default function PackworksGameClean() {
         </div>
       )}
 
-      {game.discoverOffer && !opening && (
+      {game.discoverOffer && (
         <div className="clean-modal-scrim">
           <article className="discover-modal" onMouseDown={(event) => event.stopPropagation()}>
             <b>DISCOVER</b>
