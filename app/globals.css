@@ -3467,6 +3467,9 @@ kbd {
   --card-width: clamp(148px, 14.5vw, 198px);
   --card-height: calc(var(--card-width) * 1.42);
   --card-gap: min(15.5vw, 205px);
+  --shrink: 1;
+  --rowoff: 0;
+  --row-gap: calc(var(--card-height) * var(--shrink) + clamp(14px, 2.4vh, 28px));
   opacity: 0;
   filter: drop-shadow(0 17px 12px rgba(0, 0, 0, 0.4));
   transform: translate(-50%, 30%) rotate(calc(var(--spread) * 8deg)) scale(0.45);
@@ -3481,9 +3484,12 @@ kbd {
 .reveal-card.is-dealt {
   opacity: 1;
   transform:
-    translate(calc(-50% + var(--spread) * var(--card-gap)), -51%)
+    translate(
+      calc(-50% + var(--spread) * var(--card-gap) * var(--shrink)),
+      calc(-51% + var(--rowoff) * var(--row-gap))
+    )
     rotate(calc(var(--spread) * 2.4deg))
-    scale(1);
+    scale(var(--shrink));
 }
 
 .reveal-card.is-hoverable {
@@ -3501,27 +3507,36 @@ kbd {
 .reveal-card.is-revealed {
   opacity: 1;
   transform:
-    translate(calc(-50% + var(--spread) * var(--card-gap)), -51%)
+    translate(
+      calc(-50% + var(--spread) * var(--card-gap) * var(--shrink)),
+      calc(-51% + var(--rowoff) * var(--row-gap))
+    )
     rotate(calc(var(--spread) * 2.4deg))
-    scale(1);
+    scale(var(--shrink));
 }
 
 .reveal-card.is-settled {
   cursor: pointer;
   pointer-events: auto;
   transform:
-    translate(calc(-50% + var(--spread) * var(--card-gap)), -58%)
+    translate(
+      calc(-50% + var(--spread) * var(--card-gap) * var(--shrink)),
+      calc(-58% + var(--rowoff) * var(--row-gap) * 0.94)
+    )
     rotate(calc(var(--spread) * 1.6deg))
-    scale(0.91);
+    scale(calc(var(--shrink) * 0.91));
 }
 
 .reveal-card.is-settled:hover {
   z-index: 24;
   filter: drop-shadow(0 27px 26px color-mix(in srgb, var(--rarity) 42%, rgba(0, 0, 0, 0.55)));
   transform:
-    translate(calc(-50% + var(--spread) * var(--card-gap)), -64%)
+    translate(
+      calc(-50% + var(--spread) * var(--card-gap) * var(--shrink)),
+      calc(-64% + var(--rowoff) * var(--row-gap) * 0.94)
+    )
     rotate(0)
-    scale(0.98);
+    scale(calc(var(--shrink) * 0.98));
 }
 
 .reveal-card.count-5 {
@@ -4165,15 +4180,22 @@ kbd {
   .reveal-card.is-dealt,
   .reveal-card.is-revealed {
     transform:
-      translate(calc(-50% + var(--spread) * var(--card-gap)), -51%)
-      rotate(calc(var(--spread) * 2.2deg));
+      translate(
+        calc(-50% + var(--spread) * var(--card-gap) * var(--shrink)),
+        calc(-51% + var(--rowoff) * var(--row-gap))
+      )
+      rotate(calc(var(--spread) * 2.2deg))
+      scale(var(--shrink));
   }
 
   .reveal-card.is-settled {
     transform:
-      translate(calc(-50% + var(--spread) * var(--card-gap)), -58%)
+      translate(
+        calc(-50% + var(--spread) * var(--card-gap) * var(--shrink)),
+        calc(-58% + var(--rowoff) * var(--row-gap) * 0.94)
+      )
       rotate(calc(var(--spread) * 1.4deg))
-      scale(0.9);
+      scale(calc(var(--shrink) * 0.9));
   }
 }
 
@@ -4202,38 +4224,9 @@ kbd {
     --card-width: min(30vw, 124px);
   }
 
-  .reveal-card:nth-child(1) { --mobile-x: -69px; --mobile-y: -115px; --mobile-r: -3deg; }
-  .reveal-card:nth-child(2) { --mobile-x: 69px; --mobile-y: -115px; --mobile-r: 3deg; }
-  .reveal-card:nth-child(3) { --mobile-x: -69px; --mobile-y: 78px; --mobile-r: 2deg; }
-  .reveal-card:nth-child(4) { --mobile-x: 69px; --mobile-y: 78px; --mobile-r: -2deg; }
-  .reveal-card:nth-child(5) { --mobile-x: 0px; --mobile-y: 78px; --mobile-r: 0deg; }
-
-  .reveal-card.count-5 { --card-width: min(27vw, 112px); }
-  .reveal-card.count-5:nth-child(1) { --mobile-x: -116px; --mobile-y: -110px; --mobile-r: -3deg; }
-  .reveal-card.count-5:nth-child(2) { --mobile-x: 0px; --mobile-y: -110px; --mobile-r: 0deg; }
-  .reveal-card.count-5:nth-child(3) { --mobile-x: 116px; --mobile-y: -110px; --mobile-r: 3deg; }
-  .reveal-card.count-5:nth-child(4) { --mobile-x: -60px; --mobile-y: 70px; --mobile-r: 2deg; }
-  .reveal-card.count-5:nth-child(5) { --mobile-x: 60px; --mobile-y: 70px; --mobile-r: -2deg; }
-
-  .reveal-card.is-dealt,
-  .reveal-card.is-revealed {
-    transform:
-      translate(calc(-50% + var(--mobile-x)), calc(-50% + var(--mobile-y)))
-      rotate(var(--mobile-r));
-  }
-
-  .reveal-card.is-settled {
-    transform:
-      translate(calc(-50% + var(--mobile-x)), calc(-67% + var(--mobile-y)))
-      rotate(var(--mobile-r))
-      scale(0.88);
-  }
-
-  .reveal-card.is-settled:hover {
-    transform:
-      translate(calc(-50% + var(--mobile-x)), calc(-72% + var(--mobile-y)))
-      rotate(0)
-      scale(0.94);
+  .reveal-card {
+    --card-gap: min(31vw, 132px);
+    --row-gap: calc(var(--card-height) * var(--shrink) + clamp(12px, 2vh, 20px));
   }
 
   .opening-instruction {
@@ -4287,15 +4280,22 @@ kbd {
   .reveal-card.is-dealt,
   .reveal-card.is-revealed {
     transform:
-      translate(calc(-50% + var(--spread) * var(--card-gap)), -51%)
-      rotate(calc(var(--spread) * 1.7deg));
+      translate(
+        calc(-50% + var(--spread) * var(--card-gap) * var(--shrink)),
+        calc(-51% + var(--rowoff) * var(--row-gap))
+      )
+      rotate(calc(var(--spread) * 1.7deg))
+      scale(var(--shrink));
   }
 
   .reveal-card.is-settled {
     transform:
-      translate(calc(-50% + var(--spread) * var(--card-gap)), -61%)
+      translate(
+        calc(-50% + var(--spread) * var(--card-gap) * var(--shrink)),
+        calc(-61% + var(--rowoff) * var(--row-gap) * 0.94)
+      )
       rotate(calc(var(--spread) * 1.2deg))
-      scale(0.89);
+      scale(calc(var(--shrink) * 0.89));
   }
 
   .card-front {
@@ -4386,24 +4386,6 @@ kbd {
 @media (max-width: 700px) and (min-height: 621px) {
   .reveal-card {
     --card-width: min(30vw, 124px);
-  }
-
-  .reveal-card.count-5 {
-    --card-width: min(27vw, 112px);
-  }
-
-  .reveal-card.is-dealt,
-  .reveal-card.is-revealed {
-    transform:
-      translate(calc(-50% + var(--mobile-x)), calc(-50% + var(--mobile-y)))
-      rotate(var(--mobile-r));
-  }
-
-  .reveal-card.is-settled {
-    transform:
-      translate(calc(-50% + var(--mobile-x)), calc(-67% + var(--mobile-y)))
-      rotate(var(--mobile-r))
-      scale(0.88);
   }
 }
 

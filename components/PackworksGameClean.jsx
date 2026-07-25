@@ -133,6 +133,9 @@ function RevealCard({
   pull,
   index,
   count,
+  perRow,
+  rows,
+  shrink,
   revealed,
   echo,
   latest,
@@ -147,7 +150,10 @@ function RevealCard({
   const presentation = getCardPresentation(pull.card, pull.rarity);
   const dealt = ["ready", "complete", "summary"].includes(phase);
   const canReveal = phase === "ready" && !revealed;
-  const spread = index - (count - 1) / 2;
+  const row = Math.floor(index / perRow);
+  const colsInRow = Math.min(perRow, count - row * perRow);
+  const spread = (index - row * perRow) - (colsInRow - 1) / 2;
+  const rowOffset = row - (rows - 1) / 2;
   const copyLabel = pull.isNew ? "NEW" : "DUPLICATE";
 
   return (
@@ -158,6 +164,8 @@ function RevealCard({
       style={{
         "--index": index,
         "--spread": spread,
+        "--rowoff": rowOffset,
+        "--shrink": shrink,
         "--rarity": rarity.color,
         "--rarity-deep": rarity.deep,
         "--signal": signal.color,
@@ -794,6 +802,7 @@ export default function PackworksGameClean() {
   const [fx, setFx] = useState({});
   const [revealEchoes, setRevealEchoes] = useState({});
   const [adminActive, setAdminActive] = useState(false);
+  const [boardNarrow, setBoardNarrow] = useState(false);
   const adminActiveRef = useRef(false);
   const fxSerialRef = useRef(0);
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -1039,6 +1048,14 @@ export default function PackworksGameClean() {
   }, [closeOpening, commit, pushToast]);
 
   useEffect(() => {
+    const media = window.matchMedia("(max-width: 700px)");
+    const update = () => setBoardNarrow(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
     if (!ready) return undefined;
     const onStorage = (event) => {
       if (event.key !== ADMIN_FLAG_KEY) return;
@@ -1055,6 +1072,18 @@ export default function PackworksGameClean() {
     signalAtRef.current = now;
     getAudio().sound("signal", rarityOrder);
   }, [getAudio]);
+
+  const boardLayout = useMemo(() => {
+    const count = opening?.result?.cards?.length || 0;
+    if (!count) return { count: 0, perRow: 1, rows: 1, shrink: 1 };
+    const maxPer = boardNarrow ? 3 : 7;
+    const rows = Math.max(1, Math.ceil(count / maxPer));
+    const perRow = Math.ceil(count / rows);
+    const widthFactor = (boardNarrow ? 3.2 : 6.6) / perRow;
+    const rowsFactor = rows <= 1 ? 1 : rows === 2 ? 0.84 : rows === 3 ? 0.7 : rows === 4 ? 0.56 : 0.48;
+    const shrink = +Math.min(1, widthFactor, rowsFactor).toFixed(3);
+    return { count, perRow, rows, shrink };
+  }, [opening?.result?.cards?.length, boardNarrow]);
 
   const revealCard = useCallback((index) => {
     const currentOpening = openingRef.current;
@@ -1673,7 +1702,10 @@ export default function PackworksGameClean() {
                 key={`${pull.card.id}-${index}`}
                 pull={pull}
                 index={index}
-                count={opening.result.cards.length}
+                count={boardLayout.count}
+                perRow={boardLayout.perRow}
+                rows={boardLayout.rows}
+                shrink={boardLayout.shrink}
                 revealed={!!pull.revealed}
                 echo={revealEchoes[index]}
                 latest={opening.impact?.index === index}
