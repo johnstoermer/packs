@@ -16,7 +16,6 @@ import {
   getFusionLevel,
   getPackPrice,
   getProductCount,
-  getSealedAssetValue,
   getUpgradeCost,
   hydrateState,
   openPack,
@@ -28,7 +27,7 @@ function clone(value) {
   return structuredClone(value);
 }
 
-test("a new game starts with three sealed packs and no cards", () => {
+test("a new game starts with three packs and no cards", () => {
   const state = createInitialState(1);
   assert.equal(getProductCount(state, "corner", "loose"), 3);
   assert.deepEqual(state.collection, {});
@@ -36,7 +35,7 @@ test("a new game starts with three sealed packs and no cards", () => {
   assert.equal(state.packsOpened, 0);
 });
 
-test("buying product changes sealed stock but can never create a card", () => {
+test("buying product changes pack stock but can never create a card", () => {
   const state = { ...createInitialState(1), coins: 500 };
   const beforeCollection = clone(state.collection);
   const next = buyProduct(state, "loose");
@@ -45,20 +44,16 @@ test("buying product changes sealed stock but can never create a card", () => {
   assert.equal(next.coins, 490);
 });
 
-test("sealed market prices rise with opened volume", () => {
+test("pack prices stay simple as opened volume grows", () => {
   const fresh = createInitialState(1);
   const knownBuyer = { ...fresh, packsOpened: 866 };
   assert.equal(getPackPrice(fresh, "loose"), 10);
-  assert.ok(getPackPrice(knownBuyer, "loose") > 19.9);
-  assert.ok(getPackPrice(knownBuyer, "loose") < 20.1);
-  assert.ok(getSealedAssetValue(knownBuyer) > getSealedAssetValue(fresh));
+  assert.equal(getPackPrice(knownBuyer, "loose"), 10);
 });
 
-test("supplier terms reduce purchase cost without reducing owned asset value", () => {
+test("supplier terms reduce purchase cost", () => {
   const state = { ...createInitialState(1), upgrades: { ...createInitialState(1).upgrades, supplier: 2 } };
-  const plain = createInitialState(1);
   assert.equal(getPackPrice(state, "loose"), 9.5);
-  assert.equal(getSealedAssetValue(state), getSealedAssetValue(plain));
 });
 
 test("opening consumes one pack, files six cards, and grants no direct cash", () => {

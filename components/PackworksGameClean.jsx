@@ -268,12 +268,11 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
   const unlockedUpgrades = CLEAN_UPGRADES.filter((upgrade) => game.packsOpened >= upgrade.unlockPacks);
   const nextUpgrade = CLEAN_UPGRADES.find((upgrade) => game.packsOpened < upgrade.unlockPacks);
   const unlockedSets = SETS.filter((set) => game.unlockedSets.includes(set.id));
-  const derived = getDerived(game);
 
   return (
     <aside className="clean-drawer" aria-label="Shop">
       <header>
-        <div><span>SHOP</span><h2>Sealed stock</h2></div>
+        <div><span>SHOP</span><h2>Pack shop</h2></div>
         <button onClick={onClose} aria-label="Close shop">CLOSE</button>
       </header>
 
@@ -348,8 +347,6 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
         </section>
 
         <footer className="clean-shop-footer">
-          <div><span>SEALED VALUE</span><strong>{money(derived.sealedAssetValue)}</strong></div>
-          <p>Unopened product rises with market demand. Opening turns it into binder income now.</p>
           <button onClick={onReset}>RESET SAVE</button>
         </footer>
       </div>
@@ -451,6 +448,8 @@ export default function PackworksGameClean() {
   const audioRef = useRef(null);
   const gameRef = useRef(createInitialState(0));
   const openingTimersRef = useRef([]);
+  const holdRevealTimerRef = useRef(null);
+  const spaceHeldRef = useRef(false);
   const revealLocksRef = useRef(new Set());
   const impactSerialRef = useRef(0);
   const toastSerialRef = useRef(0);
@@ -464,6 +463,7 @@ export default function PackworksGameClean() {
   const [selectedCard, setSelectedCard] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [resetArmed, setResetArmed] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
 
   const commit = useCallback((nextOrUpdater) => {
     const next = typeof nextOrUpdater === "function" ? nextOrUpdater(gameRef.current) : nextOrUpdater;
@@ -538,11 +538,19 @@ export default function PackworksGameClean() {
     openingTimersRef.current = [];
   }, []);
 
+  const clearHoldRevealTimer = useCallback(() => {
+    if (holdRevealTimerRef.current !== null) {
+      window.clearTimeout(holdRevealTimerRef.current);
+      holdRevealTimerRef.current = null;
+    }
+  }, []);
+
   const closeOpening = useCallback(() => {
     clearOpeningTimers();
+    clearHoldRevealTimer();
     revealLocksRef.current.clear();
     setOpening(null);
-  }, [clearOpeningTimers]);
+  }, [clearHoldRevealTimer, clearOpeningTimers]);
 
   const signalCard = useCallback((rarityOrder) => {
     const now = performance.now();
@@ -596,7 +604,7 @@ export default function PackworksGameClean() {
       getAudio().sound("deny");
       pushToast(
         rolled.error === "MANUAL_RATE_CAP" ? "ONE MOMENT" : "NO PACKS READY",
-        rolled.error === "MANUAL_RATE_CAP" ? "Let the foil settle before opening another." : "Buy a sealed pack from the shop.",
+        rolled.error === "MANUAL_RATE_CAP" ? "Let the foil settle before opening another." : "Buy a pack from the shop.",
         "warning",
       );
       if (rolled.error === "NO_STOCK") setDrawer("shop");
@@ -631,6 +639,43 @@ export default function PackworksGameClean() {
       audio.sound("deal");
     }, dealDelay));
   }, [clearOpeningTimers, commit, drawer, getAudio, opening, pushToast, ready, selectedCard]);
+
+  useEffect(() => {
+    clearHoldRevealTimer();
+    if (!spaceHeld || drawer || selectedCard || !opening) return undefined;
+
+    if (opening.phase === "ready") {
+      const nextIndex = opening.result.cards.findIndex((_, index) => !opening.revealed.includes(index));
+      if (nextIndex >= 0) {
+        const lastIndex = opening.revealed.at(-1);
+        const lastPull = Number.isInteger(lastIndex) ? opening.result.cards[lastIndex] : null;
+        const lastOrder = lastPull ? RARITIES[lastPull.rarity].order : 0;
+        const delay = lastOrder >= 4 ? 1250 : lastOrder === 3 ? 900 : lastOrder === 2 ? 650 : 480;
+        holdRevealTimerRef.current = window.setTimeout(() => {
+          holdRevealTimerRef.current = null;
+          revealCard(nextIndex);
+        }, delay);
+      }
+    } else if (
+      opening.phase === "summary"
+      && getProductCount(gameRef.current, gameRef.current.activeSet, "loose") > 0
+    ) {
+      holdRevealTimerRef.current = window.setTimeout(() => {
+        holdRevealTimerRef.current = null;
+        beginManualOpen();
+      }, 650);
+    }
+
+    return clearHoldRevealTimer;
+  }, [
+    beginManualOpen,
+    clearHoldRevealTimer,
+    drawer,
+    opening,
+    revealCard,
+    selectedCard,
+    spaceHeld,
+  ]);
 
   const handleBuy = useCallback((productId) => {
     const next = buyProduct(gameRef.current, productId);
@@ -685,20 +730,34 @@ export default function PackworksGameClean() {
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.repeat) return;
       if (event.code === "Space" && !drawer && !selectedCard) {
         event.preventDefault();
-        if (opening?.phase === "summary") closeOpening();
-        else beginManualOpen();
+        if (event.repeat || spaceHeldRef.current) return;
+        spaceHeldRef.current = true;
+        setSpaceHeld(true);
+        if (!opening || opening.phase === "summary") beginManualOpen();
       } else if (event.key === "Escape") {
         if (selectedCard) setSelectedCard(null);
         else if (opening?.phase === "summary") closeOpening();
         else setDrawer(null);
       }
     };
+    const stopHoldingSpace = (event) => {
+      if (event?.type === "keyup" && event.code !== "Space") return;
+      if (event?.code === "Space") event.preventDefault();
+      spaceHeldRef.current = false;
+      setSpaceHeld(false);
+      clearHoldRevealTimer();
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [beginManualOpen, closeOpening, drawer, opening, selectedCard]);
+    window.addEventListener("keyup", stopHoldingSpace);
+    window.addEventListener("blur", stopHoldingSpace);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", stopHoldingSpace);
+      window.removeEventListener("blur", stopHoldingSpace);
+    };
+  }, [beginManualOpen, clearHoldRevealTimer, closeOpening, drawer, opening, selectedCard]);
 
   useEffect(() => {
     const preventSelection = (event) => event.preventDefault();
@@ -706,7 +765,10 @@ export default function PackworksGameClean() {
     return () => document.removeEventListener("selectstart", preventSelection);
   }, []);
 
-  useEffect(() => () => clearOpeningTimers(), [clearOpeningTimers]);
+  useEffect(() => () => {
+    clearOpeningTimers();
+    clearHoldRevealTimer();
+  }, [clearHoldRevealTimer, clearOpeningTimers]);
 
   const derived = useMemo(() => getDerived(game), [game]);
   const activeSet = getSet(game.activeSet);
@@ -719,7 +781,7 @@ export default function PackworksGameClean() {
 
   return (
     <main
-      className={`packworks pw2 pw-clean ${game.settings.reducedEffects ? "reduced-effects" : ""} ${opening ? "opening-active" : ""}`}
+      className={`packworks pw2 pw-clean ${game.settings.reducedEffects ? "reduced-effects" : ""} ${opening ? "opening-active" : ""} ${spaceHeld ? "space-held" : ""}`}
       style={{ "--set-a": activeSet.colors[0], "--set-b": activeSet.colors[1], "--set-c": activeSet.colors[2] }}
     >
       <header className="clean-topbar">
@@ -767,7 +829,7 @@ export default function PackworksGameClean() {
             <strong>{loosePacks ? "OPEN PACK" : "NO PACKS READY"}</strong>
             <small>
               {loosePacks
-                ? `${loosePacks} SEALED ON THE TABLE`
+                ? `${loosePacks} READY / HOLD SPACE`
                 : breakableProduct
                   ? `${breakableProduct.label.toUpperCase()} WAITING`
                   : "BUY ONE TO KEEP OPENING"}
@@ -791,7 +853,7 @@ export default function PackworksGameClean() {
           <i />
           <div><strong>{formatNumber(game.packsOpened)}</strong><span>PACKS OPENED</span></div>
           <i />
-          <div><strong>{formatNumber(derived.sealedPacks)}</strong><span>SEALED</span></div>
+          <div><strong>{formatNumber(derived.packStock)}</strong><span>PACKS READY</span></div>
         </div>
         <p className="clean-loop">Open cards. The binder earns cash. Cash buys more packs.</p>
       </section>
@@ -844,7 +906,7 @@ export default function PackworksGameClean() {
           <div className="foil-pack-wrap">
             <div className="foil-half foil-top"><PackFace set={opening.result.set} /></div>
             <div className="foil-half foil-bottom"><PackFace set={opening.result.set} /></div>
-            <span className="tear-ribbon">PACKWORKS / FACTORY SEALED</span>
+            <span className="tear-ribbon">PACKWORKS / FACTORY WRAPPED</span>
             <span className="tear-shockwave" />
             <PackDebris />
           </div>
@@ -866,7 +928,13 @@ export default function PackworksGameClean() {
           </div>
           {(opening.phase === "ready" || opening.phase === "complete") && (
             <div className="opening-instruction clean-opening-instruction">
-              <strong>{opening.phase === "complete" ? "PACK COMPLETE" : "HOVER FOR A RARITY SIGNAL / CLICK EACH CARD"}</strong>
+              <strong>
+                {opening.phase === "complete"
+                  ? "PACK COMPLETE"
+                  : spaceHeld
+                    ? "SPACE HELD / REVEALING ONE BY ONE"
+                    : "HOVER FOR RARITY / CLICK EACH CARD OR HOLD SPACE"}
+              </strong>
             </div>
           )}
           <OpeningImpact impact={opening.impact} />
