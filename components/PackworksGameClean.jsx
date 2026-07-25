@@ -12,8 +12,11 @@ import {
   getSet,
 } from "../lib/gameData";
 import {
+  ADMIN_FLAG_KEY,
+  ADMIN_SAVE_KEY,
   SAVE_KEY,
   applyOfflineProgress,
+  createAdminState,
   breakProduct,
   buyProduct,
   buyUpgrade,
@@ -789,6 +792,8 @@ export default function PackworksGameClean() {
   const [rewriteArmed, setRewriteArmed] = useState(false);
   const [fx, setFx] = useState({});
   const [revealEchoes, setRevealEchoes] = useState({});
+  const [adminActive, setAdminActive] = useState(false);
+  const adminActiveRef = useRef(false);
   const fxSerialRef = useRef(0);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [mobileAutoHeld, setMobileAutoHeld] = useState(false);
@@ -864,6 +869,30 @@ export default function PackworksGameClean() {
   }, [getAudio, pushToast]);
 
   useEffect(() => {
+    let adminFlag = false;
+    try {
+      adminFlag = window.localStorage.getItem(ADMIN_FLAG_KEY) === "1";
+    } catch {
+      adminFlag = false;
+    }
+    if (adminFlag) {
+      let sandbox = null;
+      try {
+        sandbox = JSON.parse(window.localStorage.getItem(ADMIN_SAVE_KEY) || "null");
+      } catch {
+        sandbox = null;
+      }
+      const adminState = sandbox
+        ? { ...hydrateState(sandbox, Date.now()), adminMode: true }
+        : createAdminState(Date.now());
+      adminActiveRef.current = true;
+      setAdminActive(true);
+      commit(adminState);
+      setBinderSetId(adminState.activeSet);
+      window.setTimeout(() => pushToast("ADMIN MODE", "Testing sandbox active — everything unlocked. Your real save is untouched.", "warning", 6500), 300);
+      setReady(true);
+      return;
+    }
     let loaded = null;
     try {
       loaded = JSON.parse(window.localStorage.getItem(SAVE_KEY) || "null");
@@ -891,6 +920,10 @@ export default function PackworksGameClean() {
     if (!ready) return undefined;
     const save = () => {
       try {
+        if (adminActiveRef.current) {
+          window.localStorage.setItem(ADMIN_SAVE_KEY, serializeState(gameRef.current));
+          return;
+        }
         const stored = window.localStorage.getItem(SAVE_KEY);
         if (storedSaveDominates(stored, gameRef.current)) return;
         window.localStorage.setItem(SAVE_KEY, serializeState(gameRef.current));
@@ -955,6 +988,63 @@ export default function PackworksGameClean() {
     setSwipeRevealing(false);
     commitOpening(null);
   }, [clearHoldRevealTimer, clearOpeningTimers, commitOpening]);
+
+  const applyAdminSwitch = useCallback((enabled) => {
+    if (enabled === adminActiveRef.current) return;
+    try {
+      if (enabled) {
+        const stored = window.localStorage.getItem(SAVE_KEY);
+        if (!storedSaveDominates(stored, gameRef.current)) {
+          window.localStorage.setItem(SAVE_KEY, serializeState(gameRef.current));
+        }
+        let sandbox = null;
+        try {
+          sandbox = JSON.parse(window.localStorage.getItem(ADMIN_SAVE_KEY) || "null");
+        } catch {
+          sandbox = null;
+        }
+        const adminState = sandbox
+          ? { ...hydrateState(sandbox, Date.now()), adminMode: true }
+          : createAdminState(Date.now());
+        adminActiveRef.current = true;
+        setAdminActive(true);
+        closeOpening();
+        setDrawer(null);
+        commit(adminState);
+        setBinderSetId(adminState.activeSet);
+        pushToast("ADMIN MODE", "Testing sandbox active — everything unlocked. Your real save is untouched.", "warning", 6500);
+      } else {
+        window.localStorage.setItem(ADMIN_SAVE_KEY, serializeState(gameRef.current));
+        let real = null;
+        try {
+          real = JSON.parse(window.localStorage.getItem(SAVE_KEY) || "null");
+        } catch {
+          real = null;
+        }
+        const restored = hydrateState(real, Date.now());
+        adminActiveRef.current = false;
+        setAdminActive(false);
+        closeOpening();
+        setDrawer(null);
+        commit(restored);
+        setBinderSetId(restored.activeSet);
+        pushToast("ADMIN MODE OFF", "Back to your real save.", "success", 5000);
+      }
+    } catch {
+      // Local storage can be unavailable in strict privacy modes.
+    }
+  }, [closeOpening, commit, pushToast]);
+
+  useEffect(() => {
+    if (!ready) return undefined;
+    const onStorage = (event) => {
+      if (event.key !== ADMIN_FLAG_KEY) return;
+      applyAdminSwitch(event.newValue === "1");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [ready, applyAdminSwitch]);
+
 
   const signalCard = useCallback((rarityOrder) => {
     const now = performance.now();
@@ -1281,10 +1371,10 @@ export default function PackworksGameClean() {
       pushToast("RESET SAVE?", "Press reset once more to erase local progress.", "warning");
       return;
     }
-    window.localStorage.removeItem(SAVE_KEY);
-    const fresh = createInitialState(Date.now());
+    window.localStorage.removeItem(adminActiveRef.current ? ADMIN_SAVE_KEY : SAVE_KEY);
+    const fresh = adminActiveRef.current ? createAdminState(Date.now()) : createInitialState(Date.now());
     commit(fresh);
-    setBinderSetId("corner");
+    setBinderSetId(fresh.activeSet);
     setDrawer(null);
     setResetArmed(false);
     closeOpening();
@@ -1397,6 +1487,11 @@ export default function PackworksGameClean() {
       style={{ "--set-a": activeSet.colors[0], "--set-b": activeSet.colors[1], "--set-c": activeSet.colors[2] }}
     >
       <header className="clean-topbar">
+        {adminActive && (
+          <span className="clean-admin-badge" title="Testing sandbox — everything unlocked; your real save is untouched.">
+            ADMIN
+          </span>
+        )}
         <div className="clean-brand">
           <span className="clean-brand-mark"><i /><i /><i /></span>
           <strong>PACKWORKS</strong>

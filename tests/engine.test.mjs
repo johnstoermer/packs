@@ -334,3 +334,28 @@ test("supports keep nudge language and never touch sale value or prices", () => 
     );
   }
 });
+
+test("admin sandbox unlocks everything and never leaks into real saves", async () => {
+  const { ADMIN_SAVE_KEY, SAVE_KEY, createAdminState, openPack, serializeState } = await import("../lib/gameLogic.js");
+  const { getCaseSlots } = await import("../lib/engineCards.js");
+  assert.notEqual(ADMIN_SAVE_KEY, SAVE_KEY);
+
+  const admin = createAdminState(1000);
+  assert.equal(admin.adminMode, true);
+  assert.equal(admin.unlockedSets.length, SETS.length);
+  assert.ok(admin.coins >= 1e15);
+  assert.equal(admin.beat, 5);
+  assert.equal(getCaseSlots(admin).slots, 6);
+  assert.ok(getCaseSlots(admin).milestones.every((milestone) => milestone.met));
+
+  // No manual rate cap in the sandbox: back-to-back opens both succeed.
+  const first = openPack(admin, { manual: true, source: "loose", now: 10, rng: () => 0.5 });
+  assert.ok(first.result);
+  const second = openPack(first.state, { manual: true, source: "loose", now: 12, rng: () => 0.5 });
+  assert.ok(second.result);
+
+  // Hydrating any save always strips the admin flag, so a sandbox snapshot
+  // can never impersonate a real save.
+  const roundTrip = hydrateState(JSON.parse(serializeState(admin)), 2000);
+  assert.equal(roundTrip.adminMode, false);
+});
