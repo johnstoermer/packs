@@ -250,6 +250,13 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await seedState(page, state);
   await page.goto("/");
 
+  const borderOf = (label) => page.getByRole("button", { name: label }).first()
+    .evaluate((node) => getComputedStyle(node).borderTopColor);
+  const commonBorder = await borderOf("Missing card 1, show rarity");
+  const chaseBorder = await borderOf("Missing card 12, show rarity");
+  expect(commonBorder).not.toBe(chaseBorder);
+  expect(commonBorder).not.toBe("rgba(255, 255, 255, 0.1)");
+
   await page.getByRole("button", { name: "Missing card 1, show rarity" }).first().click();
   const detail = page.locator(".clean-card-detail");
   await expect(detail).toBeVisible();
