@@ -1,4 +1,4 @@
-import PackworksGame from "../components/PackworksGameV2";
+import PackworksGame from "../components/PackworksGameClean";
 
 export default function Home() {
   return <PackworksGame />;

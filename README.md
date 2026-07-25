@@ -1,46 +1,49 @@
 # PACKWORKS
 
-PACKWORKS is a voxel-isometric incremental card game about the tension between keeping product sealed and opening it for power now. The current release is a complete v1 arc covering beats 1–5.
+PACKWORKS is a clean incremental game about opening card packs and building a binder that pays for the next one.
 
-## Core rules
+## The loop
 
-1. The pack is the only door. No duel, milestone, forge, rule, or offline system can issue a loose card.
-2. Sealed product is an asset. Boxes and cases stay intact until the player deliberately breaks them into openable stock.
-3. Machines can open, but they cannot see. The v1 systems establish manual heat, grade, misprint detection, and false rarity tells ahead of the warehouse automation arc.
+1. Open a sealed six-card pack.
+2. Hover each card for a rarity signal, then reveal every card by hand.
+3. Cards in the binder earn cash every second.
+4. Spend cash on more sealed packs, booster boxes, cases, or one of three upgrades.
 
-These rules are enforced in `lib/gameLogic.js` and covered by the unit suite.
+That is the whole visible game. There are no duel, filing-rule, automation, contract, or beat dashboards.
 
-## Gameplay
+## Progression
 
-- Begin with three sealed loose packs and no cash.
-- Hover each face-down card for an imperfect rarity signal, then reveal all six cards individually.
-- Hand opening applies a permanent +25% hit-slot weight, builds Legendary heat, assesses condition grade, and detects misprints.
-- Cards generate binder income from beat 2 onward.
-- Copies fuse at 2/4/8/16/32 for +40% effect at each threshold.
-- Buy loose packs, booster boxes, and cases. Bulk product stays sealed until deliberately broken.
-- Standing orders automate purchasing only; they never open stock.
-- Build a physical twelve-card list and run an eight-second auto-resolved duel. Wins award sealed packs.
-- Enter Sealed by committing six loose packs, opening all thirty-six cards, and building exclusively from that restricted pool.
-- Write filing rules for true bulk and turn offcuts into tag-biased forged packs.
-- Reach 3/6/9 archetype thresholds in Swarm, Tempo, Relic, and Fortress lists.
+- The player begins with three sealed packs and no loose cards or cash grants.
+- Binder income begins with the first card, but uses a slower payout scale tuned around roughly one minute for an early pack after the starter stock is opened.
+- Display shelves improve binder income.
+- Inspection lamps improve premium-card weight.
+- Supplier terms reduce the purchase price of sealed product.
+- Booster boxes unlock after 10 packs; cases unlock after 150.
+- New sets arrive at 150, 500, 1,500, and 5,000 packs.
+- Duplicate cards fuse at 2, 4, 8, 16, and 32 copies for +40% effect at each milestone.
+- Unopened stock appreciates as total market demand rises.
 
-Manual opening is capped near forty packs per minute. Quick opening shortens the wrapper sequence but never skips individual card reveals.
+Boxes and cases remain sealed until the player deliberately breaks them into loose packs. Only `openPack` can increase a collection count.
 
-## Audio
+## Opening
 
-All audio is synthesized at runtime with the Web Audio API. The mix includes layered foil handling, a zipper tear, six-card deal transients, rarity-specific reveal chords, misprint and fusion stingers, sealed-entry and forge sequences, and a timed four-exchange duel mix with distinct win and loss resolves.
+Pack opening remains deliberately elaborate even though the surrounding game is minimal:
+
+- staged foil handling and tear animation;
+- six separately dealt cards;
+- hover rarity signals with occasional false positives;
+- manual click-to-reveal;
+- rarity-specific impact, lighting, particles, and synthesized audio;
+- distinctive original voxel artwork for all 60 cards.
+
+Manual opening is capped near forty packs per minute. Reduced-motion preferences shorten packaging without skipping individual reveals.
 
 ## Controls
 
-- `Space`: open selected stock
-- `I`: sealed inventory
-- `B`: binder
-- `L`: league desk
-- `R`: filing rules and forge
-- `M`: audio
-- `Escape`: close the active detail or completed sequence
+- `Space`: open a pack
+- `Escape`: close the current panel, card, or completed opening
 
-Progress is stored locally. Offline progress accrues binder cash and may execute standing orders, but never opens a pack.
+Progress and offline binder earnings are stored locally. Offline progress never buys or opens product.
 
 ## Development
 
@@ -58,10 +61,10 @@ npm run build
 npm run build:portal
 ```
 
-Both builds are written to `dist/`. The default build packages a Sites-compatible Worker plus root-relative assets, while the portal build targets `/games/packs/`.
+Both builds are written to `dist/`. The default build packages a Sites-compatible Worker plus root-relative assets. The portal build targets `/games/packs/`.
 
-## Visual assets and UI license
+## Assets and UI license
 
-The 60 card illustrations in `public/card-art/` were created specifically for PACKWORKS. No artwork, characters, names, or card scans from commercial trading-card games are included. The generation brief is preserved in `docs/CARD_ART_PROMPTS.md`.
+The 60 illustrations in `public/card-art/` were created specifically for PACKWORKS. No artwork, characters, names, or scans from commercial trading-card games are included. The generation brief is preserved in `docs/CARD_ART_PROMPTS.md`.
 
-Hard-edged panel framing uses [augmented-ui](https://augmented-ui.com/), distributed under the BSD 2-Clause License. A copy of that license is included at `public/vendor/augmented-ui.LICENSE.txt`.
+The project includes [augmented-ui](https://augmented-ui.com/) under the BSD 2-Clause License. Its license is included at `public/vendor/augmented-ui.LICENSE.txt`.
