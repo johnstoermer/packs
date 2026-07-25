@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ALL_CARDS, RARITIES, SETS } from "../lib/gameData.js";
+import { ALL_CARDS, RARITIES, SETS, seededRandom } from "../lib/gameData.js";
 import {
   CARD_DEFS,
   DISCOVER_POOL,
@@ -358,4 +358,93 @@ test("admin sandbox unlocks everything and never leaks into real saves", async (
   // can never impersonate a real save.
   const roundTrip = hydrateState(JSON.parse(serializeState(admin)), 2000);
   assert.equal(roundTrip.adminMode, false);
+});
+
+test("audit: markSpread dial is live — revealed Marks spread more with it displayed", () => {
+  const runMarks = (ids, seed) => {
+    let state = displayAll(withSlots(createInitialState(1), ids), ids);
+    const rng = seededRandom(seed);
+    let spreads = 0;
+    for (let round = 0; round < 120; round += 1) {
+      const opened = openPack(state, { manual: true, free: true, now: 5_000 + round, rng });
+      state = opened.state;
+      let cards = opened.result.cards;
+      for (let index = 0; index < cards.length; index += 1) {
+        if (cards[index].revealed || cards[index].fusedAway) continue;
+        const before = cards.filter((pull) => pull.marked).length;
+        const step = revealPackCard(state, cards, index, { manual: true, rng });
+        state = step.state;
+        cards = step.cards;
+        const after = cards.filter((pull) => pull.marked).length;
+        if (after > before) spreads += after - before;
+      }
+    }
+    return spreads;
+  };
+  const withoutKnob = runMarks(["circuit-12"], 11);
+  const withKnob = runMarks(["circuit-12", "circuit-06"], 11);
+  assert.ok(withKnob > withoutKnob, `expected spreads with knob (${withKnob}) > without (${withoutKnob})`);
+});
+
+test("audit: transmute chance past 100% is guaranteed and hits extra cards", () => {
+  const ids = ["polar-12", "lastlight-05"];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  // 20 base + 100 boost = 120%: rng 0.97 would have failed the old capped
+  // roll (0.97 > 0.95) — now one Transmute is guaranteed.
+  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.97 });
+  const step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0.97 });
+  assert.ok(step.events.some((event) => event.t === "transmute"));
+  assert.equal(step.events.find((event) => event.t === "transmute").cardId, "polar-12");
+});
+
+test("audit: catalyst spread past 100% can spread twice", () => {
+  const ids = ["cloud-12", "circuit-12", "prism-11", "lastlight-06"];
+  const built = displayAll(withSlots(createInitialState(1), [...ids, ...SETS[2].cards.map((c) => c.id)], {
+    collection: Object.fromEntries([...SETS[1].cards, ...SETS[2].cards, ...SETS[13].cards, ...SETS[17].cards, ...SETS[9].cards].map((c) => [c.id, 1])),
+  }), ids);
+  // catalystChance 25 + 50 + 100 = 175: one guaranteed spread plus 75% of a
+  // second. rng 0.5 -> 50 < 75, so the Mark King's mark spreads twice.
+  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
+  const markEvents = opened.result.events.filter((event) => event.t === "mark");
+  assert.ok(markEvents.length >= 3, `expected 3+ marks, got ${markEvents.length}`);
+  const catalystEvents = opened.result.events.filter((event) => event.t === "catalyst");
+  assert.ok(catalystEvents.length >= 2);
+  assert.equal(catalystEvents[0].cardId, "cloud-12");
+});
+
+test("audit: threshold and duplicate-sale cards emit attributed trigger events", () => {
+  const idleIds = ["corner-05"];
+  const idleState = {
+    ...displayAll(withSlots(createInitialState(1), idleIds), idleIds),
+    lifetimeCoins: 5_000,
+  };
+  const swept = evaluateIdleThresholds(idleState, { rng: () => 0.5 });
+  assert.ok(swept.events.some((event) => event.t === "trigger" && event.cardId === "corner-05"));
+
+  const saleIds = ["frontier-12", "frontier-01", "frontier-06"];
+  const saleReady = displayAll(withSlots(createInitialState(1), saleIds), saleIds);
+  const withDups = {
+    ...saleReady,
+    collection: { ...saleReady.collection, "corner-01": 6 },
+    duplicateBank: 5,
+  };
+  const sale = sellDuplicatesDetailed(withDups, { rng: () => 0.99 });
+  assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === "frontier-01"));
+  assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === "frontier-06"));
+  assert.ok(sale.events.some((event) => event.t === "coins" && event.source === "frontier-06"));
+});
+
+test("audit: direct-applied Mystery Pack cards fire reveal supports", () => {
+  const ids = ["frontier-12", "corner-05", "abyss-11"];
+  const built = {
+    ...displayAll(withSlots(createInitialState(1), ids), ids),
+    lifetimeCoins: 2_000,
+  };
+  const swept = evaluateIdleThresholds(built, { rng: () => 0.5 });
+  assert.ok(swept.mysteryCards.length > 0, "idle salvage produced mystery cards");
+  assert.ok(
+    swept.events.some((event) => event.t === "trigger" && event.cardId === "abyss-11"),
+    "mysteryReveal support fired for direct-applied mystery cards",
+  );
+  assert.ok(swept.events.some((event) => event.t === "mystery" && event.cardId === "frontier-12"));
 });

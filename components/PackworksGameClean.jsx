@@ -834,10 +834,9 @@ export default function PackworksGameClean() {
       const kind = event.t === "echo" ? "echo"
         : event.t === "relay" ? "relay"
         : event.t === "mystery" ? "mystery"
-        : event.t === "trigger" ? "pulse"
+        : ["trigger", "mark", "mimic", "transmute", "fracture", "catalyst"].includes(event.t) ? "pulse"
         : null;
       if (kind && event.cardId) stamp[event.cardId] = { kind, serial: ++fxSerialRef.current };
-      if (event.t === "relay") stamp.__relay = { kind: "relay", serial: ++fxSerialRef.current };
     }
     if (Object.keys(stamp).length) {
       setFx((current) => ({ ...current, ...stamp }));
@@ -860,6 +859,9 @@ export default function PackworksGameClean() {
     if (encore) pushToast("ENCORE", `The pack continues — ${encore.count} bonus cards.`, "gold");
     const freePacks = events.filter((event) => event.t === "packs").reduce((sum, event) => sum + event.count, 0);
     if (freePacks > 0) pushToast("FREE PACKS", `${freePacks} loose pack${freePacks > 1 ? "s" : ""} added to your stock.`, "gold");
+    if (events.some((event) => event.t === "fuseLift")) {
+      pushToast("FUSE LIFT", "Your next Fusion climbs one extra step.", "success", 2600);
+    }
     for (const boon of events.filter((event) => event.t === "boon").slice(0, 2)) {
       const option = DISCOVER_POOL.find((candidate) => candidate.id === boon.option);
       if (option) pushToast("BOON", `${option.name} gained.`, "success", 2200);
