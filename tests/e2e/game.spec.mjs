@@ -206,6 +206,39 @@ test("the top bar is only the brand and wallet, with options on the corner gear"
   await expect(page.locator(".clean-settings")).toContainText("Sound");
   await expect(page.locator(".clean-settings")).toContainText("Haptics");
   await expect(page.locator(".clean-settings")).toContainText("Reset save");
+  await expect.poll(async () => page.locator(".clean-settings").evaluate((node) => {
+    const bounds = node.getBoundingClientRect();
+    return {
+      x: Math.round(bounds.left + bounds.width / 2 - window.innerWidth / 2),
+      y: Math.round(bounds.top + bounds.height / 2 - window.innerHeight / 2),
+    };
+  })).toEqual({ x: 0, y: 0 });
+});
+
+test("Locklure shakes its display slot when it adds a Common card", async ({ page }) => {
+  const state = createInitialState(Date.now());
+  state.collection["crown-11"] = 1;
+  state.displayed = [{ id: "crown-11", at: Date.now() }];
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+  await page.evaluate(() => {
+    Math.random = () => 0;
+  });
+
+  const slot = page.locator(".case-strip-slot.is-filled").first();
+  await expect(slot).toHaveAttribute("title", "Locklure");
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".reveal-card")).toHaveCount(6);
+  await page.locator(".reveal-card").first().click();
+
+  await expect(page.locator(".reveal-card")).toHaveCount(7);
+  await expect(slot).toHaveClass(/is-triggered/);
+  await expect(slot).toHaveClass(/fx-trigger/);
+  await expect(slot).toHaveCSS("animation-name", "league-strip-trigger");
+  await expect(slot).toHaveAttribute("data-fx", /\d+/);
 });
 
 test("clicking an empty pack stack buys and opens without visiting a shop", async ({ page }) => {
@@ -247,8 +280,9 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await expect(detail).toContainText("~82%");
   await expect(detail).not.toContainText("Coinbud");
   await expect(detail.locator(".clean-detail-art.is-missing")).toBeVisible();
+  await expect(detail.locator(".card-zoom-close")).toHaveCount(0);
   await page.screenshot({ path: "test-results/clean-undiscovered-rarity.png" });
-  await detail.getByRole("button", { name: "CLOSE" }).click();
+  await page.keyboard.press("Escape");
   await expect(detail).toHaveCount(0);
 
   await page.getByRole("button", { name: "Missing card 98, show rarity" }).click();
@@ -282,7 +316,7 @@ test("the display case holds cards whose unique effects augment the game", async
   expect(await detail.locator(".card-rules-copy").evaluate((node) => node.scrollHeight <= node.clientHeight + 1)).toBe(true);
   await detail.getByRole("button", { name: "DISPLAY IN CASE" }).click();
   await expect(detail.getByRole("button", { name: "UNSEAT FROM CASE" })).toBeVisible();
-  await detail.getByRole("button", { name: "CLOSE" }).click();
+  await page.keyboard.press("Escape");
   await expect(page.locator(".clean-binder-grid")).toContainText("ON DISPLAY");
   await expect(page.locator(".case-strip-slot.is-filled").first()).toBeVisible();
 

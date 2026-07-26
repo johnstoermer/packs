@@ -11,6 +11,7 @@ import {
   describeCard,
   getCardDef,
   getCardRules,
+  getCaseSlots,
   getEngine,
   tokenizeCardText,
 } from "../lib/engineCards.js";
@@ -370,6 +371,8 @@ test("Locklure makes packs Common-only and can grow them on Common reveals", () 
   const step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0 });
   assert.equal(step.cards.length, before + 1);
   assert.equal(step.cards.at(-1).rarity, "common");
+  assert.ok(step.events.some((event) => event.t === "trigger" && event.cardId === id));
+  assert.ok(step.events.some((event) => event.t === "addCards" && event.source === id));
 });
 
 test("Heraldthorn stacks repeated Marks", () => {
@@ -515,9 +518,25 @@ test("supports keep nudge language and never touch sale value or prices", () => 
   }
 });
 
+test("a later display-case milestone unlocks its named slot", () => {
+  const foundCards = ALL_CARDS
+    .filter((card) => RARITIES[card.rarity].order < RARITIES.mythic.order)
+    .slice(0, 43)
+    .map((card) => card.id);
+  const state = withCards(createInitialState(1), foundCards, { packsOpened: 0 });
+  const result = getCaseSlots(state);
+
+  assert.equal(result.milestones.find((milestone) => milestone.slot === 3).met, false);
+  assert.equal(result.milestones.find((milestone) => milestone.slot === 4).met, true);
+  assert.equal(result.slots, 4);
+  assert.deepEqual(
+    result.milestones.filter((milestone) => [2, 4, 6].includes(milestone.slot)).map((milestone) => milestone.label),
+    ["Find 12 cards", "Find 36 cards", "Find 72 cards"],
+  );
+});
+
 test("admin sandbox unlocks everything and never leaks into real saves", async () => {
   const { ADMIN_SAVE_KEY, SAVE_KEY, applyAdminGuarantees, createAdminState, openPack, serializeState } = await import("../lib/gameLogic.js");
-  const { getCaseSlots } = await import("../lib/engineCards.js");
   assert.notEqual(ADMIN_SAVE_KEY, SAVE_KEY);
 
   const admin = createAdminState(1000);

@@ -20,9 +20,9 @@ import {
   breakProduct,
   buyProduct,
   canRewrite,
-  chooseDiscoverOption,
+  chooseDiscoverOptionDetailed,
   createInitialState,
-  dismissDiscoverOffer,
+  dismissDiscoverOfferDetailed,
   displayCard,
   evaluateIdleThresholds,
   getCardSaleValue,
@@ -631,10 +631,6 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
         onMouseDown={(event) => event.stopPropagation()}
         style={{ "--rarity": rarity.color, "--rarity-deep": rarity.deep }}
       >
-        <button className="card-zoom-close" onClick={onClose} aria-label="CLOSE">
-          <span>×</span>
-          CLOSE
-        </button>
         <div className={`clean-detail-art card-zoom-card${count ? "" : " is-missing"}`}>
           {count ? (
             <PrintedCard
@@ -811,8 +807,8 @@ function CaseStrip({ game, derived, fx, onOpenCase }) {
         return (
           <button
             type="button"
-            key={index}
-            className={`case-strip-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}${pulse ? ` fx-${pulse.kind}` : ""}`}
+            key={`${entry.id}-${pulse?.serial || "idle"}`}
+            className={`case-strip-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}${pulse ? ` is-triggered fx-${pulse.kind}` : ""}`}
             style={{ "--rarity": RARITIES[card.rarity].color }}
             data-fx={pulse ? pulse.serial : undefined}
             title={card.name}
@@ -1010,12 +1006,16 @@ export default function PackworksGameClean() {
     playCashGains(cashGains);
     const stamp = {};
     for (const event of events) {
-      const kind = event.t === "echo" ? "echo"
+      const kind = event.t === "trigger" || event.t === "addCards" ? "trigger"
+        : event.t === "echo" ? "echo"
         : event.t === "relay" ? "relay"
         : event.t === "mystery" ? "mystery"
-        : ["trigger", "mark", "mimic", "transmute", "fracture", "catalyst"].includes(event.t) ? "pulse"
+        : ["mark", "mimic", "transmute", "fracture", "catalyst"].includes(event.t) ? "pulse"
         : null;
-      if (kind && event.cardId) stamp[event.cardId] = { kind, serial: ++fxSerialRef.current };
+      const displayCardId = event.t === "addCards" ? event.source : event.cardId;
+      if (kind && displayCardId) {
+        stamp[displayCardId] = { kind, serial: ++fxSerialRef.current };
+      }
     }
     if (Object.keys(stamp).length) {
       setFx((current) => ({ ...current, ...stamp }));
@@ -1634,7 +1634,11 @@ export default function PackworksGameClean() {
         setSpaceHeld(true);
         if (!opening || opening.phase === "summary") beginManualOpen();
       } else if (event.key === "Escape") {
-        if (gameRef.current.discoverOffer) commit(dismissDiscoverOffer(gameRef.current));
+        if (gameRef.current.discoverOffer) {
+          const outcome = dismissDiscoverOfferDetailed(gameRef.current);
+          commit(outcome.state);
+          pushFx(outcome.events);
+        }
         else if (selectedCard) setSelectedCard(null);
         else if (opening?.phase === "summary") closeOpening();
         else setDrawer(null);
@@ -1661,6 +1665,7 @@ export default function PackworksGameClean() {
     closeOpening,
     drawer,
     opening,
+    pushFx,
     selectedCard,
   ]);
 
@@ -1959,7 +1964,9 @@ export default function PackworksGameClean() {
                     className={`discover-card option-${id}`}
                     style={{ "--spread": spread, "--deal": `${index * 95}ms` }}
                     onClick={() => {
-                      commit(chooseDiscoverOption(gameRef.current, id));
+                      const outcome = chooseDiscoverOptionDetailed(gameRef.current, id);
+                      commit(outcome.state);
+                      pushFx(outcome.events);
                       getAudio().sound("switch");
                     }}
                   >
@@ -1975,7 +1982,16 @@ export default function PackworksGameClean() {
                 );
               })}
             </div>
-            <button className="discover-skip" onClick={() => commit(dismissDiscoverOffer(gameRef.current))}>SKIP</button>
+            <button
+              className="discover-skip"
+              onClick={() => {
+                const outcome = dismissDiscoverOfferDetailed(gameRef.current);
+                commit(outcome.state);
+                pushFx(outcome.events);
+              }}
+            >
+              SKIP
+            </button>
           </div>
         </div>
       )}

@@ -1208,34 +1208,6 @@
   display: none;
 }
 
-.theme-league .card-zoom-close {
-  top: -6px;
-  right: 38px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px 7px 7px;
-  border: 3px solid var(--league-navy);
-  border-radius: 16px;
-  background: #f4fbff;
-  box-shadow: 0 4px 0 var(--league-navy);
-  color: #075496;
-  font-weight: 950;
-}
-
-.theme-league .card-zoom-close span {
-  display: grid;
-  width: 23px;
-  height: 23px;
-  place-items: center;
-  border: 2px solid var(--league-navy);
-  border-radius: 50%;
-  background: var(--league-red);
-  color: white;
-  font-size: 17px;
-  line-height: 1;
-}
-
 .theme-league .clean-detail-art.card-zoom-card {
   position: relative;
   width: clamp(280px, 27vw, 345px);
@@ -2282,31 +2254,49 @@
   font-weight: 950;
 }
 
+.theme-league .case-strip-slot.fx-trigger { animation: league-strip-trigger 0.72s var(--motion-pop); }
 .theme-league .case-strip-slot.fx-pulse { animation: league-strip-pulse 0.75s var(--motion-pop); }
 .theme-league .case-strip-slot.fx-echo { animation: league-strip-echo 0.85s var(--motion-pop); }
 .theme-league .case-strip-slot.fx-relay { animation: league-strip-relay 0.72s var(--motion-snap); }
 .theme-league .case-strip-slot.fx-mystery { animation: league-strip-mystery 0.9s var(--motion-pop); }
 
+@keyframes league-strip-trigger {
+  0%, 100% { transform: translateX(0) rotate(0) scale(1); filter: brightness(1); }
+  12% { transform: translateX(-5px) rotate(-5deg) scale(1.06); }
+  25% { transform: translateX(5px) rotate(5deg) scale(1.14); filter: brightness(1.55); }
+  39% { transform: translateX(-4px) rotate(-4deg) scale(1.12); }
+  54% { transform: translateX(4px) rotate(3deg) scale(1.09); filter: brightness(1.28); }
+  70% { transform: translateX(-2px) rotate(-2deg) scale(1.05); }
+  86% { transform: translateX(1px) rotate(1deg) scale(1.02); }
+}
+
 @keyframes league-strip-pulse {
   0% { transform: scale(1); box-shadow: 0 0 0 0 var(--rarity); }
+  12% { transform: translateX(-4px) rotate(-4deg) scale(1.08); }
+  25% { transform: translateX(4px) rotate(4deg) scale(1.16); }
   42% { transform: translateY(-6px) scale(1.28); box-shadow: 0 0 0 6px color-mix(in srgb, var(--rarity) 28%, transparent); }
   100% { transform: scale(1); box-shadow: 0 0 0 12px transparent; }
 }
 
 @keyframes league-strip-echo {
-  0%, 42%, 84%, 100% { transform: scale(1); }
-  22%, 64% { transform: translateY(-4px) scale(1.2); filter: brightness(1.35); }
+  0%, 42%, 84%, 100% { transform: translateX(0) rotate(0) scale(1); }
+  10%, 52% { transform: translateX(-4px) rotate(-4deg) scale(1.08); }
+  22%, 64% { transform: translateX(4px) translateY(-4px) rotate(4deg) scale(1.2); filter: brightness(1.35); }
 }
 
 @keyframes league-strip-relay {
   0% { transform: translateX(0); }
-  40% { transform: translateX(9px) rotate(4deg); filter: brightness(1.5); }
+  15% { transform: translateX(-4px) rotate(-4deg); }
+  40% { transform: translateX(9px) rotate(5deg); filter: brightness(1.5); }
+  62% { transform: translateX(-2px) rotate(-2deg); }
   100% { transform: translateX(0); }
 }
 
 @keyframes league-strip-mystery {
   0% { transform: rotate(0) scale(1); }
-  38% { transform: rotate(-11deg) scale(1.3); filter: hue-rotate(32deg) brightness(1.45); }
+  12% { transform: translateX(-4px) rotate(-7deg) scale(1.08); }
+  24% { transform: translateX(4px) rotate(6deg) scale(1.16); }
+  42% { transform: rotate(-11deg) scale(1.3); filter: hue-rotate(32deg) brightness(1.45); }
   100% { transform: rotate(0) scale(1); }
 }
 
@@ -2952,11 +2942,6 @@
     -webkit-line-clamp: 3;
   }
 
-  .theme-league .card-zoom-close {
-    top: -4px;
-    right: 4px;
-  }
-
   .theme-league .card-zoom-hud {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -3458,8 +3443,8 @@
 .theme-league .clean-settings {
   position: fixed;
   z-index: 201;
-  right: max(15px, env(safe-area-inset-right));
-  bottom: calc(76px + env(safe-area-inset-bottom));
+  top: 50%;
+  left: 50%;
   width: min(330px, calc(100vw - 30px));
   overflow: hidden;
   border: 4px solid var(--league-navy);
@@ -3467,6 +3452,7 @@
   background: #eaf7ff;
   box-shadow: 0 7px 0 var(--league-navy), 0 22px 50px rgba(3, 26, 56, 0.42);
   color: var(--league-navy);
+  transform: translate(-50%, -50%);
   animation: settings-plate-in 220ms cubic-bezier(0.18, 0.82, 0.22, 1) both;
 }
 
@@ -3558,8 +3544,8 @@
 }
 
 @keyframes settings-plate-in {
-  from { opacity: 0; transform: translateY(20px) scale(0.92); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 20px)) scale(0.92); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
 /* Rewards travel through the playfield instead of appearing in message boxes. */
