@@ -3826,3 +3826,101 @@
     bottom: 82px;
   }
 }
+
+/* Pack opening stays on the table. The playfield never swaps scenes. */
+
+.theme-league .clean-pack-clicker {
+  transition: opacity 150ms ease;
+}
+
+.theme-league.opening-active .clean-pack-clicker {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-league .opening-layer.clean-opening,
+.theme-league.fx-holo .opening-layer.clean-opening,
+.theme-league.fx-tabletop .opening-layer.clean-opening {
+  position: fixed;
+  z-index: 15;
+  top: 64px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  background: transparent;
+  animation: none;
+  pointer-events: none;
+}
+
+.theme-league .opening-layer::before,
+.theme-league .opening-layer::after {
+  display: none;
+}
+
+.theme-league .opening-haze,
+.theme-league.fx-holo .opening-haze,
+.theme-league.fx-tabletop .opening-haze {
+  inset: 8% 13% 12%;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent,
+      color-mix(in srgb, var(--set-a) 24%, transparent),
+      transparent 28%,
+      color-mix(in srgb, var(--set-b) 20%, transparent),
+      transparent 58%,
+      color-mix(in srgb, var(--set-c) 22%, transparent),
+      transparent
+    );
+  filter: blur(16px);
+  opacity: 0.5;
+  animation: league-holo-turn 12s linear infinite;
+  pointer-events: none;
+}
+
+.theme-league .foil-pack-wrap,
+.theme-league .reveal-deck,
+.theme-league .clean-opening-instruction,
+.theme-league .clean-opening-summary,
+.theme-league .mobile-auto-control {
+  pointer-events: auto;
+}
+
+.theme-league .opening-impact {
+  pointer-events: none;
+}
+
+.theme-league .clean-opening-summary {
+  right: auto;
+  bottom: 70px;
+  left: 50%;
+  width: min(620px, calc(100vw - 32px));
+  box-sizing: border-box;
+  translate: -50% 0;
+}
+
+.theme-league .phase-summary .reveal-deck {
+  top: 44%;
+}
+
+@media (max-width: 700px), (hover: none) and (pointer: coarse) {
+  .theme-league .opening-layer.clean-opening,
+  .theme-league.fx-holo .opening-layer.clean-opening,
+  .theme-league.fx-tabletop .opening-layer.clean-opening {
+    top: 64px;
+  }
+
+  .theme-league .opening-haze {
+    inset: 9% -18% 15%;
+  }
+
+  .theme-league .clean-opening-summary {
+    right: auto;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    left: 50%;
+    width: calc(100vw - 18px);
+    translate: -50% 0;
+  }
+}

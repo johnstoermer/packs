@@ -1842,14 +1842,6 @@ export default function PackworksGameClean() {
           }}
         >
           <div className="opening-haze" />
-          <div className="opening-topline">
-            <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
-            <small>
-              {opening.result.cards.filter((pull) => pull.revealed).length}
-              {" / "}
-              {opening.result.cards.filter((pull) => !pull.fusedAway).length}
-            </small>
-          </div>
           <div className="foil-pack-wrap">
             <div className="foil-half foil-top"><PackFace set={opening.result.set} /></div>
             <div className="foil-half foil-bottom"><PackFace set={opening.result.set} /></div>
@@ -1924,7 +1916,7 @@ export default function PackworksGameClean() {
                 </small>
               </div>
               <div className="summary-actions">
-                <button className="summary-secondary" onClick={closeOpening}>BACK TO TABLE</button>
+                <button className="summary-secondary" onClick={closeOpening}>CLEAR TABLE</button>
               </div>
             </div>
           )}

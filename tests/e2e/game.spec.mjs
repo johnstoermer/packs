@@ -43,6 +43,12 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   await page.getByRole("button", { name: /Open a pack/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 6_000 });
   await expect(page.locator(".reveal-card")).toHaveCount(6);
+  await expect(page.locator(".case-strip")).toHaveCount(1);
+  await expect(page.locator(".clean-stage")).toBeVisible();
+  await expect(page.locator(".clean-set-progress")).toBeVisible();
+  await expect(page.locator(".clean-pack-station > .clean-simple-stats")).toBeVisible();
+  await expect(page.locator(".opening-layer")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(page.locator(".opening-topline")).toHaveCount(0);
 
   const first = page.locator(".reveal-card").first();
   await first.hover();
@@ -56,7 +62,7 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   await expect(page.locator(".summary-total")).toContainText("PACK RESULTS");
   await page.screenshot({ path: "test-results/clean-pack-summary.png" });
 
-  await page.getByRole("button", { name: "BACK TO TABLE" }).click();
+  await page.getByRole("button", { name: "CLEAR TABLE" }).click();
   await expect(page.locator(".clean-set-progress")).not.toContainText("0/98");
   await page.locator(".clean-set-progress").click();
   await expect(page.locator(".clean-binder-grid button.found").first()).toBeVisible();
@@ -411,7 +417,7 @@ test("reveals fire haptic pulses through the vibration API when enabled", async 
   const withHaptics = await page.evaluate(() => window.__vibrations.length);
   expect(withHaptics).toBeGreaterThanOrEqual(7); // pack open + six reveals
 
-  await page.getByRole("button", { name: "BACK TO TABLE" }).click();
+  await page.getByRole("button", { name: "CLEAR TABLE" }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await haptics.click();
   await expect(haptics).toContainText("OFF");
