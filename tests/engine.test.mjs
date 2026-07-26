@@ -5,13 +5,14 @@ import { ALL_CARDS, LEGACY_CARD_MAP, RARITIES, SETS, getCard, seededRandom } fro
 const L = (legacyId) => LEGACY_CARD_MAP[legacyId] || legacyId;
 import {
   CARD_DEFS,
+  CARD_KEYWORD_GLOSSARY,
   DISCOVER_POOL,
-  KINGS,
-  SET_KINGS,
   SIGNATURE_CARDS,
   describeCard,
   getCardDef,
+  getCardRules,
   getEngine,
+  tokenizeCardText,
 } from "../lib/engineCards.js";
 import {
   NAMELESS_CARD_ID,
@@ -23,6 +24,7 @@ import {
   evaluateIdleThresholds,
   getDuplicateCount,
   getInscriptionsEarned,
+  getPassiveIncomeRate,
   hydrateState,
   openPack,
   resolveFusions,
@@ -34,6 +36,7 @@ import {
 
 const CORNER_IDS = SETS[0].cards.map((card) => card.id);
 const FIRST = SETS[0].id;
+const BLANK_IDS = new Set();
 
 function withCards(state, ids, extra = {}) {
   return advanceBeat({
@@ -66,27 +69,61 @@ function revealAll(state, cards, rng) {
   return { state: working, cards: board };
 }
 
-test("every card has a verb-engine definition with player-facing text", () => {
-  assert.equal(Object.keys(CARD_DEFS).length, 240);
+test("every card has a verb-engine definition; intentional blanks have no rules text", () => {
+  assert.equal(Object.keys(CARD_DEFS).length, 98);
   for (const card of ALL_CARDS) {
     const def = getCardDef(card.id);
     assert.ok(def, card.id);
     const text = describeCard(card.id);
+    if (BLANK_IDS.has(card.id)) {
+      assert.equal(def.blank, true, card.id);
+      assert.equal(text, "", card.id);
+      continue;
+    }
     assert.ok(text.length > 10, card.id);
     assert.ok(!/support|King card/i.test(text.replace(/KING \//, "")), `internal jargon leaked: ${card.id}: ${text}`);
   }
 });
 
-test("all twelve signatures live on high-rarity cards with real effects", () => {
-  const verbs = Object.keys(KINGS).sort();
-  assert.deepEqual(Object.keys(SIGNATURE_CARDS).sort(), verbs);
-  assert.deepEqual([...new Set(Object.values(SET_KINGS))].sort(), verbs);
-  const allowed = new Set(["legendary", "mythic", "celestial"]);
+test("every card exposes structured, highlightable rules text", () => {
+  assert.ok(Object.keys(CARD_KEYWORD_GLOSSARY).length >= 20);
+  for (const card of ALL_CARDS) {
+    const rules = getCardRules(card.id);
+    if (BLANK_IDS.has(card.id)) {
+      assert.equal(rules, null, card.id);
+      continue;
+    }
+    assert.ok(rules, card.id);
+    assert.ok(rules.eyebrow, card.id);
+    assert.ok(rules.title, card.id);
+    assert.equal(rules.text, describeCard(card.id), card.id);
+    assert.deepEqual(rules.tokens, tokenizeCardText(rules.text), card.id);
+    assert.ok(rules.tokens.length > 0, card.id);
+    assert.ok(rules.tokens.some((token) => token.type !== "text"), `no emphasized token: ${card.id}`);
+  }
+});
+
+test("card copy follows the shared rules grammar", () => {
+  for (const card of ALL_CARDS) {
+    const text = describeCard(card.id);
+    assert.ok(!/\bcoins?\b/i.test(text), `legacy resource name: ${card.id}: ${text}`);
+    assert.ok(!/\d+x\b/i.test(text), `ASCII multiplier: ${card.id}: ${text}`);
+    assert.ok(!/\bWhen(?:ever)?\b[^.]*:/i.test(text), `trigger colon: ${card.id}: ${text}`);
+    assert.ok(!/\bextra\b/i.test(text), `inconsistent additional wording: ${card.id}: ${text}`);
+    if (text.startsWith("When")) {
+      assert.ok(text.startsWith("Whenever"), `event trigger must use Whenever: ${card.id}: ${text}`);
+    }
+  }
+});
+
+test("selected signature cards remain high-rarity cards with real effects", () => {
+  const required = new Set(["mark", "fusion", "mimic", "transmute", "relay", "autopilot"]);
+  assert.ok([...required].every((verb) => SIGNATURE_CARDS[verb]), "selected signatures survive consolidation");
   for (const [verb, cardId] of Object.entries(SIGNATURE_CARDS)) {
     const card = getCard(cardId);
     const def = getCardDef(cardId);
     assert.ok(card, cardId);
-    assert.ok(allowed.has(card.rarity), `${verb} signature sits at ${card.rarity}`);
+    assert.ok(RARITIES[card.rarity].order >= RARITIES.legendary.order, `${verb} signature sits at ${card.rarity}`);
     assert.equal(def.signature, true, cardId);
     assert.equal(def.sig, verb, cardId);
     // A signature is never a bare gate: it carries its own chance source or
@@ -118,9 +155,9 @@ test("pure dials stay inert without a source: fusion depth alone fuses nothing",
   assert.equal(fusion.fused, false);
 });
 
-test("Salvage signature turns duplicate sales into Mystery Packs", () => {
-  const base = withSlots(createInitialState(1), [L("frontier-12"), L("frontier-01")]);
-  const built = displayAll(base, [L("frontier-12"), L("frontier-01")]);
+test("selected Salvage sources turn duplicate sales into Mystery Packs", () => {
+  const base = withSlots(createInitialState(1), [L("frontier-01"), L("frontier-07")]);
+  const built = displayAll(base, [L("frontier-01"), L("frontier-07")]);
   const loaded = {
     ...built,
     collection: { ...built.collection, [L("corner-01")]: 1_001 },
@@ -135,8 +172,8 @@ test("Salvage signature turns duplicate sales into Mystery Packs", () => {
 });
 
 test("coin thresholds fire from any income source, never from timers", () => {
-  const base = withSlots(createInitialState(1), [L("frontier-12"), L("corner-05")]);
-  const built = displayAll(base, [L("frontier-12"), L("corner-05")]);
+  const base = withSlots(createInitialState(1), [L("corner-05")]);
+  const built = displayCard(base, L("corner-05"), 0);
   const flush = { ...built, lifetimeCoins: built.lifetimeCoins + 10_000, coins: built.coins + 10_000 };
   const swept = evaluateIdleThresholds(flush, { rng: () => 0.5 });
   assert.ok(swept.events.some((event) => event.t === "mystery"));
@@ -162,30 +199,28 @@ test("Mark signature marks a visible card before reveal and marked reveals pay",
   assert.ok(step.state.coins > coinsBefore);
 });
 
-test("Echo chance is additive from zero, boosts matter, and overflow doubles payoffs", () => {
-  const base = withSlots(createInitialState(1), [L("corner-12"), L("corner-02"), L("lastlight-01")]);
+test("Echo chance is additive from zero and overflow adds guaranteed repeats", () => {
+  const allEcho = L("prism-12");
+  const rareEchoes = [L("crown-01"), L("lastlight-02")];
+  const base = withSlots(createInitialState(1), [allEcho, ...rareEchoes]);
 
-  // Signature alone: +50% chance — a high roll does NOT echo, so further
-  // chance sources have real room to work in.
-  const kingOnly = displayAll(base, [L("corner-12"), L("corner-02")]);
-  const openedKing = openPack(kingOnly, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
-  const kingIndex = openedKing.result.cards.findIndex((pull) => pull.rarity === "common");
-  const kingStep = revealPackCard(openedKing.state, openedKing.result.cards, kingIndex, { manual: true, rng: () => 0.99 });
-  assert.ok(!kingStep.events.some((event) => event.t === "echo"));
-  const plainGain = kingStep.state.coins - openedKing.state.coins;
+  const plain = displayCard(base, allEcho, 0);
+  const openedPlain = openPack(plain, { manual: true, free: true, now: 5_000, rng: () => 0.49 });
+  const plainCards = openedPlain.result.cards.map((pull, index) => (
+    index === 0 ? { ...pull, rarity: "rare" } : pull
+  ));
+  const plainStep = revealPackCard(openedPlain.state, plainCards, 0, { manual: true, rng: () => 0.49 });
+  assert.equal(plainStep.events.filter((event) => event.t === "echo").length, 1);
 
-  // Signature + Matchstick Moth (+100%): 150% -> exactly one guaranteed Echo
-  // on the same high roll, doubling the reveal payoff. The echo event carries
-  // the signature's card id so the case strip can pulse it.
-  const boosted = displayAll(base, [L("corner-12"), L("corner-02"), L("lastlight-01")]);
-  const openedEcho = openPack(boosted, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
-  const echoIndex = openedEcho.result.cards.findIndex((pull) => pull.rarity === "common");
-  const echoStep = revealPackCard(openedEcho.state, openedEcho.result.cards, echoIndex, { manual: true, rng: () => 0.99 });
-  const echoEvents = echoStep.events.filter((event) => event.t === "echo");
-  assert.equal(echoEvents.length, 1);
-  assert.equal(echoEvents[0].cardId, L("corner-12"));
-  const echoGain = echoStep.state.coins - openedEcho.state.coins;
-  assert.equal(echoGain, plainGain * 2);
+  // Omniecho (+50%) + Resonash (+100%) + Nightecho (+100%) = 250%:
+  // two guaranteed repeats and a final 50% roll.
+  const boosted = displayAll(base, [allEcho, ...rareEchoes]);
+  const openedBoosted = openPack(boosted, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
+  const boostedCards = openedBoosted.result.cards.map((pull, index) => (
+    index === 0 ? { ...pull, rarity: "rare" } : pull
+  ));
+  const boostedStep = revealPackCard(openedBoosted.state, boostedCards, 0, { manual: true, rng: () => 0.99 });
+  assert.equal(boostedStep.events.filter((event) => event.t === "echo").length, 2);
 });
 
 test("Fusion signature fuses same-rarity pairs upward and they reveal again", () => {
@@ -203,9 +238,9 @@ test("Fusion signature fuses same-rarity pairs upward and they reveal again", ()
   assert.equal(consumed, newCards.length * 2);
 });
 
-test("Fracture signature spills extra packs into the same reveal", () => {
-  const base = withSlots(createInitialState(1), [L("ember-12"), L("ember-01")]);
-  const built = displayAll(base, [L("ember-12"), L("ember-01")]);
+test("selected Fracture sources spill extra packs into the same reveal", () => {
+  const base = withSlots(createInitialState(1), [L("ember-01")]);
+  const built = displayCard(base, L("ember-01"), 0);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.01 });
   assert.ok(opened.result.cards.length >= 12);
   assert.ok(opened.result.events.some((event) => event.t === "fracture"));
@@ -241,21 +276,16 @@ test("Mimic signature copies one unrevealed card before reveal", () => {
 });
 
 test("Transmute signature morphs an unrevealed card toward the revealed rarity", () => {
-  const base = withSlots(createInitialState(1), [L("polar-12"), L("polar-04")]);
-  const built = displayAll(base, [L("polar-12"), L("polar-04")]);
+  const base = withSlots(createInitialState(1), [L("polar-12")]);
+  const built = displayCard(base, L("polar-12"), 0);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.3 });
   const step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0.001 });
   assert.ok(step.events.some((event) => event.t === "transmute"));
   assert.ok(step.cards.some((pull) => pull.transmuted && !pull.revealed));
 });
 
-test("Blueprint copies slot 1 and Relay chains to the right", () => {
-  const base = withSlots(createInitialState(1), [L("glass-12"), L("harbor-12"), L("corner-02"), L("corner-01")]);
-  const blueprintCase = displayAll(base, [L("corner-02"), L("glass-12")]);
-  const engine = getEngine(blueprintCase);
-  assert.equal(engine.reveal.length, 2);
-  assert.equal(engine.reveal[1].id, L("glass-12"));
-
+test("Relay chains display triggers to the right", () => {
+  const base = withSlots(createInitialState(1), [L("harbor-12"), L("corner-02"), L("corner-01")]);
   const relayCase = displayAll(base, [L("corner-02"), L("harbor-12"), L("corner-01")]);
   const opened = openPack(relayCase, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const commonIndex = opened.result.cards.findIndex((pull) => pull.rarity === "common");
@@ -264,10 +294,10 @@ test("Blueprint copies slot 1 and Relay chains to the right", () => {
 });
 
 test("Discover offers three options, stacks picks, and Autopilot self-picks", () => {
-  const base = withSlots(createInitialState(1), [L("corner-08")]);
-  const built = displayAll(base, [L("corner-08")]);
-  const flush = { ...built, packsOpened: built.packsOpened + 60 };
-  const opened = openPack(flush, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
+  const discover = L("observatory-05");
+  const base = withSlots(createInitialState(1), [discover]);
+  const built = displayCard(base, discover, 0);
+  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
   assert.ok(opened.state.discoverOffer);
   assert.equal(opened.state.discoverOffer.length, 3);
   const optionId = opened.state.discoverOffer[0];
@@ -276,10 +306,9 @@ test("Discover offers three options, stacks picks, and Autopilot self-picks", ()
   assert.ok(chosen.discoverStack[optionId] >= 1);
   assert.ok(DISCOVER_POOL.some((option) => option.id === optionId));
 
-  const autoBase = withSlots(createInitialState(1), [L("orchard-12"), L("corner-08")]);
-  const autoBuilt = displayAll(autoBase, [L("orchard-12"), L("corner-08")]);
-  const autoFlush = { ...autoBuilt, packsOpened: autoBuilt.packsOpened + 60 };
-  const autoOpened = openPack(autoFlush, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
+  const autoBase = withSlots(createInitialState(1), [L("orchard-12"), discover]);
+  const autoBuilt = displayAll(autoBase, [L("orchard-12"), discover]);
+  const autoOpened = openPack(autoBuilt, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
   assert.equal(autoOpened.state.discoverOffer, null);
   assert.ok(Object.values(autoOpened.state.discoverStack).some((count) => count >= 2));
   assert.ok(autoOpened.result.events.some((event) => event.t === "discoverAuto"));
@@ -300,6 +329,110 @@ test("editing the display case sells the duplicate stack first", () => {
   const removed = undisplayCard({ ...edited, collection: { ...edited.collection, [L("corner-02")]: 3 }, duplicateBank: 2 }, L("corner-01"));
   assert.equal(getDuplicateCount(removed), 0);
   assert.equal(removed.displayed.length, 0);
+});
+
+test("core card update pass keeps authored triggers live", () => {
+  const pennigeon = L("corner-02");
+  let state = displayCard(withSlots(createInitialState(1), [pennigeon]), pennigeon, 0);
+  const engine = getEngine(state);
+  assert.ok(engine.reveal.some((record) => record.id === pennigeon));
+
+  const opened = openPack(state, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
+  const commonIndex = opened.result.cards.findIndex((pull) => pull.rarity === "common");
+  const step = revealPackCard(opened.state, opened.result.cards, commonIndex, { manual: true, rng: () => 0.99 });
+  assert.equal(step.state.coins - opened.state.coins, 100);
+
+  const questhound = L("observatory-05");
+  state = displayCard(withSlots(createInitialState(1), [questhound]), questhound, 0);
+  const discovered = openPack(state, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
+  assert.ok(discovered.state.discoverOffer);
+});
+
+test("Echowl adds a matching card to the live pack whenever Omniecho Echoes", () => {
+  const ids = [L("corner-10"), L("prism-12")];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0 });
+  const cards = opened.result.cards.map((pull, index) => (
+    index === 0 ? { ...pull, rarity: "common" } : pull
+  ));
+  const before = cards.length;
+  const step = revealPackCard(opened.state, cards, 0, { manual: true, rng: () => 0 });
+  assert.equal(step.cards.length, before + 1);
+  assert.ok(step.events.some((event) => event.t === "addCards" && event.source === L("corner-10")));
+});
+
+test("Locklure makes packs Common-only and can grow them on Common reveals", () => {
+  const id = L("crown-11");
+  const built = displayCard(withSlots(createInitialState(5), [id]), id, 0);
+  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0 });
+  assert.ok(opened.result.cards.every((pull) => pull.rarity === "common"));
+  const before = opened.result.cards.length;
+  const step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0 });
+  assert.equal(step.cards.length, before + 1);
+  assert.equal(step.cards.at(-1).rarity, "common");
+});
+
+test("Heraldthorn stacks repeated Marks", () => {
+  const stackingIds = [L("crown-08"), L("circuit-12"), L("circuit-01")];
+  const stacking = displayAll(withSlots(createInitialState(5), stackingIds), stackingIds);
+  const opened = openPack(stacking, { manual: true, free: true, now: 5_000, rng: () => 0 });
+  assert.ok(opened.result.cards.some((pull) => pull.markStacks >= 2));
+});
+
+test("Questcap and Truescope resolve positional display triggers without loops", () => {
+  const pennigeon = L("corner-02");
+  const questcap = L("observatory-01");
+  let built = displayAll(withSlots(createInitialState(5), [pennigeon, questcap]), [pennigeon, questcap]);
+  let opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
+  const commonIndex = opened.result.cards.findIndex((pull) => pull.rarity === "common");
+  let step = revealPackCard(opened.state, opened.result.cards, commonIndex, { manual: true, rng: () => 0 });
+  assert.ok(step.events.some((event) => event.t === "leftTriggered" && event.cardId === questcap));
+  assert.ok(step.state.discoverOffer);
+
+  const truescope = L("observatory-02");
+  const zeraph = L("circuit-12");
+  built = displayAll(withSlots(createInitialState(5), [pennigeon, truescope, zeraph]), [pennigeon, truescope, zeraph]);
+  opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0 });
+  const markedIndex = opened.result.cards.findIndex((pull) => pull.marked);
+  step = revealPackCard(opened.state, opened.result.cards, markedIndex, { manual: true, rng: () => 0 });
+  assert.ok(step.events.some((event) => event.t === "triggerLeft" && event.cardId === pennigeon));
+  assert.ok(step.events.length < 80);
+});
+
+test("Firstseer reveals the full pack and Lunaglyph Echoes revealed Marked cards", () => {
+  const firstseer = L("observatory-07");
+  let built = displayCard(withSlots(createInitialState(5), [firstseer]), firstseer, 0);
+  let opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
+  let step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0.99 });
+  assert.ok(step.cards.every((pull) => pull.revealed || pull.fusedAway));
+  assert.ok(step.events.some((event) => event.t === "revealRest"));
+
+  const ids = [L("corner-02"), L("observatory-06"), L("circuit-12")];
+  built = displayAll(withSlots(createInitialState(5), ids), ids);
+  opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0 });
+  const markedIndex = opened.result.cards.findIndex((pull) => pull.marked);
+  step = revealPackCard(opened.state, opened.result.cards, markedIndex, { manual: true, rng: () => 0.99 });
+  assert.ok(step.events.some((event) => event.t === "echo" && event.allMarked));
+});
+
+test("Coincrow scales idle income and Regalynx reveals owned duplicates at cash thresholds", () => {
+  const coincrow = L("crown-09");
+  const regalynx = L("crown-10");
+  const ids = [coincrow, regalynx, L("corner-01"), L("corner-02")];
+  let built = displayAll(withSlots(createInitialState(5), ids), [coincrow, regalynx]);
+  const discovered = Object.values(built.collection).filter((count) => count > 0).length;
+  assert.ok(getPassiveIncomeRate(built) >= discovered + 1);
+
+  const copiesBefore = Object.values(built.collection).reduce((sum, count) => sum + count, 0);
+  built = {
+    ...built,
+    coins: built.coins + 1_000,
+    lifetimeCoins: built.lifetimeCoins + 1_000,
+  };
+  const swept = evaluateIdleThresholds(built, { rng: () => 0 });
+  const copiesAfter = Object.values(swept.state.collection).reduce((sum, count) => sum + count, 0);
+  assert.equal(copiesAfter, copiesBefore + 1);
+  assert.ok(swept.events.some((event) => event.t === "duplicateReveal"));
 });
 
 test("the Nameless still opens the Rewrite and inscriptions persist", () => {
@@ -333,10 +466,19 @@ test("saves round-trip engine state and drop unknown discover entries", () => {
 
 test("no two cards share identical effect text", () => {
   const seen = new Map();
+  const intentionalSharedText = new Set([
+    "For every 10 packs you open, Discover.",
+    "Common cards have +100% Echo.",
+    "Packs have +100% chance to contain a Marked card.",
+  ]);
   for (const card of ALL_CARDS) {
     const text = describeCard(card.id);
+    if (BLANK_IDS.has(card.id)) continue;
     assert.ok(text.length > 0, `${card.id} has effect text`);
-    assert.ok(!seen.has(text), `${card.id} duplicates ${seen.get(text)}: "${text}"`);
+    assert.ok(
+      !seen.has(text) || intentionalSharedText.has(text),
+      `${card.id} duplicates ${seen.get(text)}: "${text}"`,
+    );
     seen.set(text, card.id);
   }
 });
@@ -345,7 +487,7 @@ test("template families stay small: numbers-stripped text repeats at most 3 time
   const families = new Map();
   for (const card of ALL_CARDS) {
     const def = getCardDef(card.id);
-    if (def?.sig || def?.capstone || def?.prestige) continue;
+    if (def?.sig || def?.capstone || def?.prestige || def?.blank) continue;
     const norm = describeCard(card.id).replace(/\d+(\.\d+)?[KMB]?/g, "N");
     families.set(norm, [...(families.get(norm) || []), card.id]);
   }
@@ -432,14 +574,14 @@ test("audit: markSpread dial is live — revealed Marks spread more with it disp
     return spreads;
   };
   const withoutKnob = runMarks([L("circuit-12")], 11);
-  const withKnob = runMarks([L("circuit-12"), L("circuit-06")], 11);
+  const withKnob = runMarks([L("circuit-12"), L("circuit-04")], 11);
   assert.ok(withKnob > withoutKnob, `expected spreads with knob (${withKnob}) > without (${withoutKnob})`);
 });
 
 test("audit: transmute chance past 100% is guaranteed and hits extra cards", () => {
-  const ids = [L("polar-12"), L("lastlight-05")];
+  const ids = [L("polar-12"), L("observatory-04")];
   const built = displayAll(withSlots(createInitialState(1), ids), ids);
-  // 50 signature + 100 boost = 150%: rng 0.97 would have failed the old
+  // 50 signature + 60 boost = 110%: rng 0.97 would have failed the old
   // capped roll (0.97 > 0.95) — now one Transmute is guaranteed.
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.97 });
   const step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0.97 });
@@ -447,17 +589,14 @@ test("audit: transmute chance past 100% is guaranteed and hits extra cards", () 
   assert.equal(step.events.find((event) => event.t === "transmute").cardId, L("polar-12"));
 });
 
-test("audit: catalyst spread past 100% can spread twice", () => {
-  const ids = [L(L("cloud-12")), L(L("circuit-12")), L(L("prism-11")), L(L("lastlight-06"))];
+test("audit: Catalystag can grant the Catalyst Fusion boon", () => {
+  const ids = [L("verdant-12"), L("verdant-08")];
   const built = displayAll(withSlots(createInitialState(1), ids), ids);
-  // catalystChance 75 + 50 + 100 = 225: two guaranteed spreads (capped at
-  // two per event), so the Mark signature's mark spreads twice.
-  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
-  const markEvents = opened.result.events.filter((event) => event.t === "mark");
-  assert.ok(markEvents.length >= 3, `expected 3+ marks, got ${markEvents.length}`);
-  const catalystEvents = opened.result.events.filter((event) => event.t === "catalyst");
-  assert.ok(catalystEvents.length >= 2);
-  assert.equal(catalystEvents[0].cardId, L(L("cloud-12")));
+  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
+  const all = revealAll(opened.state, opened.result.cards, () => 0.99);
+  const fusion = resolveFusions(all.state, all.cards, { rng: () => 0 });
+  assert.equal(fusion.fused, true);
+  assert.ok(fusion.events.some((event) => event.t === "boon" && event.option === "catalyst"));
 });
 
 test("audit: threshold and duplicate-sale cards emit attributed trigger events", () => {
@@ -469,30 +608,29 @@ test("audit: threshold and duplicate-sale cards emit attributed trigger events",
   const swept = evaluateIdleThresholds(idleState, { rng: () => 0.5 });
   assert.ok(swept.events.some((event) => event.t === "trigger" && event.cardId === L("corner-05")));
 
-  const saleIds = [L("frontier-12"), L("frontier-01"), L("frontier-06")];
+  const saleIds = [L("frontier-01")];
   const saleReady = displayAll(withSlots(createInitialState(1), saleIds), saleIds);
   const withDups = {
     ...saleReady,
     collection: { ...saleReady.collection, [L("corner-01")]: 6 },
     duplicateBank: 5,
   };
-  const sale = sellDuplicatesDetailed(withDups, { rng: () => 0.99 });
+  const sale = sellDuplicatesDetailed(withDups, { rng: () => 0 });
   assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === L("frontier-01")));
-  assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === L("frontier-06")));
-  assert.ok(sale.events.some((event) => event.t === "coins" && event.source === L("frontier-06")));
+  assert.ok(sale.events.some((event) => event.t === "mystery"));
 });
 
-test("audit: direct-applied Mystery Pack cards fire reveal supports", () => {
-  const ids = [L("frontier-12"), L("corner-05"), L("abyss-11")];
+test("audit: direct-applied Mystery Packs fire selected mystery-open supports", () => {
+  const ids = [L("corner-05"), L("apocalypse-06")];
   const built = {
     ...displayAll(withSlots(createInitialState(1), ids), ids),
     lifetimeCoins: 2_000,
   };
-  const swept = evaluateIdleThresholds(built, { rng: () => 0.5 });
+  const swept = evaluateIdleThresholds(built, { rng: () => 0 });
   assert.ok(swept.mysteryCards.length > 0, "idle salvage produced mystery cards");
   assert.ok(
-    swept.events.some((event) => event.t === "trigger" && event.cardId === L("abyss-11")),
-    "mysteryReveal support fired for direct-applied mystery cards",
+    swept.events.some((event) => event.t === "boon" && event.option === "acceleration"),
+    "mystery-open support fired for direct-applied mystery cards",
   );
-  assert.ok(swept.events.some((event) => event.t === "mystery" && event.cardId === L("frontier-12")));
+  assert.ok(swept.events.some((event) => event.t === "mystery"));
 });

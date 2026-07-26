@@ -31,7 +31,7 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "SELL DUPLICATES" })).toBeVisible();
   await expect(page.locator(".clean-set-progress")).toBeVisible();
-  await expect(page.locator(".clean-set-progress")).toContainText("0/48");
+  await expect(page.locator(".clean-set-progress")).toContainText("0/98");
   await expect(page.getByText("MANUAL HEAT")).toHaveCount(0);
   await expect(page.getByText("RULES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PLAY", { exact: true })).toHaveCount(0);
@@ -54,7 +54,7 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   await page.screenshot({ path: "test-results/clean-pack-summary.png" });
 
   await page.getByRole("button", { name: "BACK TO TABLE" }).click();
-  await expect(page.locator(".clean-set-progress")).not.toContainText("0/48");
+  await expect(page.locator(".clean-set-progress")).not.toContainText("0/98");
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
   await expect(page.locator(".clean-binder-grid button.found").first()).toBeVisible();
   expect(pageErrors).toEqual([]);
@@ -189,15 +189,9 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await page.getByRole("button", { name: "SHOP", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Pack shop" })).toBeVisible();
   await expect(page.getByText("SEALED VALUE")).toHaveCount(0);
-  await expect(page.locator(".clean-set-stock")).toHaveCount(5);
+  await expect(page.locator(".clean-set-stock")).toHaveCount(1);
   await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(1);
-  const stockRow = (name) => page.locator(".clean-set-stock").filter({
-    has: page.getByRole("heading", { name, exact: true }),
-  });
-  await expect(stockRow(SETS[1].name)).toContainText(`Find 20 cards in ${SETS[0].name} 0/20`);
-  await expect(stockRow(SETS[2].name)).toContainText(`Find 20 cards in ${SETS[1].name} 0/20`);
-  await expect(stockRow(SETS.at(-1).name)).toContainText(`Find 20 cards in ${SETS.at(-2).name} 0/20`);
-  await expect(stockRow(SETS.at(-1).name)).not.toContainText("chase");
+  await expect(page.locator(".clean-set-stock")).toContainText(SETS[0].name);
   await expect(page.getByText("Booster box")).toHaveCount(0);
   await expect(page.getByText("THREE SIMPLE TRACKS")).toHaveCount(0);
   await expect(page.locator(".clean-upgrades")).toContainText("Open 5 more packs");
@@ -216,10 +210,9 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await seedState(page, state);
   await page.reload();
   await page.getByRole("button", { name: "SHOP", exact: true }).click();
-  await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(2);
+  await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(1);
   await expect(page.locator(".clean-upgrade", { hasText: "Dealer tray" })).toBeVisible();
-  await page.getByRole("button", { name: `Select ${SETS[1].name}` }).click();
-  await expect(page.locator(".clean-set-title")).toContainText(SETS[1].name);
+  await expect(page.locator(".clean-set-title")).toContainText(SETS[0].name);
   await page.screenshot({ path: "test-results/clean-shop.png" });
 });
 
@@ -232,7 +225,7 @@ test("the empty table shows no shop cue overlay, only the pack label", async ({ 
   await seedState(page, state);
   await page.goto("/");
 
-  await expect(page.locator(".clean-open-copy")).toContainText("PACKS AVAILABLE IN SHOP");
+  await expect(page.locator(".clean-open-copy")).toContainText("TAP TO VISIT SHOP");
   await expect(page.locator(".clean-shop-cue")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Buy .* pack/i })).toHaveCount(0);
 
@@ -252,7 +245,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   const borderOf = (label) => page.getByRole("button", { name: label }).first()
     .evaluate((node) => getComputedStyle(node).borderTopColor);
   const commonBorder = await borderOf("Missing card 1, show rarity");
-  const chaseBorder = await borderOf("Missing card 48, show rarity");
+  const chaseBorder = await borderOf("Missing card 98, show rarity");
   expect(commonBorder).not.toBe(chaseBorder);
   expect(commonBorder).not.toBe("rgba(255, 255, 255, 0.1)");
 
@@ -262,16 +255,18 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await expect(detail).toContainText("Card 01");
   await expect(detail).toContainText("Common");
   await expect(detail).toContainText("~82%");
-  await expect(detail).not.toContainText("Alley Sprout");
+  await expect(detail).not.toContainText("Coinbud");
   await expect(detail.locator(".clean-detail-art.is-missing")).toBeVisible();
   await page.screenshot({ path: "test-results/clean-undiscovered-rarity.png" });
   await detail.getByRole("button", { name: "CLOSE" }).click();
   await expect(detail).toHaveCount(0);
 
   await page.locator(".clean-binder-grid > button.missing").last().click();
-  await expect(page.locator(".clean-card-detail")).toContainText("Card 48");
-  await expect(page.locator(".clean-card-detail .clean-detail-effect")).toBeVisible();
+  await expect(page.locator(".clean-card-detail")).toContainText("Card 98");
+  await expect(page.locator(".clean-card-detail .clean-detail-effect")).toHaveCount(0);
   await expect(page.locator(".clean-card-detail .clean-detail-art.is-missing")).toBeVisible();
+  await expect(page.locator(".clean-card-detail .card-zoom-back")).toBeVisible();
+  await expect(page.locator(".clean-card-detail .card-front")).toHaveCount(0);
 });
 
 test("the display case holds cards whose unique effects augment the game", async ({ page }) => {
@@ -286,10 +281,11 @@ test("the display case holds cards whose unique effects augment the game", async
   await expect(page.locator(".case-strip").first()).toBeVisible();
 
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
-  await page.getByRole("button", { name: "Pavement Pigeon, 2 copies" }).click();
+  await page.getByRole("button", { name: "Pennigeon, 2 copies" }).click();
   const detail = page.locator(".clean-card-detail");
-  await expect(detail).toContainText("DISPLAY EFFECT");
-  await expect(detail).toContainText("When you reveal a Common");
+  await expect(detail.locator(".game-detail-three-card canvas")).toBeVisible();
+  await expect(detail.locator(".clean-detail-copy")).toHaveCount(0);
+  await expect(detail).toContainText("Whenever you reveal a Common");
   await detail.getByRole("button", { name: "DISPLAY IN CASE" }).click();
   await expect(detail.getByRole("button", { name: "UNSEAT FROM CASE" })).toBeVisible();
   await detail.getByRole("button", { name: "CLOSE" }).click();
@@ -299,7 +295,7 @@ test("the display case holds cards whose unique effects augment the game", async
   await page.getByRole("button", { name: /^CASE/ }).click();
   const caseDrawer = page.locator(".clean-case");
   await expect(caseDrawer).toBeVisible();
-  await expect(caseDrawer).toContainText("Pavement Pigeon");
+  await expect(caseDrawer).toContainText("Pennigeon");
   await expect(caseDrawer).toContainText("1/1 slots filled");
   await expect(caseDrawer.locator(".clean-case-slot.is-locked")).toHaveCount(5);
   await expect(caseDrawer).toContainText("Rewrite");
@@ -360,7 +356,15 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
   await expect(legendary).toBeVisible();
   await legendary.hover();
   await legendary.click();
+  await expect(legendary.locator(".back-mark")).toHaveCSS("visibility", "hidden");
   await expect(page.locator(".opening-impact.impact-legendary")).toBeVisible();
+  await page.waitForTimeout(950);
+  const legendaryFace = legendary.locator(".card-front");
+  const legendaryBack = legendary.locator(".card-back");
+  expect(await legendaryFace.evaluate((node) => getComputedStyle(node).transform)).not.toBe("none");
+  await expect(legendaryFace).toHaveCSS("backface-visibility", "hidden");
+  await expect(legendaryBack).toHaveCSS("visibility", "hidden");
+  await expect(legendaryBack).toHaveCSS("opacity", "0");
   await page.screenshot({ path: "test-results/clean-legendary-impact.png" });
 });
 
@@ -390,7 +394,7 @@ test("the Nameless tier uses its shifting border treatment", async ({ page }) =>
   await nameless.click();
   const border = nameless.locator(".rarity-border-fx");
   await expect(border).toBeVisible();
-  expect(await border.evaluate((node) => getComputedStyle(node).animationName)).toContain("rarity-nameless-flicker");
+  expect(await border.evaluate((node) => getComputedStyle(node).animationName)).toContain("league-nameless-glitch");
   await page.waitForTimeout(750);
   await page.screenshot({ path: "test-results/clean-nameless.png" });
 });
@@ -436,8 +440,8 @@ test("reveals fire haptic pulses through the vibration API when enabled", async 
 
 test("duplicate selling keeps one copy and pays cash from the table", async ({ page }) => {
   const state = createInitialState(Date.now());
-  state.collection = { "corner-01": 3, "corner-06": 2 };
-  state.bestRarities = { "corner-01": "rare", "corner-06": "mythic" };
+  state.collection = { "corner-01": 3, "corner-02": 2 };
+  state.bestRarities = { "corner-01": "rare", "corner-02": "common" };
   state.duplicateBank = 42;
   state.settings.sound = false;
   state.lastSavedAt = Date.now();
@@ -449,7 +453,7 @@ test("duplicate selling keeps one copy and pays cash from the table", async ({ p
   await sell.click();
   await expect(sell).toContainText("NO EXTRA COPIES");
   await expect(page.locator(".clean-wallet strong")).toContainText("42");
-  await expect(page.locator(".clean-set-progress")).toContainText("2/48");
+  await expect(page.locator(".clean-set-progress")).toContainText("2/98");
 });
 
 test("the clean table remains usable inside the compact game frame", async ({ page }) => {
@@ -469,4 +473,57 @@ test("the clean table remains usable inside the compact game frame", async ({ pa
   expect(packBounds.x + packBounds.width).toBeLessThanOrEqual(800);
   expect(packBounds.y + packBounds.height).toBeLessThanOrEqual(450);
   await page.screenshot({ path: "test-results/clean-compact.png" });
+});
+
+test("the card lab exposes every standard, holo, filter, zoom, and flip state", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/review/");
+
+  await expect(page.getByRole("heading", { name: "Card Lab" })).toBeVisible();
+  await expect(page.locator(".review-grid-item")).toHaveCount(98);
+  await expect(page.locator("kbd")).toHaveCount(0);
+  await expect(page.locator(".review-logo img")).toHaveCount(0);
+  await expect(page.locator(".review-logo")).toContainText("PACKWORKS");
+  await expect(page.locator(".review-logo .clean-brand-mark i")).toHaveCount(3);
+
+  const mechanics = page.locator(".mechanic-simulator");
+  await expect(mechanics.getByRole("heading", { name: "Mechanics Arena" })).toBeVisible();
+  await expect(mechanics.locator(".mechanic-selector button")).toHaveCount(14);
+  await expect(mechanics.locator(".mechanic-visual")).toHaveAttribute("data-mechanic", "discover");
+  const insight = mechanics.locator(".three-discover-controls button").filter({ hasText: "Insight" });
+  await insight.click();
+  await expect(insight).toHaveClass(/is-selected/);
+
+  await mechanics.locator(".mechanic-selector button").nth(5).click();
+  await expect(mechanics.locator(".mechanic-visual")).toHaveAttribute("data-mechanic", "fusion");
+  await expect(mechanics.locator(".three-mechanic-stage canvas")).toBeVisible();
+  await expect(mechanics.locator(".back-mark")).toHaveCount(0);
+  await mechanics.getByRole("button", { name: "BROADCAST" }).click();
+  await expect(mechanics).toHaveClass(/fx-broadcast/);
+
+  const priorRun = await mechanics.locator(".mechanic-visual").getAttribute("data-run");
+  await mechanics.getByRole("button", { name: "REPLAY EFFECT" }).click();
+  await expect.poll(() => mechanics.locator(".mechanic-visual").getAttribute("data-run")).not.toBe(priorRun);
+
+  await mechanics.getByRole("button", { name: "FOCUS VIEW" }).click();
+  await expect(mechanics).toHaveClass(/is-focused/);
+  await mechanics.getByRole("button", { name: "EXIT FOCUS" }).click();
+  await expect(mechanics).not.toHaveClass(/is-focused/);
+
+  const turn = page.getByRole("button", { name: "Reveal Coinbud" });
+  await turn.click();
+  await expect(page.getByRole("button", { name: "Turn Coinbud" })).toBeVisible();
+  await page.waitForTimeout(720);
+  await expect(page.getByRole("button", { name: "Turn Coinbud" }).locator("canvas")).toBeVisible();
+
+  await page.getByRole("button", { name: "STANDARD" }).click();
+  await expect(page.locator(".review-grid .is-pixel-animated")).toHaveCount(0);
+  await page.locator(".review-controls select").first().selectOption(SETS[0].id);
+  await expect(page.locator(".review-grid-item")).toHaveCount(98);
+  await page.getByPlaceholder("Try Echo, Salvage, Mark…").fill("Echo");
+  expect(await page.locator(".review-grid-item").count()).toBeGreaterThan(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mechanics.scrollIntoViewIfNeeded();
+  expect(await mechanics.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
 });

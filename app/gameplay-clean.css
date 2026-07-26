@@ -710,6 +710,25 @@
   box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--stock-a, var(--set-a)) 34%, #b3b2a8), 3px 4px 0 rgba(21, 29, 26, 0.1);
 }
 
+.shop-pack-preview {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 57px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.shop-pack-preview > .pack-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 244px;
+  height: 350px;
+  transform: scale(0.163);
+  transform-origin: 0 0;
+}
+
 .clean-set-stock {
   min-height: 72px;
 }
@@ -1745,17 +1764,6 @@
   animation: rarity-singularity-pull 2.8s ease-in-out infinite;
 }
 
-.pw-clean .rarity-singularity .rarity-border-fx::before {
-  top: 50%;
-  left: 50%;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #08050e;
-  box-shadow: 0 0 22px 7px rgba(87, 49, 157, 0.76);
-  transform: translate(-50%, -50%);
-}
-
 .pw-clean .rarity-nameless .rarity-border-fx {
   border-color: #f4f4f2;
   box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.48), 0 0 24px rgba(255, 255, 255, 0.58);
@@ -2504,6 +2512,17 @@
   animation: mark-glow 1.2s ease-in-out infinite;
 }
 
+.pw-clean .reveal-card.is-marked[data-mark-stacks]::after {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  color: #102844;
+  content: "×" attr(data-mark-stacks);
+  font-size: 9px;
+  font-weight: 900;
+}
+
 @keyframes mark-glow {
   0%, 100% { box-shadow: 0 0 6px #ffd15c; }
   50% { box-shadow: 0 0 16px #ffd15c; }
@@ -2848,120 +2867,76 @@ button.clean-case-slot.is-empty:hover {
   .reveal-echo-flash { animation-iteration-count: 1; }
 }
 
-/* --- Salvage burst: Mystery Packs rip open on screen --- */
+/* Shared, compact Three.js bursts can fire over any menu without taking over
+   the screen. One renderer handles independently timed retriggers. */
 
-.salvage-burst {
+.three-global-burst-layer,
+.three-global-burst-canvas {
   position: fixed;
   inset: 0;
-  z-index: 60;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  animation: salvage-burst-fade 2.8s ease forwards;
-}
-
-.reduced-effects .salvage-burst { display: none; }
-
-.salvage-burst-pack {
-  position: relative;
-  width: 92px;
-  height: 128px;
-}
-
-.salvage-burst-pack b {
-  position: absolute;
-  left: 50%;
-  top: -30px;
-  transform: translateX(-50%);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  color: #f0d688;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
-  white-space: nowrap;
-}
-
-.salvage-burst-half {
-  position: absolute;
-  top: 0;
-  width: 50%;
+  display: block;
+  width: 100%;
   height: 100%;
-  background: linear-gradient(160deg, #d9b856, #8a6b1f);
-  border: 1px solid #f2dd9a;
-  box-shadow: 0 0 22px rgba(240, 214, 136, 0.5);
+  pointer-events: none;
 }
 
-.salvage-burst-half.is-left {
-  left: 0;
-  border-radius: 6px 0 0 6px;
-  animation: salvage-half-left 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+.three-global-burst-layer {
+  z-index: 180;
 }
 
-.salvage-burst-half.is-right {
-  right: 0;
-  border-radius: 0 6px 6px 0;
-  animation: salvage-half-right 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+.three-global-burst-canvas {
+  z-index: 0;
 }
 
-@keyframes salvage-half-left {
-  0% { transform: none; opacity: 1; }
-  100% { transform: translate(-74px, -16px) rotate(-24deg); opacity: 0; }
+.reduced-effects .three-global-burst-layer {
+  display: none;
 }
 
-@keyframes salvage-half-right {
-  0% { transform: none; opacity: 1; }
-  100% { transform: translate(74px, -16px) rotate(24deg); opacity: 0; }
-}
-
-.salvage-burst-cards {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-}
-
-.salvage-burst-card {
-  --angle: calc((var(--i) - (var(--n) - 1) / 2) * (170deg / max(var(--n) - 1, 1)));
-  position: absolute;
-  width: 44px;
-  height: 62px;
+.global-burst-label {
+  --burst-accent: #77efff;
+  position: fixed;
+  top: calc(50px + var(--burst-slot) * 34px);
+  right: clamp(28px, 8vw, 112px);
+  z-index: 2;
+  padding: 5px 9px 4px;
+  border: 2px solid #042650;
   border-radius: 4px;
-  border: 1px solid var(--rarity, #d9b856);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--rarity, #d9b856) 45%, #101815), #0c1210);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--rarity, #d9b856) 50%, transparent);
-  opacity: 0;
-  animation: salvage-card-fly 2s cubic-bezier(0.16, 0.8, 0.3, 1) forwards;
-  animation-delay: calc(0.12s + var(--i) * 70ms);
+  background: #f4fbff;
+  box-shadow:
+    inset 0 -3px color-mix(in srgb, var(--burst-accent) 55%, #ffffff),
+    0 3px 0 #042650,
+    0 8px 18px rgba(1, 19, 45, 0.24);
+  color: #052752;
+  font: 950 9px/1 "Trebuchet MS", Arial, sans-serif;
+  letter-spacing: 0.08em;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  animation: global-burst-label 1.18s cubic-bezier(0.2, 0.8, 0.25, 1) both;
 }
 
-.salvage-burst-card em {
-  position: absolute;
-  left: 50%;
-  bottom: -14px;
-  transform: translateX(-50%);
-  font-size: 8px;
-  font-style: normal;
-  letter-spacing: 0.12em;
-  color: #9fe3b7;
+.global-burst-label.is-salvage {
+  --burst-accent: #63e7d6;
 }
 
-.salvage-burst-more {
-  position: absolute;
-  left: 50%;
-  bottom: -46px;
-  transform: translateX(-50%);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: #cfc7b4;
+.global-burst-label.is-fracture {
+  --burst-accent: #ff7a61;
 }
 
-@keyframes salvage-card-fly {
-  0% { opacity: 0; transform: rotate(var(--angle)) translateY(0) rotate(calc(var(--angle) * -1)) scale(0.4); }
-  18% { opacity: 1; }
-  62% { opacity: 1; transform: rotate(var(--angle)) translateY(-124px) rotate(calc(var(--angle) * -1)) scale(1); }
-  100% { opacity: 0; transform: rotate(var(--angle)) translateY(-152px) rotate(calc(var(--angle) * -1)) scale(0.92); }
+@keyframes global-burst-label {
+  0% { opacity: 0; transform: translateY(-7px) scale(0.72); }
+  14%, 72% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-4px) scale(0.92); }
 }
 
-@keyframes salvage-burst-fade {
-  0%, 86% { opacity: 1; }
-  100% { opacity: 0; }
+@media (max-width: 719px) {
+  .global-burst-label {
+    top: calc(38px + var(--burst-slot) * 30px);
+    right: 50%;
+    transform: translateX(50%);
+  }
+
+  @keyframes global-burst-label {
+    0% { opacity: 0; transform: translateX(50%) translateY(-7px) scale(0.72); }
+    14%, 72% { opacity: 1; transform: translateX(50%); }
+    100% { opacity: 0; transform: translateX(50%) translateY(-4px) scale(0.92); }
+  }
 }

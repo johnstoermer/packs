@@ -1,0 +1,438 @@
+.subset-selector-document {
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.subset-selector {
+  min-height: 100vh;
+  padding: 28px clamp(18px, 4vw, 60px) 72px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(86, 203, 238, 0.25), transparent 28%),
+    linear-gradient(180deg, #0876c9 0 320px, #dff3ff 320px 100%);
+  color: #052752;
+}
+
+.subset-masthead {
+  display: grid;
+  max-width: 1480px;
+  margin: 0 auto 26px;
+  grid-template-columns: minmax(180px, 0.55fr) minmax(300px, 1.4fr) auto;
+  gap: 28px;
+  align-items: center;
+  padding: 22px 26px;
+  border: 5px solid #052752;
+  border-radius: 22px;
+  background: #fffdf0;
+  box-shadow: 0 8px 0 #052752, inset 0 0 0 4px #ffd63d;
+}
+
+.subset-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #052752;
+  font-size: 18px;
+  font-weight: 950;
+  text-decoration: none;
+}
+
+.subset-title > span,
+.subset-count > span,
+.subset-controls label > span,
+.subset-results-heading span {
+  color: #3975a3;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.11em;
+}
+
+.subset-title h1 {
+  margin: 3px 0 2px;
+  font-size: clamp(27px, 3vw, 44px);
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.subset-title p {
+  margin: 6px 0 0;
+  color: #52738c;
+  font-size: 12px;
+}
+
+.subset-count {
+  display: grid;
+  min-width: 160px;
+  justify-items: end;
+}
+
+.subset-count > strong {
+  color: #075ca1;
+  font-size: 42px;
+  line-height: 0.9;
+}
+
+.subset-count button,
+.subset-results-heading a {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 3px solid #052752;
+  border-radius: 8px;
+  background: #ffd63d;
+  box-shadow: 0 3px 0 #052752;
+  color: #052752;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 950;
+  text-decoration: none;
+}
+
+.subset-count button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.subset-controls {
+  position: sticky;
+  z-index: 30;
+  top: 10px;
+  display: grid;
+  max-width: 1480px;
+  margin: 0 auto 28px;
+  grid-template-columns: repeat(3, minmax(150px, 0.55fr)) minmax(240px, 1.35fr);
+  gap: 10px;
+  padding: 14px;
+  border: 4px solid #052752;
+  border-radius: 16px;
+  background: rgba(245, 252, 255, 0.97);
+  box-shadow: 0 6px 0 #052752;
+  backdrop-filter: blur(12px);
+}
+
+.subset-controls label {
+  display: grid;
+  gap: 5px;
+}
+
+.subset-controls select,
+.subset-controls input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 11px;
+  border: 3px solid #052752;
+  border-radius: 8px;
+  background: white;
+  color: #052752;
+  font: 850 12px "Trebuchet MS", Arial, sans-serif;
+}
+
+.subset-results-heading {
+  display: flex;
+  max-width: 1480px;
+  margin: 0 auto 20px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.subset-results-heading h2 {
+  margin: 3px 0 0;
+  font-size: 25px;
+}
+
+.subset-grid {
+  display: grid;
+  max-width: 1480px;
+  margin: 0 auto;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 24px 18px;
+}
+
+.subset-card {
+  position: relative;
+  min-width: 0;
+  padding: 10px;
+  border: 4px solid transparent;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.5);
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.subset-card.is-picked {
+  border-color: #052752;
+  background: #fff5b5;
+  box-shadow: 0 6px 0 #052752;
+  transform: translateY(-3px);
+}
+
+.subset-card-view {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 0.7042;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.subset-card-view > .card-front {
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
+
+.subset-pick {
+  position: absolute;
+  z-index: 10;
+  top: 17px;
+  right: 17px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border: 2px solid #052752;
+  border-radius: 8px;
+  background: #f2fbff;
+  box-shadow: 0 3px 0 #052752;
+  color: #052752;
+  cursor: pointer;
+  font-size: 7px;
+  font-weight: 950;
+}
+
+.subset-pick i {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 2px solid #052752;
+  border-radius: 4px;
+  background: white;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.subset-pick[aria-pressed="true"] {
+  background: #ffd63d;
+}
+
+.subset-pick[aria-pressed="true"] i {
+  background: #62d790;
+}
+
+.subset-card footer {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 10px 2px 0;
+}
+
+.subset-card footer b {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subset-card footer p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #244e6c;
+  font: 750 10px/1.35 "Trebuchet MS", Arial, sans-serif;
+}
+
+.subset-card footer small {
+  grid-column: 2;
+  grid-row: 1;
+  color: #52738c;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.subset-zoom {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 34px;
+  background: rgba(3, 26, 56, 0.86);
+  backdrop-filter: blur(12px);
+}
+
+.subset-zoom-close {
+  position: fixed;
+  z-index: 2;
+  top: 24px;
+  right: 28px;
+  padding: 10px 14px;
+  border: 3px solid #052752;
+  border-radius: 8px;
+  background: #ffd63d;
+  box-shadow: 0 4px 0 #052752;
+  color: #052752;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.subset-zoom-content {
+  display: grid;
+  width: min(900px, 94vw);
+  grid-template-columns: minmax(300px, 430px) minmax(260px, 1fr);
+  gap: 34px;
+  align-items: center;
+  padding: 28px;
+  border: 5px solid #052752;
+  border-radius: 24px;
+  background: #dff3ff;
+  box-shadow: 0 10px 0 #052752, inset 0 0 0 4px #ffd63d;
+}
+
+.subset-zoom-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 0.7042;
+}
+
+.subset-zoom-card > .card-front {
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
+
+.subset-zoom-content aside {
+  color: #052752;
+}
+
+.subset-zoom-content aside > span {
+  color: #3975a3;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.11em;
+}
+
+.subset-zoom-content aside h2 {
+  margin: 6px 0 18px;
+  font-size: 36px;
+  line-height: 1;
+}
+
+.subset-zoom-content aside b {
+  display: block;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #9cc1d7;
+  font-size: 12px;
+}
+
+.subset-zoom-content aside p {
+  margin: 12px 0;
+  font: 800 16px/1.45 "Trebuchet MS", Arial, sans-serif;
+}
+
+.subset-zoom-content aside small {
+  display: block;
+  color: #52738c;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.subset-zoom-content aside button {
+  margin-top: 24px;
+  padding: 12px 16px;
+  border: 3px solid #052752;
+  border-radius: 9px;
+  background: #ffd63d;
+  box-shadow: 0 4px 0 #052752;
+  color: #052752;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+@media (max-width: 900px) {
+  .subset-masthead {
+    grid-template-columns: 1fr auto;
+  }
+
+  .subset-brand {
+    display: none;
+  }
+
+  .subset-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .subset-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .subset-selector {
+    padding: 14px 10px 50px;
+  }
+
+  .subset-masthead {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .subset-count {
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: center;
+    justify-items: start;
+  }
+
+  .subset-count button {
+    margin: 0;
+  }
+
+  .subset-controls {
+    position: relative;
+    top: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .subset-search {
+    grid-column: auto;
+  }
+
+  .subset-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 6px;
+  }
+
+  .subset-card {
+    padding: 5px;
+  }
+
+  .subset-pick {
+    top: 9px;
+    right: 9px;
+  }
+
+  .subset-pick span {
+    display: none;
+  }
+
+  .subset-zoom {
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .subset-zoom-content {
+    width: min(430px, 96vw);
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .subset-zoom-content aside h2 {
+    font-size: 28px;
+  }
+}

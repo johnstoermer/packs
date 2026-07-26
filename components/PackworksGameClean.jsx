@@ -9,6 +9,7 @@ import {
   SETS,
   formatNumber,
   getCard,
+  getCardArtId,
   getSet,
 } from "../lib/gameData";
 import {
@@ -53,14 +54,18 @@ import {
   CASE_SIZE,
   DISCOVER_POOL,
   KINGS,
-  describeCard,
   getCardDef,
+  getCardRules,
   getCaseSlots,
 } from "../lib/engineCards";
 import { createAudioEngine } from "../lib/audio";
 import { createHapticsEngine } from "../lib/haptics";
+import ThreeCardScene from "./ThreeCardScene";
+import ThreeGlobalBurstLayer from "./ThreeGlobalBurstLayer";
+import ThreePackScene from "./ThreePackScene";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
+const PIXEL_ART_VERSION = "20260726-2";
 const SHOP_PRODUCTS = PACK_PRODUCTS.filter((product) => ["loose", "case"].includes(product.id));
 const CASE_PRODUCT = PACK_PRODUCTS.find((product) => product.id === "case");
 const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
@@ -94,27 +99,123 @@ function getCardPresentation(card, rarityId = card.rarity) {
   return { kind, treatment };
 }
 
-function CardArt({ card, compact = false }) {
+function CardArt({ card, compact = false, animated = false }) {
+  const pixelRef = useRef(null);
+  const [pixelReady, setPixelReady] = useState(false);
   const set = getSet(card.setId);
   // Art is filed under the legacy print a card was reprinted from.
-  const artKey = card.legacy || card.id;
+  const artKey = getCardArtId(card);
   const artAt = artKey.lastIndexOf("-");
-  const artPath = `${ASSET_BASE}/card-art/${artKey.slice(0, artAt)}/${artKey.slice(artAt + 1)}.webp`;
+  const artSetId = artKey.slice(0, artAt);
+  const artNumber = artKey.slice(artAt + 1);
+  const legacyPath = `${ASSET_BASE}/card-art/${artSetId}/${artNumber}.webp`;
+  const pixelPath = `${ASSET_BASE}/card-art-pixel/${artSetId}/${artNumber}/frame-0.png?v=${PIXEL_ART_VERSION}`;
+  const holoPath = `${ASSET_BASE}/card-art-pixel/${artSetId}/${artNumber}/holo-strip.png?v=${PIXEL_ART_VERSION}`;
+  useEffect(() => {
+    setPixelReady(Boolean(pixelRef.current?.complete && pixelRef.current?.naturalWidth));
+  }, [pixelPath]);
   return (
     <span
-      className={`card-art ${compact ? "compact" : ""}`}
+      className={`card-art ${compact ? "compact" : ""} ${animated ? "is-pixel-animated" : ""} ${pixelReady ? "has-pixel-art" : ""}`.trim()}
       role="img"
       aria-label={`${card.name}, an original card illustration`}
       style={{ "--art-a": set.colors[0], "--art-b": set.colors[1] }}
     >
-      <img src={artPath} alt="" aria-hidden="true" loading={compact ? "lazy" : "eager"} decoding="async" />
+      <img className="card-art-legacy" src={legacyPath} alt="" aria-hidden="true" loading={compact ? "lazy" : "eager"} decoding="async" />
+      <img
+        ref={pixelRef}
+        className="card-art-pixel"
+        src={pixelPath}
+        alt=""
+        aria-hidden="true"
+        loading={compact ? "lazy" : "eager"}
+        decoding="async"
+        onLoad={() => setPixelReady(true)}
+        onError={() => setPixelReady(false)}
+      />
+      {animated && (
+        <span
+          className="card-art-holo-strip"
+          aria-hidden="true"
+          style={{ backgroundImage: `url("${holoPath}")` }}
+        />
+      )}
       <span className="card-art-grade" />
       <span className="card-art-index">{set.short} / {String(card.number).padStart(2, "0")}</span>
     </span>
   );
 }
 
+function CardRules({ cardId, heading = false, reminders = false, className = "" }) {
+  const rules = getCardRules(cardId);
+  if (!rules) return null;
+  return (
+    <span className={`card-rules ${heading ? "has-heading" : ""} ${className}`.trim()}>
+      {heading && (
+        <span className="card-rules-heading">
+          <small>{rules.eyebrow}</small>
+          <b>{rules.title}</b>
+        </span>
+      )}
+      <span className="card-rules-copy">
+        {rules.tokens.map((token, index) => {
+          if (token.type === "text") return token.value;
+          return (
+            <mark
+              className={`rules-token is-${token.type} ${token.tone ? `tone-${token.tone}` : ""}`}
+              key={`${cardId}-${index}`}
+              title={token.keyword || undefined}
+            >
+              {token.value}
+            </mark>
+          );
+        })}
+      </span>
+      {reminders && rules.reminders.length > 0 && (
+        <span className="card-rules-reminders">
+          {rules.reminders.map((entry) => (
+            <small key={entry.keyword}>
+              <b>{entry.keyword}</b> — {entry.reminder}
+            </small>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function PackCreatureArt({ card }) {
+  const artKey = getCardArtId(card);
+  const artAt = artKey.lastIndexOf("-");
+  const artSetId = artKey.slice(0, artAt);
+  const artNumber = artKey.slice(artAt + 1);
+  const pixelPath = `${ASSET_BASE}/card-art-pixel/${artSetId}/${artNumber}/frame-0.png?v=${PIXEL_ART_VERSION}`;
+  const legacyPath = `${ASSET_BASE}/card-art/${artSetId}/${artNumber}.webp`;
+  return (
+    <img
+      src={pixelPath}
+      data-fallback={legacyPath}
+      alt=""
+      aria-hidden="true"
+      decoding="async"
+      onError={(event) => {
+        const image = event.currentTarget;
+        const fallback = image.dataset.fallback;
+        if (fallback && image.getAttribute("src") !== fallback) image.src = fallback;
+        else image.hidden = true;
+      }}
+    />
+  );
+}
+
 function PackFace({ set, small = false }) {
+  const featured = [...set.cards]
+    .sort((left, right) => (
+      RARITIES[right.rarity].order - RARITIES[left.rarity].order
+      || right.number - left.number
+    ))
+    .slice(0, 3);
+  const [chase, leftFeature, rightFeature] = featured;
   return (
     <span
       className={`${small ? "pack-face small" : "pack-face"}`}
@@ -125,11 +226,67 @@ function PackFace({ set, small = false }) {
       }}
     >
       <span className="pack-crimp top" />
-      <strong>{set.name}</strong>
-      <span className="pack-glyph"><i /><i /><i /></span>
-      <span className="pack-count">6 CARDS</span>
-      <span className="pack-series">PACKWORKS / {set.short}</span>
+      <span className="pack-title">
+        <strong>{set.name}</strong>
+      </span>
+      <span
+        className="pack-creature-scene"
+        aria-label={`${chase.name}, ${leftFeature.name}, and ${rightFeature.name}`}
+      >
+        <span className="pack-creature is-left"><PackCreatureArt card={leftFeature} /></span>
+        <span className="pack-creature is-right"><PackCreatureArt card={rightFeature} /></span>
+        <span className="pack-creature is-chase"><PackCreatureArt card={chase} /></span>
+        <span className="pack-info"><b>6 CARDS</b><small>PACKWORKS</small></span>
+      </span>
       <span className="pack-crimp bottom" />
+    </span>
+  );
+}
+
+export function PrintedCard({
+  card,
+  rarityId = card.rarity,
+  copyLabel = "COLLECTED",
+  foil = false,
+  compact = false,
+  misprintDetected = false,
+  className = "",
+}) {
+  const rarity = RARITIES[rarityId];
+  const set = getSet(card.setId);
+  const presentation = getCardPresentation(card, rarityId);
+  return (
+    <span
+      className={`card-front rarity-${rarityId} treatment-${presentation.treatment} set-${card.setId} ${foil ? "is-foil" : ""} ${className}`.trim()}
+      style={{
+        "--rarity": rarity.color,
+        "--rarity-deep": rarity.deep,
+        "--set-a": set.colors[0],
+        "--set-b": set.colors[1],
+        "--set-c": set.colors[2],
+      }}
+    >
+      <span className="card-head">
+        <span>{set.short}-{String(card.number).padStart(2, "0")}</span>
+        <b>{rarity.short}</b>
+      </span>
+      <CardArt card={card} compact={compact} animated={foil} />
+      <span className="card-copy">
+        <span className="card-type-line">{rarity.label} / {presentation.kind}</span>
+        <strong>{card.name}</strong>
+        <CardRules cardId={card.id} />
+        <small className="card-flavor">“{card.flavor}”</small>
+      </span>
+      <span className="card-foot">
+        <span>{copyLabel}</span>
+        <b>{rarity.label}</b>
+      </span>
+      {misprintDetected && <span className="pw-misprint-stamp">MISPRINT</span>}
+      <span className="rarity-border-fx" aria-hidden="true">
+        {Array.from({ length: 12 }, (_, point) => <i key={point} />)}
+      </span>
+      <span className="foil-sheen" />
+      <span className="card-print-mark">{set.short}</span>
     </span>
   );
 }
@@ -153,7 +310,6 @@ function RevealCard({
   const rarity = RARITIES[pull.rarity];
   const signal = RARITIES[pull.signalRarity || pull.rarity];
   const set = getSet(pull.card.setId);
-  const presentation = getCardPresentation(pull.card, pull.rarity);
   const dealt = ["ready", "complete", "summary"].includes(phase);
   const canReveal = phase === "ready" && !revealed;
   const row = Math.floor(index / perRow);
@@ -166,6 +322,7 @@ function RevealCard({
     <button
       type="button"
       data-reveal-index={index}
+      data-mark-stacks={pull.marked && (pull.markStacks || 1) > 1 ? pull.markStacks : undefined}
       className={`reveal-card count-${count} rarity-${pull.rarity} ${dealt ? "is-dealt" : ""} ${revealed ? "is-revealed" : ""} ${latest ? "is-impacting" : ""} ${canReveal ? "is-hoverable" : ""} ${pull.foil ? "is-foil" : ""} ${phase === "summary" ? "is-settled" : ""} ${pull.marked && !revealed ? "is-marked" : ""} ${pull.transmuted && !revealed ? "is-transmuted" : ""} ${pull.fusedAway ? "is-fused-away" : ""} ${pull.fromMystery ? "is-mystery" : ""}`}
       style={{
         "--index": index,
@@ -203,47 +360,48 @@ function RevealCard({
           <b className="reveal-echo-chip">ECHO{echo.count > 1 ? ` ×${echo.count}` : ""}</b>
         </span>
       )}
-      <span className="reveal-card-inner">
-        <span className="card-back">
-          <span className="back-set">{set.short}</span>
-          <span className="back-orbit"><i /><i /><i /></span>
-          <span className="back-mark">PW</span>
-          <span className="back-rule" />
-          <span className="rarity-signal" style={{ "--rarity": signal.color }}>
+      <span className="reveal-card-inner has-three-card">
+        <span className="reveal-card-fallback" aria-hidden="true">
+          <span className="card-back back-style-crest">
+            <span className="back-set">{set.short}</span>
+            <span className="back-orbit"><i /><i /><i /></span>
+            <span className="back-mark"><span><b>PW</b><small>PACKWORKS</small></span></span>
+            <span className="back-rule" />
+          </span>
+          <PrintedCard
+            card={pull.card}
+            rarityId={pull.rarity}
+            copyLabel={copyLabel}
+            foil={pull.foil}
+            misprintDetected={pull.misprintDetected}
+          />
+        </span>
+        <ThreeCardScene
+          card={pull.card}
+          rarityId={pull.rarity}
+          foil={pull.foil}
+          faceUp={revealed}
+          interactive={false}
+          paused={phase === "summary"}
+          autoFloat={false}
+          backStyle="crest"
+          copyLabel={copyLabel}
+          wrapper="span"
+          className="reveal-three-card"
+        />
+        {!revealed && (
+          <span className="rarity-signal three-rarity-signal" style={{ "--rarity": signal.color }}>
             <i />
             <b>{signal.label}</b>
             <small>{signal.rateLabel} BASE / CLICK TO REVEAL</small>
           </span>
-        </span>
-        <span className={`card-front treatment-${presentation.treatment} set-${pull.card.setId}`}>
-          <span className="card-head">
-            <span>{set.short}-{String(pull.card.number).padStart(2, "0")}</span>
-            <b>{rarity.short}</b>
-          </span>
-          <CardArt card={pull.card} />
-          <span className="card-copy">
-            <span className="card-type-line">{rarity.label} / {rarity.rateLabel} / {presentation.kind}</span>
-            <strong>{pull.card.name}</strong>
-            <small>{pull.card.flavor}</small>
-          </span>
-          <span className="card-foot">
-            <span>{copyLabel}</span>
-            <b>{rarity.label}</b>
-          </span>
-          {pull.misprintDetected && <span className="pw-misprint-stamp">MISPRINT</span>}
-          {pull.foil && <span className="foil-stamp">FOIL</span>}
-          <span className="rarity-border-fx" aria-hidden="true">
-            {Array.from({ length: 12 }, (_, point) => <i key={point} />)}
-          </span>
-          <span className="foil-sheen" />
-          <span className="card-print-mark">{set.short}</span>
-        </span>
+        )}
       </span>
     </button>
   );
 }
 
-function OpeningImpact({ impact }) {
+export function OpeningImpact({ impact }) {
   if (!impact) return null;
   const rarity = RARITIES[impact.rarity];
   return (
@@ -416,7 +574,16 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
                 key={set.id}
                 style={{ "--stock-a": set.colors[0], "--stock-b": set.colors[1], "--stock-c": set.colors[2] }}
               >
-                <div className="clean-product-icon loose"><i /><i /><i /></div>
+                <span className="shop-pack-preview shop-pack-preview-three" aria-hidden="true">
+                  <ThreePackScene
+                    set={set}
+                    interactive={false}
+                    paused
+                    wrapper="span"
+                    label=""
+                    className="shop-three-pack"
+                  />
+                </span>
                 <button
                   className="clean-stock-info"
                   disabled={!unlocked}
@@ -540,13 +707,19 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
               key={card.id}
               className={`${count ? "found" : "missing"} rarity-${rarityId}`}
               onClick={() => onCard(card.id)}
-              style={{ "--rarity": rarity.color }}
+              style={{
+                "--rarity": rarity.color,
+                borderColor: count ? undefined : rarity.color,
+              }}
               aria-label={count ? `${card.name}, ${count} copies` : `Missing card ${card.number}, show rarity`}
             >
               {count ? <CardArt card={card} compact /> : <span className="clean-missing-card">PW</span>}
               <span className="clean-binder-card-copy">
                 <b>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</b>
                 <small>{count ? `${rarity.label} ${rarity.rateLabel} / ${count} ${count === 1 ? "copy" : "copies"}` : "Not found"}</small>
+                {count > 0 && getCardRules(card.id) && (
+                  <em className="clean-binder-ability">{getCardRules(card.id).title}</em>
+                )}
                 {displayedIds?.has(card.id) && <em className="clean-on-display">ON DISPLAY</em>}
               </span>
             </button>
@@ -564,37 +737,52 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
   const rarity = RARITIES[rarityId];
   const count = game.collection[card.id] || 0;
   const duplicateValue = Math.ceil(getCardSaleValue(game, card.id) * (1 + (game.upgrades?.shelf || 0) * 0.2));
-  const def = getCardDef(card.id);
   const isDisplayed = derived.displayedEntries.some((entry) => entry.id === card.id);
   const caseFull = derived.displayedEntries.length >= derived.caseSlots;
   return (
     <div className="clean-modal-scrim" onMouseDown={onClose}>
-      <article className={`clean-card-detail rarity-${rarityId}`} onMouseDown={(event) => event.stopPropagation()} style={{ "--rarity": rarity.color }}>
-        <button onClick={onClose}>CLOSE</button>
-        <div className={`clean-detail-art${count ? "" : " is-missing"}`}>
-          {count ? <CardArt card={card} /> : <span aria-hidden="true">PW</span>}
-        </div>
-        <div className="clean-detail-copy">
-          <span style={{ color: rarity.color }}>{rarity.label} / {rarity.rateLabel} BASE PULL</span>
-          <h2>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</h2>
-          <p>{count ? card.flavor : "Not found yet. Keep opening packs to reveal this card."}</p>
-          {def && (
-            <div className={`clean-detail-effect${def.sig || def.prestige ? " is-meta" : ""}`}>
-              <b>{def.sig ? `${KINGS[def.sig].name.toUpperCase()} SIGNATURE` : def.prestige ? "THE DOOR OUT" : "DISPLAY EFFECT"}</b>
-              <span>{describeCard(card.id)}</span>
-            </div>
-          )}
+      <article
+        className={`clean-card-detail card-zoom-detail rarity-${rarityId}`}
+        onMouseDown={(event) => event.stopPropagation()}
+        style={{ "--rarity": rarity.color, "--rarity-deep": rarity.deep }}
+      >
+        <button className="card-zoom-close" onClick={onClose} aria-label="CLOSE">
+          <span>×</span>
+          CLOSE
+        </button>
+        <div className={`clean-detail-art card-zoom-card${count ? "" : " is-missing"}`}>
           {count ? (
-            <dl>
-              <div><dt>COPIES</dt><dd>{count}</dd></div>
-              <div><dt>EACH EXTRA</dt><dd>{money(duplicateValue)}</dd></div>
-            </dl>
+            <ThreeCardScene
+              card={card}
+              rarityId={rarityId}
+              foil={false}
+              faceUp
+              initialFaceUp
+              interactive
+              autoFloat
+              backStyle="crest"
+              copyLabel={`${count} ${count === 1 ? "COPY" : "COPIES"}`}
+              className="game-detail-three-card"
+            />
           ) : (
-            <dl>
-              <div><dt>RARITY</dt><dd style={{ color: rarity.color }}>{rarity.label}</dd></div>
-              <div><dt>BASE PULL</dt><dd>{rarity.rateLabel}</dd></div>
-            </dl>
+            <span className="card-back card-zoom-back back-style-crest" aria-label={`Card ${String(card.number).padStart(2, "0")}, not found`}>
+              <span className="back-set">{getSet(card.setId).short}</span>
+              <span className="back-orbit"><i /><i /><i /></span>
+              <span className="back-mark"><span><b>PW</b><small>PACKWORKS</small></span></span>
+              <span className="back-rule" />
+            </span>
           )}
+        </div>
+        <div className="card-zoom-hud">
+          <div className="card-zoom-status">
+            <span>{count ? `${rarity.label} / ${rarity.rateLabel} BASE PULL` : "UNDISCOVERED"}</span>
+            <strong>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</strong>
+            <small>
+              {count
+                ? `${count} ${count === 1 ? "copy" : "copies"} / each duplicate sells for ${money(duplicateValue)} cash`
+                : `${rarity.label} / ${rarity.rateLabel} base pull`}
+            </small>
+          </div>
           {count > 0 && (
             isDisplayed ? (
               <button className="clean-display-toggle is-displayed" onClick={() => onUndisplay(card.id)}>
@@ -610,12 +798,12 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
               </button>
             )
           )}
-          {count ? (
-            <small>Selling duplicates always keeps one copy. This card is permanently {rarity.label}.</small>
-          ) : (
-            <small>This card is permanently {rarity.label}. Its art and name stay hidden until you pull it.</small>
-          )}
         </div>
+        {count > 0 && (
+          <span className="card-detail-accessible-copy">
+            {getCardRules(card.id)?.text}
+          </span>
+        )}
       </article>
     </div>
   );
@@ -651,7 +839,7 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
                   </button>
                   <div className="clean-case-slot-copy">
                     <b>{index === 0 ? "SLOT 1 / " : ""}{card.name}{def?.sig ? ` — ${KINGS[def.sig].name}` : ""}</b>
-                    <span>{describeCard(card.id)}</span>
+                    <CardRules cardId={card.id} heading />
                     {tally > 0 && <i className="clean-case-ramp">TRIGGERED {formatNumber(tally)} TIMES</i>}
                   </div>
                   <button className="clean-case-unseat" onClick={() => onUndisplay(card.id)}>UNSEAT</button>
@@ -796,6 +984,7 @@ export default function PackworksGameClean() {
   const revealLocksRef = useRef(new Set());
   const impactSerialRef = useRef(0);
   const toastSerialRef = useRef(0);
+  const globalBurstSerialRef = useRef(0);
   const signalAtRef = useRef(0);
 
   const [game, setGame] = useState(() => createInitialState(0));
@@ -805,6 +994,7 @@ export default function PackworksGameClean() {
   const [opening, setOpening] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [globalBursts, setGlobalBursts] = useState([]);
   const [resetArmed, setResetArmed] = useState(false);
   const [rewriteArmed, setRewriteArmed] = useState(false);
   const [fx, setFx] = useState({});
@@ -817,7 +1007,6 @@ export default function PackworksGameClean() {
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [mobileAutoHeld, setMobileAutoHeld] = useState(false);
   const [swipeRevealing, setSwipeRevealing] = useState(false);
-
   const commit = useCallback((nextOrUpdater) => {
     const next = typeof nextOrUpdater === "function" ? nextOrUpdater(gameRef.current) : nextOrUpdater;
     gameRef.current = next;
@@ -855,6 +1044,16 @@ export default function PackworksGameClean() {
     window.setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), duration);
   }, []);
 
+  const queueGlobalBurst = useCallback((type, count = 1) => {
+    if (gameRef.current?.settings?.reducedEffects) return;
+    const burst = {
+      id: ++globalBurstSerialRef.current,
+      type,
+      count: Math.max(1, count),
+    };
+    setGlobalBursts((current) => [...current.slice(-4), burst]);
+  }, []);
+
   const pushFx = useCallback((events) => {
     if (!events?.length) return;
     const stamp = {};
@@ -878,12 +1077,14 @@ export default function PackworksGameClean() {
     }
     const mysteries = events.filter((event) => event.t === "mystery").length;
     if (mysteries > 0) {
+      queueGlobalBurst("salvage", mysteries);
       getAudio().sound("caseBreak");
       getHaptics().pulse("burst");
       pushToast("SALVAGE", `${mysteries} Mystery Pack${mysteries > 1 ? "s" : ""} burst open!`, "gold");
     }
     const fractures = events.filter((event) => event.t === "fracture").length;
     if (fractures > 0) {
+      queueGlobalBurst("fracture", fractures);
       getHaptics().pulse("burst");
       pushToast("FRACTURE", "The pack split — more cards join this reveal.", "gold");
     }
@@ -900,35 +1101,7 @@ export default function PackworksGameClean() {
     }
     const sets = events.filter((event) => event.t === "setComplete");
     for (const done of sets) pushToast("SET COMPLETE", `${getSet(done.setId).name} is finished.`, "gold", 6000);
-  }, [getAudio, getHaptics, pushToast]);
-
-  // Salvage burst: the Mystery Packs a sale or idle sweep rips open, shown
-  // as a full-screen card burst so Salvage is never a silent toast.
-  const [salvageBurst, setSalvageBurst] = useState(null);
-  const salvageBurstTimerRef = useRef(null);
-  const showSalvageBurst = useCallback((mysteryCards, packs) => {
-    if (!mysteryCards?.length || gameRef.current?.settings?.reducedEffects) return;
-    if (salvageBurstTimerRef.current !== null) window.clearTimeout(salvageBurstTimerRef.current);
-    setSalvageBurst({
-      id: Date.now(),
-      packs: Math.max(1, packs || 1),
-      cards: mysteryCards.slice(0, 9).map((pull, index) => ({
-        key: `${pull.card.id}-${index}`,
-        name: pull.card.name,
-        rarity: pull.rarity,
-        color: RARITIES[pull.rarity].color,
-        isNew: !!pull.isNew,
-      })),
-      more: Math.max(0, mysteryCards.length - 9),
-    });
-    salvageBurstTimerRef.current = window.setTimeout(() => {
-      setSalvageBurst(null);
-      salvageBurstTimerRef.current = null;
-    }, 2_800);
-  }, []);
-  useEffect(() => () => {
-    if (salvageBurstTimerRef.current !== null) window.clearTimeout(salvageBurstTimerRef.current);
-  }, []);
+  }, [getAudio, getHaptics, pushToast, queueGlobalBurst]);
 
   useEffect(() => {
     let adminFlag = false;
@@ -1023,13 +1196,10 @@ export default function PackworksGameClean() {
       if (swept.state !== gameRef.current) {
         commit(swept.state);
         pushFx(swept.events);
-        if (swept.mysteryCards?.length) {
-          showSalvageBurst(swept.mysteryCards, swept.events.filter((event) => event.t === "mystery").length);
-        }
       }
     }, 2_000);
     return () => window.clearInterval(interval);
-  }, [commit, pushFx, ready, showSalvageBurst]);
+  }, [commit, pushFx, ready]);
 
   const clearOpeningTimers = useCallback(() => {
     openingTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -1242,7 +1412,7 @@ export default function PackworksGameClean() {
     if (!rolled.result) {
       getAudio().sound("deny");
       pushToast(
-        rolled.error === "MANUAL_RATE_CAP" ? "ONE MOMENT" : "NO PACKS READY",
+        rolled.error === "MANUAL_RATE_CAP" ? "ONE MOMENT" : "SHOP STOCK EMPTY",
         rolled.error === "MANUAL_RATE_CAP" ? "Let the foil settle before opening another." : "Buy a pack from the shop.",
         "warning",
       );
@@ -1462,7 +1632,6 @@ export default function PackworksGameClean() {
     commit(sale.state);
     pushFx(sale.events);
     getAudio().sound("purchase");
-    if (sale.salvages > 0) showSalvageBurst(sale.mysteryCards, sale.salvages);
     const mysteryNote = sale.salvages > 0
       ? ` ${sale.salvages} Salvage${sale.salvages > 1 ? "s" : ""} fired — ${sale.mysteryCards.length} mystery cards joined your binder.`
       : "";
@@ -1472,7 +1641,7 @@ export default function PackworksGameClean() {
       sale.salvages ? "gold" : "success",
       sale.salvages ? 6500 : 4200,
     );
-  }, [commit, getAudio, pushFx, pushToast, showSalvageBurst]);
+  }, [commit, getAudio, pushFx, pushToast]);
 
   const handleSet = useCallback((setId) => {
     const next = selectSet(gameRef.current, setId);
@@ -1568,7 +1737,14 @@ export default function PackworksGameClean() {
       window.removeEventListener("keyup", stopHoldingSpace);
       window.removeEventListener("blur", stopHoldingSpace);
     };
-  }, [beginManualOpen, clearHoldRevealTimer, closeOpening, drawer, opening, selectedCard]);
+  }, [
+    beginManualOpen,
+    clearHoldRevealTimer,
+    closeOpening,
+    drawer,
+    opening,
+    selectedCard,
+  ]);
 
   useEffect(() => {
     const preventSelection = (event) => event.preventDefault();
@@ -1591,7 +1767,7 @@ export default function PackworksGameClean() {
   const mobileAutoTitle = mobileAutoHeld
     ? "AUTO-OPENING"
     : opening?.phase === "summary"
-      ? loosePacks > 0 ? "OPEN ANOTHER" : "NO PACKS READY"
+      ? loosePacks > 0 ? "OPEN ANOTHER" : "VISIT SHOP"
       : "HOLD TO AUTO-OPEN";
   const mobileAutoDetail = mobileAutoHeld
     ? "RELEASE TO STOP"
@@ -1601,7 +1777,8 @@ export default function PackworksGameClean() {
 
   return (
     <main
-      className={`packworks pw2 pw-clean ${game.settings.reducedEffects ? "reduced-effects" : ""} ${opening ? "opening-active" : ""} ${spaceHeld ? "space-held" : ""} ${mobileAutoHeld ? "mobile-auto-held" : ""} ${swipeRevealing ? "swipe-revealing" : ""}`}
+      className={`packworks pw2 pw-clean theme-league fx-holo ${game.settings.reducedEffects ? "reduced-effects" : ""} ${opening ? "opening-active" : ""} ${spaceHeld ? "space-held" : ""} ${mobileAutoHeld ? "mobile-auto-held" : ""} ${swipeRevealing ? "swipe-revealing" : ""}`}
+      data-fx-style="holo"
       style={{ "--set-a": activeSet.colors[0], "--set-b": activeSet.colors[1], "--set-c": activeSet.colors[2] }}
     >
       <header className="clean-topbar">
@@ -1663,34 +1840,45 @@ export default function PackworksGameClean() {
           )}
         </div>
         <div className="clean-set-title">
-          <span>{activeSet.short} / CURRENT SET</span>
           <strong>{activeSet.name}</strong>
         </div>
 
         <button
           className="clean-pack-clicker"
-          disabled={!loosePacks}
           onPointerDown={(event) => {
             if (event.pointerType === "mouse") return;
+            if (!loosePacks) {
+              setDrawer("shop");
+              return;
+            }
             startMobileAuto(event);
             beginManualOpen();
           }}
           onPointerUp={stopMobileAuto}
           onPointerCancel={stopMobileAuto}
           onContextMenu={(event) => event.preventDefault()}
-          onClick={beginManualOpen}
-          aria-label={loosePacks ? `Open a pack. ${loosePacks} ready.` : "No packs ready"}
+          onClick={loosePacks ? beginManualOpen : () => setDrawer("shop")}
+          aria-label={loosePacks ? `Open a pack. ${loosePacks} ready.` : "Open the pack shop"}
         >
           <span className="clean-pack-shadow" />
-          <span className="clean-pack-stack"><i /><i /><PackFace set={activeSet} /></span>
+          <span className="clean-pack-stack clean-pack-stack-three">
+            <i /><i />
+            <ThreePackScene
+              set={activeSet}
+              interactive={false}
+              wrapper="span"
+              label=""
+              className="game-table-three-pack"
+            />
+          </span>
           <span className="clean-open-copy">
-            <strong>{loosePacks ? "OPEN PACK" : "NO PACKS READY"}</strong>
+            <strong>OPEN PACK</strong>
             <small>
               {loosePacks
                 ? `${loosePacks} READY / TAP OR HOLD`
                 : breakableProduct
                   ? `${breakableProduct.label.toUpperCase()} WAITING`
-                  : "PACKS AVAILABLE IN SHOP"}
+                  : "TAP TO VISIT SHOP"}
             </small>
           </span>
         </button>
@@ -1945,26 +2133,14 @@ export default function PackworksGameClean() {
         />
       )}
 
-      {salvageBurst && (
-        <div className="salvage-burst" key={salvageBurst.id} aria-hidden="true">
-          <div className="salvage-burst-pack">
-            <i className="salvage-burst-half is-left" />
-            <i className="salvage-burst-half is-right" />
-            <b>SALVAGE ×{salvageBurst.packs}</b>
-          </div>
-          <div className="salvage-burst-cards">
-            {salvageBurst.cards.map((card, index) => (
-              <span
-                key={card.key}
-                className={`salvage-burst-card rarity-${card.rarity}${card.isNew ? " is-new" : ""}`}
-                style={{ "--i": index, "--n": salvageBurst.cards.length, "--rarity": card.color }}
-              >
-                {card.isNew && <em>NEW</em>}
-              </span>
-            ))}
-            {salvageBurst.more > 0 && <small className="salvage-burst-more">+{salvageBurst.more} MORE</small>}
-          </div>
-        </div>
+      {globalBursts.length > 0 && (
+        <ThreeGlobalBurstLayer
+          bursts={globalBursts}
+          size="compact"
+          onComplete={(id) => {
+            setGlobalBursts((current) => current.filter((burst) => burst.id !== id));
+          }}
+        />
       )}
 
       <div className="clean-toasts" aria-live="polite">
