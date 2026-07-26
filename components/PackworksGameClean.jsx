@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ALL_CARDS,
-  CLEAN_UPGRADES,
-  PACK_PRODUCTS,
   RARITIES,
   SETS,
   formatNumber,
@@ -21,7 +19,6 @@ import {
   createAdminState,
   breakProduct,
   buyProduct,
-  buyUpgrade,
   canRewrite,
   chooseDiscoverOption,
   createInitialState,
@@ -29,21 +26,15 @@ import {
   displayCard,
   evaluateIdleThresholds,
   getCardSaleValue,
-  getCardValue,
   getDerived,
-  getDuplicateCount,
-  getDuplicateSaleValue,
   getInscriptionsEarned,
   getPackPrice,
   getProductCount,
-  getSetUnlockStatus,
-  getUpgradeCost,
   hydrateState,
   openPack,
   resolveFusions,
   revealPackCard,
   rewriteState,
-  selectSet,
   sellDuplicatesDetailed,
   serializeState,
   storedSaveDominates,
@@ -53,7 +44,6 @@ import {
 import {
   CASE_SIZE,
   DISCOVER_POOL,
-  KINGS,
   getCardDef,
   getCardRules,
   getCaseSlots,
@@ -64,8 +54,6 @@ import GlobalBurstLayer from "./GlobalBurstLayer";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
 const PIXEL_ART_VERSION = "20260726-2";
-const SHOP_PRODUCTS = PACK_PRODUCTS.filter((product) => ["loose", "case"].includes(product.id));
-const CASE_PRODUCT = PACK_PRODUCTS.find((product) => product.id === "case");
 const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
 const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
@@ -253,9 +241,11 @@ export function PrintedCard({
   const rarity = RARITIES[rarityId];
   const set = getSet(card.setId);
   const presentation = getCardPresentation(card, rarityId);
+  const rulesLength = getCardRules(card.id)?.text?.length || 0;
+  const copyFitClass = rulesLength > 155 ? "copy-very-long" : rulesLength > 105 ? "copy-long" : "";
   return (
     <span
-      className={`card-front rarity-${rarityId} treatment-${presentation.treatment} set-${card.setId} ${foil ? "is-foil" : ""} ${className}`.trim()}
+      className={`card-front rarity-${rarityId} treatment-${presentation.treatment} set-${card.setId} ${foil ? "is-foil" : ""} ${compact ? "is-compact" : ""} ${copyFitClass} ${className}`.trim()}
       style={{
         "--rarity": rarity.color,
         "--rarity-deep": rarity.deep,
@@ -265,13 +255,15 @@ export function PrintedCard({
       }}
     >
       <span className="card-head">
-        <span>{set.short}-{String(card.number).padStart(2, "0")}</span>
+        <span className="card-identity">
+          <small>{set.short}-{String(card.number).padStart(2, "0")}</small>
+          <strong>{card.name}</strong>
+        </span>
         <b>{rarity.short}</b>
       </span>
       <CardArt card={card} compact={compact} animated={foil} />
       <span className="card-copy">
         <span className="card-type-line">{rarity.label} / {presentation.kind}</span>
-        <strong>{card.name}</strong>
         <CardRules cardId={card.id} />
         <small className="card-flavor">“{card.flavor}”</small>
       </span>
@@ -441,213 +433,84 @@ function PackDebris() {
   );
 }
 
-function RepeatPurchaseButton({ disabled, onPurchase, ariaLabel, children }) {
-  const holdTimerRef = useRef(null);
-  const repeatTimerRef = useRef(null);
-  const startPointRef = useRef(null);
-  const repeatedRef = useRef(false);
-  const movedRef = useRef(false);
-  const [repeating, setRepeating] = useState(false);
-
-  const clearTimers = useCallback(() => {
-    if (holdTimerRef.current !== null) {
-      window.clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (repeatTimerRef.current !== null) {
-      window.clearInterval(repeatTimerRef.current);
-      repeatTimerRef.current = null;
-    }
-    setRepeating(false);
-  }, []);
-
-  useEffect(() => clearTimers, [clearTimers]);
-
-  const stop = useCallback((event) => {
-    clearTimers();
-    if (event?.currentTarget?.hasPointerCapture?.(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }, [clearTimers]);
-
+function CashStreamLayer({ streams }) {
+  if (!streams.length) return null;
   return (
-    <button
-      type="button"
-      className={`clean-hold-buy ${repeating ? "is-repeating" : ""}`}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      title="Tap to buy one. Hold to buy rapidly."
-      onPointerDown={(event) => {
-        if (disabled || event.button !== 0) return;
-        startPointRef.current = { x: event.clientX, y: event.clientY };
-        repeatedRef.current = false;
-        movedRef.current = false;
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-        holdTimerRef.current = window.setTimeout(() => {
-          repeatedRef.current = true;
-          setRepeating(true);
-          if (onPurchase(true) === false) {
-            clearTimers();
-            return;
-          }
-          repeatTimerRef.current = window.setInterval(() => {
-            if (onPurchase(true) === false) clearTimers();
-          }, 110);
-        }, 340);
-      }}
-      onPointerMove={(event) => {
-        if (!startPointRef.current || repeatedRef.current) return;
-        const distance = Math.hypot(
-          event.clientX - startPointRef.current.x,
-          event.clientY - startPointRef.current.y,
-        );
-        if (distance > 12) {
-          movedRef.current = true;
-          clearTimers();
-        }
-      }}
-      onPointerUp={stop}
-      onPointerCancel={stop}
-      onLostPointerCapture={clearTimers}
-      onClick={(event) => {
-        if (repeatedRef.current || movedRef.current) {
-          event.preventDefault();
-          repeatedRef.current = false;
-          movedRef.current = false;
-          return;
-        }
-        onPurchase(false);
-      }}
-    >
-      {children}
-    </button>
+    <div className="cash-stream-layer" aria-live="polite">
+      {streams.map((stream) => (
+        <span
+          className="cash-stream-value"
+          key={stream.id}
+          style={{
+            "--cash-x": `${stream.x}px`,
+            "--cash-delay": `${stream.delay}ms`,
+          }}
+        >
+          +{money(stream.amount)}
+        </span>
+      ))}
+    </div>
   );
 }
 
-function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }) {
-  const unlockedUpgrades = CLEAN_UPGRADES.filter((upgrade) => game.packsOpened >= upgrade.unlockPacks);
-  const nextUpgrade = CLEAN_UPGRADES.find((upgrade) => game.packsOpened < upgrade.unlockPacks);
-  const caseAvailable = CASE_PRODUCT && CASE_PRODUCT.unlockBeat <= game.beat;
-  const caseOwned = caseAvailable ? getProductCount(game, game.activeSet, CASE_PRODUCT.id) : 0;
-  const casePrice = caseAvailable ? getPackPrice(game, CASE_PRODUCT.id, game.activeSet) : 0;
-  const activeSet = getSet(game.activeSet);
-
+function GameplayCueLayer({ cues }) {
+  if (!cues.length) return null;
   return (
-    <aside className="clean-drawer" aria-label="Shop">
-      <header>
-        <div><span>SHOP</span><h2>Pack shop</h2></div>
-        <button onClick={onClose} aria-label="Close shop">CLOSE</button>
-      </header>
-
-      <div className="clean-drawer-scroll">
-        <section className="clean-product-list clean-pack-shelf">
-          <div className="clean-section-title"><h3>Pack sets</h3><span>HOLD PRICE TO STOCK UP</span></div>
-          {SETS.map((set) => {
-            const status = getSetUnlockStatus(game, set.id);
-            const unlocked = status.unlocked;
-            const price = getPackPrice(game, "loose", set.id);
-            const owned = getProductCount(game, set.id, "loose");
-            const found = set.cards.filter((card) => game.collection[card.id]).length;
-            const unmet = status.requirements.filter((requirement) => !requirement.met);
-            return (
-              <article
-                className={`clean-product clean-set-stock ${unlocked ? "is-stocked" : "is-locked"} ${set.id === game.activeSet ? "is-active" : ""}`}
-                key={set.id}
-                style={{ "--stock-a": set.colors[0], "--stock-b": set.colors[1], "--stock-c": set.colors[2] }}
-              >
-                <span className="shop-pack-preview" aria-hidden="true">
-                  <PackFace set={set} small />
-                </span>
-                <button
-                  className="clean-stock-info"
-                  disabled={!unlocked}
-                  onClick={() => onSet(set.id)}
-                  aria-label={unlocked ? `Select ${set.name}` : undefined}
-                >
-                  <h3>{set.name}</h3>
-                  <p>
-                    {unlocked
-                      ? `${found}/${set.cards.length} found${set.id === game.activeSet ? " / selected" : ""}`
-                      : unmet.map((requirement) => `${requirement.label} ${requirement.current}/${requirement.target}`).join(" / ")}
-                  </p>
-                </button>
-                <span className="clean-owned">{owned ? `${owned} owned` : ""}</span>
-                <RepeatPurchaseButton
-                  disabled={!unlocked || game.coins < price}
-                  onPurchase={() => onBuy("loose", set.id)}
-                  ariaLabel={unlocked ? `Buy ${set.name} pack for ${money(price)}. Hold to buy rapidly.` : `${set.name} locked`}
-                >
-                  {unlocked ? money(price) : "LOCKED"}
-                </RepeatPurchaseButton>
-              </article>
-            );
-          })}
-        </section>
-
-        {caseAvailable && (
-          <section className="clean-product-list clean-case-stock">
-            <div className="clean-section-title"><h3>Case</h3><span>{activeSet.short} / 144 PACKS</span></div>
-            <article
-              className="clean-product"
-              style={{ "--stock-a": activeSet.colors[0], "--stock-b": activeSet.colors[1], "--stock-c": activeSet.colors[2] }}
-            >
-              <div className="clean-product-icon case"><i /><i /><i /></div>
-              <div><h3>{activeSet.name} case</h3><p>144 packs</p></div>
-              <span className="clean-owned">{caseOwned ? `${caseOwned} owned` : ""}</span>
-              <button disabled={game.coins < casePrice} onClick={() => onBuy("case", game.activeSet)}>
-                {money(casePrice)}
-              </button>
-              {caseOwned > 0 && (
-                <button className="clean-break" onClick={() => onBreak("case")}>BREAK ONE</button>
-              )}
-            </article>
-          </section>
-        )}
-
-        <section className="clean-upgrades">
-          <div className="clean-section-title"><h3>Upgrades</h3></div>
-          {unlockedUpgrades.length === 0 ? (
-            <p className="clean-empty">Open {Math.max(0, 5 - game.packsOpened)} more packs to unlock the first upgrade.</p>
-          ) : (
-            unlockedUpgrades.map((upgrade) => {
-              const rank = game.upgrades?.[upgrade.id] || 0;
-              const cost = getUpgradeCost(game, upgrade.id);
-              const maxed = rank >= upgrade.max;
-              return (
-                <article className="clean-upgrade" key={upgrade.id}>
-                  <div><h3>{upgrade.name}</h3><p>{upgrade.detail}</p></div>
-                  <span>LV {rank}</span>
-                  <button disabled={maxed || game.coins < cost} onClick={() => onUpgrade(upgrade.id)}>
-                    {maxed ? "MAX" : money(cost)}
-                  </button>
-                </article>
-              );
-            })
-          )}
-          {nextUpgrade && unlockedUpgrades.length > 0 && (
-            <p className="clean-next-unlock">{nextUpgrade.name} unlocks at {nextUpgrade.unlockPacks} packs.</p>
-          )}
-        </section>
-
-        <footer className="clean-shop-footer">
-          <button onClick={onReset}>RESET SAVE</button>
-        </footer>
-      </div>
-    </aside>
+    <div className="gameplay-cue-layer" aria-live="polite">
+      {cues.map((cue) => (
+        <span
+          className={`gameplay-cue cue-${cue.type}`}
+          key={cue.id}
+          style={{ "--cue-slot": cue.id % 3 }}
+        >
+          <span className="gameplay-cue-symbol" aria-hidden="true"><i /><i /><i /></span>
+          <b>{cue.label}</b>
+          {cue.detail && <small>{cue.detail}</small>}
+        </span>
+      ))}
+    </div>
   );
 }
 
 function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
   const set = getSet(setId);
   const unlockedSets = SETS.filter((candidate) => game.unlockedSets.includes(candidate.id));
+  const [query, setQuery] = useState("");
+  const [ownership, setOwnership] = useState("all");
+  const [rarityFilter, setRarityFilter] = useState("all");
+  const [sort, setSort] = useState("rarity");
   const found = set.cards.filter((card) => game.collection[card.id]).length;
-  const setDuplicates = set.cards.reduce(
-    (sum, card) => sum + Math.max(0, (game.collection[card.id] || 0) - 1),
-    0,
-  );
+  const visibleCards = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return set.cards
+      .filter((card) => {
+        const owned = (game.collection[card.id] || 0) > 0;
+        if (ownership === "owned" && !owned) return false;
+        if (ownership === "missing" && owned) return false;
+        if (rarityFilter !== "all" && card.rarity !== rarityFilter) return false;
+        if (!needle) return true;
+        const rules = getCardRules(card.id);
+        return [
+          card.name,
+          card.id,
+          card.flavor,
+          rules?.title,
+          rules?.text,
+          ...(rules?.keywords || []),
+        ].join(" ").toLowerCase().includes(needle);
+      })
+      .sort((left, right) => {
+        if (sort === "name") return left.name.localeCompare(right.name);
+        if (sort === "number") return left.number - right.number;
+        if (sort === "rarity-low") {
+          return RARITIES[left.rarity].order - RARITIES[right.rarity].order || left.number - right.number;
+        }
+        return RARITIES[right.rarity].order - RARITIES[left.rarity].order || left.number - right.number;
+      });
+  }, [game.collection, ownership, query, rarityFilter, set.cards, sort]);
 
   return (
-    <aside className="clean-drawer clean-binder" aria-label="Binder">
+    <aside className={`clean-drawer clean-binder ${unlockedSets.length > 1 ? "has-set-picker" : ""}`} aria-label="Binder">
       <header>
         <div><span>BINDER</span><h2>{set.name}</h2></div>
         <button onClick={onClose} aria-label="Close binder">CLOSE</button>
@@ -665,14 +528,50 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
           ))}
         </div>
       )}
-      <div className="clean-binder-summary">
-        <strong>{found} / {set.cards.length}</strong>
-        <span>COLLECTED</span>
-        <strong>{formatNumber(setDuplicates)}</strong>
-        <span>DUPLICATES</span>
+      <div className="clean-binder-tools">
+        <label className="clean-binder-search">
+          <span>SEARCH CARDS</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Name, effect, or keyword…"
+          />
+        </label>
+        <label>
+          <span>COLLECTION</span>
+          <select value={ownership} onChange={(event) => setOwnership(event.target.value)}>
+            <option value="all">All cards</option>
+            <option value="owned">Unlocked</option>
+            <option value="missing">Not unlocked</option>
+          </select>
+        </label>
+        <label>
+          <span>RARITY</span>
+          <select value={rarityFilter} onChange={(event) => setRarityFilter(event.target.value)}>
+            <option value="all">All rarities</option>
+            {Object.values(RARITIES).map((rarity) => (
+              <option key={rarity.id} value={rarity.id}>{rarity.label}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>SORT</span>
+          <select value={sort} onChange={(event) => setSort(event.target.value)}>
+            <option value="rarity">Rarity / high first</option>
+            <option value="rarity-low">Rarity / low first</option>
+            <option value="number">Card number</option>
+            <option value="name">Card name</option>
+          </select>
+        </label>
+        <div className="clean-binder-count">
+          <strong>{found}/{set.cards.length}</strong>
+          <span>UNLOCKED</span>
+          <small>{visibleCards.length} SHOWN</small>
+        </div>
       </div>
-      <div className="clean-binder-grid">
-        {set.cards.map((card) => {
+      <div className="clean-binder-grid" aria-label={`${visibleCards.length} cards shown`}>
+        {visibleCards.map((card) => {
           const count = game.collection[card.id] || 0;
           const rarityId = card.rarity;
           const rarity = RARITIES[rarityId];
@@ -687,18 +586,30 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
               }}
               aria-label={count ? `${card.name}, ${count} copies` : `Missing card ${card.number}, show rarity`}
             >
-              {count ? <CardArt card={card} compact /> : <span className="clean-missing-card">PW</span>}
-              <span className="clean-binder-card-copy">
-                <b>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</b>
-                <small>{count ? `${rarity.label} ${rarity.rateLabel} / ${count} ${count === 1 ? "copy" : "copies"}` : "Not found"}</small>
-                {count > 0 && getCardRules(card.id) && (
-                  <em className="clean-binder-ability">{getCardRules(card.id).title}</em>
-                )}
-                {displayedIds?.has(card.id) && <em className="clean-on-display">ON DISPLAY</em>}
+              {count ? (
+                <PrintedCard
+                  card={card}
+                  compact
+                  foil={(game.foils?.[card.id] || 0) > 0}
+                  copyLabel={displayedIds?.has(card.id) ? "ON DISPLAY" : "UNLOCKED"}
+                />
+              ) : (
+                <span className="card-back back-style-crest">
+                  <span className="back-set">{set.short}-{String(card.number).padStart(2, "0")}</span>
+                  <span className="back-orbit"><i /><i /><i /></span>
+                  <span className="back-mark"><span><b>PW</b><small>PACKWORKS</small></span></span>
+                  <span className="back-rule" />
+                </span>
+              )}
+              <span className="clean-binder-card-state">
+                {count ? rarity.label : `${rarity.label} / NOT UNLOCKED`}
               </span>
             </button>
           );
         })}
+        {visibleCards.length === 0 && (
+          <p className="clean-binder-empty">No cards match those filters.</p>
+        )}
       </div>
     </aside>
   );
@@ -746,7 +657,7 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
             <strong>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</strong>
             <small>
               {count
-                ? `${count} ${count === 1 ? "copy" : "copies"} / each duplicate sells for ${money(duplicateValue)} cash`
+                ? `${count} ${count === 1 ? "copy" : "copies"} / future duplicates auto-sell for ${money(duplicateValue)} cash`
                 : `${rarity.label} / ${rarity.rateLabel} base pull`}
             </small>
           </div>
@@ -787,9 +698,8 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
       </header>
       <div className="clean-drawer-scroll">
         <p className="clean-case-note">
-          Displayed cards work for you while you play — their effects fire live.
-          Editing the case sells your duplicate stack first.
-          {" "}{derived.displayedEntries.length}/{derived.caseSlots} slots filled.
+          Displayed cards fire their printed effects while you play.
+          {" "}{derived.displayedEntries.length}/{derived.caseSlots} available slots filled.
         </p>
         <div className="clean-case-slots">
           {Array.from({ length: CASE_SIZE }, (_, index) => {
@@ -801,14 +711,15 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
               const tally = game.triggerTallies?.[entry.id] || 0;
               return (
                 <article className={`clean-case-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}`} key={`slot-${index}`} style={{ "--rarity": rarity.color }}>
-                  <button className="clean-case-card" onClick={() => onPickCard(card.id)} aria-label={`${card.name} details`}>
-                    <CardArt card={card} compact />
+                  <button className="clean-case-card" onClick={() => onPickCard(card.id)} aria-label={`Zoom ${card.name}`}>
+                    <PrintedCard
+                      card={card}
+                      compact
+                      foil={(game.foils?.[card.id] || 0) > 0}
+                      copyLabel={`CASE SLOT ${index + 1}`}
+                    />
                   </button>
-                  <div className="clean-case-slot-copy">
-                    <b>{index === 0 ? "SLOT 1 / " : ""}{card.name}{def?.sig ? ` — ${KINGS[def.sig].name}` : ""}</b>
-                    <CardRules cardId={card.id} heading />
-                    {tally > 0 && <i className="clean-case-ramp">TRIGGERED {formatNumber(tally)} TIMES</i>}
-                  </div>
+                  {tally > 0 && <i className="clean-case-ramp">TRIGGERED {formatNumber(tally)}×</i>}
                   <button className="clean-case-unseat" onClick={() => onUndisplay(card.id)}>UNSEAT</button>
                 </article>
               );
@@ -822,22 +733,25 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
                   onClick={onOpenBinder}
                   aria-label={`Empty slot ${index + 1} — open binder`}
                 >
-                  <span className="clean-case-empty-mark">+</span>
-                  <div className="clean-case-slot-copy">
-                    <b>Empty slot {index + 1}</b>
-                    <span>Tap to open the binder and pick a card.</span>
-                  </div>
+                  <span className="card-back back-style-crest">
+                    <span className="back-set">SLOT {index + 1}</span>
+                    <span className="back-orbit"><i /><i /><i /></span>
+                    <span className="back-mark"><span><b>+</b><small>ADD CARD</small></span></span>
+                    <span className="back-rule" />
+                  </span>
                 </button>
               );
             }
             const milestone = derived.caseMilestones[index];
             return (
               <article className="clean-case-slot is-locked" key={`slot-${index}`}>
-                <span className="clean-case-empty-mark">×</span>
-                <div className="clean-case-slot-copy">
-                  <b>Locked slot</b>
-                  <span>{milestone ? milestone.label : "Keep collecting"} to unlock.</span>
-                </div>
+                <span className="card-back back-style-crest">
+                  <span className="back-set">SLOT {index + 1}</span>
+                  <span className="back-orbit"><i /><i /><i /></span>
+                  <span className="back-mark"><span><b>×</b><small>LOCKED</small></span></span>
+                  <span className="back-rule" />
+                </span>
+                <small className="clean-case-lock-copy">{milestone ? milestone.label : "Keep collecting"}</small>
               </article>
             );
           })}
@@ -854,7 +768,7 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
             <>
               <p>
                 What Was Never Named is yours. Rewriting resets your binder, cash,
-                and shop — and inscribes permanent power. Display the Nameless
+                and packs — and inscribes permanent power. Display the Nameless
                 itself to double what you earn.
               </p>
               <button className={`clean-rewrite-button ${rewriteArmed ? "is-armed" : ""}`} onClick={onRewrite}>
@@ -872,7 +786,7 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
   );
 }
 
-function CaseStrip({ game, derived, fx, onOpenCase, onOpenBinder }) {
+function CaseStrip({ game, derived, fx, onOpenCase }) {
   return (
     <div className="case-strip">
       {Array.from({ length: CASE_SIZE }, (_, index) => {
@@ -884,8 +798,8 @@ function CaseStrip({ game, derived, fx, onOpenCase, onOpenBinder }) {
               type="button"
               key={index}
               className={`case-strip-slot ${locked ? "is-locked" : "is-empty"}`}
-              onClick={locked ? onOpenCase : onOpenBinder}
-              aria-label={locked ? "Locked slot — open display case" : "Empty slot — open binder"}
+              onClick={onOpenCase}
+              aria-label={locked ? "Locked slot — open display case" : "Empty slot — open display case"}
             >
               {locked ? "×" : "+"}
             </button>
@@ -912,6 +826,43 @@ function CaseStrip({ game, derived, fx, onOpenCase, onOpenBinder }) {
       })}
       <button type="button" className="case-strip-label" onClick={onOpenCase} aria-label="Open display case">CASE</button>
     </div>
+  );
+}
+
+function SettingsPanel({
+  game,
+  hapticsAvailable,
+  resetArmed,
+  onClose,
+  onToggleSound,
+  onToggleHaptics,
+  onReset,
+}) {
+  return (
+    <aside className="clean-settings" aria-label="Settings">
+      <header>
+        <div><span>SETTINGS</span><h2>Game options</h2></div>
+        <button onClick={onClose} aria-label="Close settings">CLOSE</button>
+      </header>
+      <div className="clean-settings-options">
+        <button className={game.settings.sound ? "is-on" : ""} onClick={onToggleSound}>
+          <span><b>Sound</b><small>Music and game effects</small></span>
+          <strong>{game.settings.sound ? "ON" : "OFF"}</strong>
+        </button>
+        <button
+          className={game.settings.haptics !== false ? "is-on" : ""}
+          onClick={onToggleHaptics}
+          disabled={!hapticsAvailable}
+        >
+          <span><b>Haptics</b><small>{hapticsAvailable ? "Touch feedback" : "Not available on this device"}</small></span>
+          <strong>{game.settings.haptics !== false && hapticsAvailable ? "ON" : "OFF"}</strong>
+        </button>
+        <button className={`clean-settings-reset ${resetArmed ? "is-armed" : ""}`} onClick={onReset}>
+          <span><b>{resetArmed ? "Confirm reset" : "Reset save"}</b><small>{resetArmed ? "This cannot be undone" : "Erase all local progress"}</small></span>
+          <strong>{resetArmed ? "RESET" : "ARM"}</strong>
+        </button>
+      </div>
+    </aside>
   );
 }
 
@@ -950,8 +901,11 @@ export default function PackworksGameClean() {
   const swipePointerRef = useRef(null);
   const revealLocksRef = useRef(new Set());
   const impactSerialRef = useRef(0);
-  const toastSerialRef = useRef(0);
+  const gameplayCueSerialRef = useRef(0);
   const globalBurstSerialRef = useRef(0);
+  const cashStreamSerialRef = useRef(0);
+  const purchaseDenyAtRef = useRef(0);
+  const legacyAutoSoldRef = useRef(false);
   const signalAtRef = useRef(0);
 
   const [game, setGame] = useState(() => createInitialState(0));
@@ -960,13 +914,13 @@ export default function PackworksGameClean() {
   const [binderSetId, setBinderSetId] = useState(SETS[0].id);
   const [opening, setOpening] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
-  const [toasts, setToasts] = useState([]);
+  const [gameplayCues, setGameplayCues] = useState([]);
   const [globalBursts, setGlobalBursts] = useState([]);
+  const [cashStreams, setCashStreams] = useState([]);
   const [resetArmed, setResetArmed] = useState(false);
   const [rewriteArmed, setRewriteArmed] = useState(false);
   const [fx, setFx] = useState({});
   const [revealEchoes, setRevealEchoes] = useState({});
-  const [adminActive, setAdminActive] = useState(false);
   const [viewport, setViewport] = useState({ w: 1200, h: 800 });
   const [hapticsAvailable, setHapticsAvailable] = useState(false);
   const adminActiveRef = useRef(false);
@@ -1005,10 +959,31 @@ export default function PackworksGameClean() {
     setHapticsAvailable(getHaptics().supported());
   }, [getHaptics]);
 
-  const pushToast = useCallback((title, detail, tone = "neutral", duration = 4200) => {
-    const id = ++toastSerialRef.current;
-    setToasts((current) => [...current.slice(-2), { id, title, detail, tone }]);
-    window.setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), duration);
+  const playGameplayCue = useCallback((type, label, detail = "", duration = 1_650) => {
+    const id = ++gameplayCueSerialRef.current;
+    setGameplayCues((current) => [...current.slice(-4), { id, type, label, detail }]);
+    window.setTimeout(() => {
+      setGameplayCues((current) => current.filter((cue) => cue.id !== id));
+    }, duration);
+  }, []);
+
+  const playCashGains = useCallback((items) => {
+    const queued = items
+      .filter((item) => item.amount > 0)
+      .slice(0, 18)
+      .map((item, index) => ({
+        id: ++cashStreamSerialRef.current,
+        amount: item.amount,
+        cardId: item.cardId || null,
+        x: ((index % 7) - 3) * 58,
+        delay: index * 55,
+      }));
+    if (!queued.length) return;
+    setCashStreams((current) => [...current.slice(-18), ...queued]);
+    const queuedIds = new Set(queued.map((stream) => stream.id));
+    window.setTimeout(() => {
+      setCashStreams((current) => current.filter((stream) => !queuedIds.has(stream.id)));
+    }, 1_750 + queued.length * 55);
   }, []);
 
   const queueGlobalBurst = useCallback((type, count = 1) => {
@@ -1023,6 +998,16 @@ export default function PackworksGameClean() {
 
   const pushFx = useCallback((events) => {
     if (!events?.length) return;
+    const soldItems = events
+      .filter((event) => event.t === "sold")
+      .flatMap((event) => event.items?.length
+        ? event.items
+        : [{ cardId: null, amount: event.value }]);
+    const triggeredCoins = events
+      .filter((event) => event.t === "coins" && (event.source || soldItems.length === 0))
+      .map((event) => ({ cardId: event.source || null, amount: event.amount }));
+    const cashGains = [...soldItems, ...triggeredCoins].filter((item) => item.amount > 0);
+    playCashGains(cashGains);
     const stamp = {};
     for (const event of events) {
       const kind = event.t === "echo" ? "echo"
@@ -1047,28 +1032,26 @@ export default function PackworksGameClean() {
       queueGlobalBurst("salvage", mysteries);
       getAudio().sound("caseBreak");
       getHaptics().pulse("burst");
-      pushToast("SALVAGE", `${mysteries} Mystery Pack${mysteries > 1 ? "s" : ""} burst open!`, "gold");
     }
     const fractures = events.filter((event) => event.t === "fracture").length;
     if (fractures > 0) {
       queueGlobalBurst("fracture", fractures);
       getHaptics().pulse("burst");
-      pushToast("FRACTURE", "The pack split — more cards join this reveal.", "gold");
     }
     const encore = events.find((event) => event.t === "encore");
-    if (encore) pushToast("ENCORE", `The pack continues — ${encore.count} bonus cards.`, "gold");
+    if (encore) playGameplayCue("encore", `ENCORE +${encore.count}`, "BONUS CARDS JOIN THE PACK");
     const freePacks = events.filter((event) => event.t === "packs").reduce((sum, event) => sum + event.count, 0);
-    if (freePacks > 0) pushToast("FREE PACKS", `${freePacks} loose pack${freePacks > 1 ? "s" : ""} added to your stock.`, "gold");
+    if (freePacks > 0) playGameplayCue("packs", `+${freePacks} PACK${freePacks === 1 ? "" : "S"}`, "ADDED TO THE PACK STACK");
     if (events.some((event) => event.t === "fuseLift")) {
-      pushToast("FUSE LIFT", "Your next Fusion climbs one extra step.", "success", 2600);
+      playGameplayCue("fusion", "FUSION ↑", "NEXT FUSION CLIMBS");
     }
     for (const boon of events.filter((event) => event.t === "boon").slice(0, 2)) {
       const option = DISCOVER_POOL.find((candidate) => candidate.id === boon.option);
-      if (option) pushToast("BOON", `${option.name} gained.`, "success", 2200);
+      if (option) playGameplayCue("boon", option.name.toUpperCase(), "BOON LOADED");
     }
     const sets = events.filter((event) => event.t === "setComplete");
-    for (const done of sets) pushToast("SET COMPLETE", `${getSet(done.setId).name} is finished.`, "gold", 6000);
-  }, [getAudio, getHaptics, pushToast, queueGlobalBurst]);
+    for (const done of sets) playGameplayCue("set", "SET COMPLETE", getSet(done.setId).name.toUpperCase(), 2_600);
+  }, [getAudio, getHaptics, playCashGains, playGameplayCue, queueGlobalBurst]);
 
   useEffect(() => {
     let adminFlag = false;
@@ -1088,10 +1071,9 @@ export default function PackworksGameClean() {
         ? applyAdminGuarantees(hydrateState(sandbox, Date.now()))
         : createAdminState(Date.now());
       adminActiveRef.current = true;
-      setAdminActive(true);
       commit(adminState);
       setBinderSetId(adminState.activeSet);
-      window.setTimeout(() => pushToast("ADMIN MODE", "Testing sandbox active — everything unlocked. Your real save is untouched.", "warning", 6500), 300);
+      window.setTimeout(() => playGameplayCue("mode", "SANDBOX", "ALL CARDS UNLOCKED", 2_600), 300);
       setReady(true);
       return;
     }
@@ -1107,16 +1089,19 @@ export default function PackworksGameClean() {
     setBinderSetId(offline.state.activeSet);
     if (offline.report) {
       const parts = [];
-      if (offline.report.coins > 0) parts.push(`earned ${money(offline.report.coins)} cash`);
+      if (offline.report.coins > 0) {
+        parts.push(`+${money(offline.report.coins)} CASH`);
+        window.setTimeout(() => playCashGains([{ amount: offline.report.coins }]), 300);
+      }
       if (offline.report.packsOpened > 0) {
-        parts.push(`auto-opened ${offline.report.packsOpened} pack${offline.report.packsOpened === 1 ? "" : "s"}${offline.report.newCards ? ` (${offline.report.newCards} new)` : ""}`);
+        parts.push(`${offline.report.packsOpened} PACK${offline.report.packsOpened === 1 ? "" : "S"} OPENED${offline.report.newCards ? ` / ${offline.report.newCards} NEW` : ""}`);
       }
       if (parts.length) {
-        window.setTimeout(() => pushToast("WELCOME BACK", `Time away ${parts.join(" and ")}.`, "success", 6000), 300);
+        window.setTimeout(() => playGameplayCue("offline", "TIME AWAY", parts.join(" • "), 3_200), 300);
       }
     }
     setReady(true);
-  }, [commit, pushToast]);
+  }, [commit, playCashGains, playGameplayCue]);
 
   useEffect(() => {
     if (!ready) return undefined;
@@ -1143,6 +1128,15 @@ export default function PackworksGameClean() {
       save();
     };
   }, [ready]);
+
+  useEffect(() => {
+    if (!ready || legacyAutoSoldRef.current) return;
+    legacyAutoSoldRef.current = true;
+    const sale = sellDuplicatesDetailed(gameRef.current, {});
+    if (sale.state === gameRef.current) return;
+    commit(sale.state);
+    pushFx(sale.events);
+  }, [commit, pushFx, ready]);
 
   useEffect(() => {
     if (!ready) return undefined;
@@ -1209,12 +1203,11 @@ export default function PackworksGameClean() {
           ? applyAdminGuarantees(hydrateState(sandbox, Date.now()))
           : createAdminState(Date.now());
         adminActiveRef.current = true;
-        setAdminActive(true);
         closeOpening();
         setDrawer(null);
         commit(adminState);
         setBinderSetId(adminState.activeSet);
-        pushToast("ADMIN MODE", "Testing sandbox active — everything unlocked. Your real save is untouched.", "warning", 6500);
+        playGameplayCue("mode", "SANDBOX", "ALL CARDS UNLOCKED", 2_600);
       } else {
         window.localStorage.setItem(ADMIN_SAVE_KEY, serializeState(gameRef.current));
         let real = null;
@@ -1225,17 +1218,16 @@ export default function PackworksGameClean() {
         }
         const restored = hydrateState(real, Date.now());
         adminActiveRef.current = false;
-        setAdminActive(false);
         closeOpening();
         setDrawer(null);
         commit(restored);
         setBinderSetId(restored.activeSet);
-        pushToast("ADMIN MODE OFF", "Back to your real save.", "success", 5000);
+        playGameplayCue("mode", "LIVE SAVE", "SANDBOX CLOSED", 2_200);
       }
     } catch {
       // Local storage can be unavailable in strict privacy modes.
     }
-  }, [closeOpening, commit, pushToast]);
+  }, [closeOpening, commit, playGameplayCue]);
 
   useEffect(() => {
     const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -1303,7 +1295,15 @@ export default function PackworksGameClean() {
     if (revealLocksRef.current.has(key)) return;
     revealLocksRef.current.add(key);
 
-    const outcome = revealPackCard(gameRef.current, currentOpening.result.cards, index, { manual: true });
+    const revealedOutcome = revealPackCard(gameRef.current, currentOpening.result.cards, index, { manual: true });
+    const automaticSale = sellDuplicatesDetailed(revealedOutcome.state, {});
+    const outcome = automaticSale.state === revealedOutcome.state
+      ? revealedOutcome
+      : {
+        ...revealedOutcome,
+        state: automaticSale.state,
+        events: [...revealedOutcome.events, ...automaticSale.events],
+      };
     commit(outcome.state);
     pushFx(outcome.events);
     const echoCount = outcome.events.filter((event) => event.t === "echo" && event.index === index).length;
@@ -1353,7 +1353,7 @@ export default function PackworksGameClean() {
           pushFx(fusion.events);
           audio.sound("fusion", 4);
           getHaptics().pulse("fuse");
-          pushToast("FUSION", "Duplicates fuse upward — reveal them again.", "gold");
+          playGameplayCue("fusion", "FUSION ↑", "REVEAL THE NEW CARD");
           commitOpening((current) => current?.id === currentOpening.id
             ? { ...current, result: { ...current.result, cards: fusion.cards }, phase: "ready", impact: null }
             : current);
@@ -1365,25 +1365,38 @@ export default function PackworksGameClean() {
           : current);
       }, delay));
     }
-  }, [commit, commitOpening, getAudio, pushFx, pushToast]);
+  }, [commit, commitOpening, getAudio, playGameplayCue, pushFx]);
 
   const beginManualOpen = useCallback(() => {
     if (!ready || drawer || selectedCard || gameRef.current.discoverOffer) return;
     const currentOpening = openingRef.current;
     if (currentOpening && currentOpening.phase !== "summary") return;
-    const current = gameRef.current;
-    const priorBeat = current.beat;
-    const priorSets = new Set(current.unlockedSets);
+    let current = gameRef.current;
+    if (getProductCount(current, current.activeSet, "loose") <= 0) {
+      if (getProductCount(current, current.activeSet, "case") > 0) {
+        current = breakProduct(current, "case");
+      }
+      if (getProductCount(current, current.activeSet, "loose") <= 0) {
+        current = buyProduct(current, "loose", current.activeSet);
+      }
+      if (getProductCount(current, current.activeSet, "loose") <= 0) {
+        const now = Date.now();
+        if (now - purchaseDenyAtRef.current > 3_500) {
+          purchaseDenyAtRef.current = now;
+          const price = getPackPrice(current, "loose", current.activeSet);
+          getAudio().sound("deny");
+          playGameplayCue("price", `${money(price)} CASH`, "KEEP HOLDING — PURCHASE RESUMES");
+        }
+        return;
+      }
+    }
     setRevealEchoes({});
     const rolled = openPack(current, { manual: true, source: "loose", now: Date.now() });
     if (!rolled.result) {
-      getAudio().sound("deny");
-      pushToast(
-        rolled.error === "MANUAL_RATE_CAP" ? "ONE MOMENT" : "SHOP STOCK EMPTY",
-        rolled.error === "MANUAL_RATE_CAP" ? "Let the foil settle before opening another." : "Buy a pack from the shop.",
-        "warning",
-      );
-      if (rolled.error === "NO_STOCK") setDrawer("shop");
+      if (rolled.error === "MANUAL_RATE_CAP") {
+        getAudio().sound("deny");
+        playGameplayCue("pack-deny", "FOIL SETTLING", "");
+      }
       return;
     }
 
@@ -1401,10 +1414,6 @@ export default function PackworksGameClean() {
     haptics.ensure();
     haptics.pulse("open");
 
-    const unlockedProduct = SHOP_PRODUCTS.find((product) => product.unlockBeat > priorBeat && product.unlockBeat <= rolled.state.beat);
-    const unlockedSet = SETS.find((set) => rolled.state.unlockedSets.includes(set.id) && !priorSets.has(set.id));
-    if (unlockedProduct) pushToast("NEW STOCK", `${unlockedProduct.label}s are now available in the shop.`, "gold", 6000);
-    else if (unlockedSet) pushToast("NEW SET", `${unlockedSet.name} is now in print.`, "gold", 6000);
     pushFx(rolled.result.events);
 
     const id = `${Date.now()}-${rolled.state.packsOpened}`;
@@ -1420,7 +1429,7 @@ export default function PackworksGameClean() {
       commitOpening((value) => value?.id === id ? { ...value, phase: "ready" } : value);
       audio.sound("deal");
     }, dealDelay));
-  }, [clearOpeningTimers, commit, commitOpening, drawer, getAudio, pushFx, pushToast, ready, selectedCard]);
+  }, [clearOpeningTimers, commit, commitOpening, drawer, getAudio, playGameplayCue, pushFx, ready, selectedCard]);
 
   const startMobileAuto = useCallback((event) => {
     if (event.button !== undefined && event.button !== 0) return;
@@ -1448,10 +1457,7 @@ export default function PackworksGameClean() {
 
   const finishMobileAuto = useCallback((event) => {
     stopMobileAuto(event);
-    if (
-      openingRef.current?.phase === "summary"
-      && getProductCount(gameRef.current, gameRef.current.activeSet, "loose") > 0
-    ) {
+    if (openingRef.current?.phase === "summary") {
       beginManualOpen();
     }
   }, [beginManualOpen, stopMobileAuto]);
@@ -1500,7 +1506,15 @@ export default function PackworksGameClean() {
   useEffect(() => {
     clearHoldRevealTimer();
     const autoOpeningHeld = spaceHeld || mobileAutoHeld;
-    if (!autoOpeningHeld || drawer || selectedCard || !opening || game.discoverOffer) return undefined;
+    if (!autoOpeningHeld || drawer || selectedCard || game.discoverOffer) return undefined;
+
+    if (!opening) {
+      holdRevealTimerRef.current = window.setTimeout(() => {
+        holdRevealTimerRef.current = null;
+        beginManualOpen();
+      }, 450);
+      return clearHoldRevealTimer;
+    }
 
     if (opening.phase === "ready") {
       const nextIndex = opening.result.cards.findIndex((_, index) => !opening.revealed.includes(index));
@@ -1516,10 +1530,7 @@ export default function PackworksGameClean() {
           revealCard(nextIndex);
         }, delay);
       }
-    } else if (
-      opening.phase === "summary"
-      && getProductCount(gameRef.current, gameRef.current.activeSet, "loose") > 0
-    ) {
+    } else if (opening.phase === "summary") {
       holdRevealTimerRef.current = window.setTimeout(() => {
         holdRevealTimerRef.current = null;
         beginManualOpen();
@@ -1536,6 +1547,7 @@ export default function PackworksGameClean() {
     selectedCard,
     mobileAutoHeld,
     spaceHeld,
+    game.coins,
     game.discoverOffer,
   ]);
 
@@ -1558,81 +1570,6 @@ export default function PackworksGameClean() {
     };
   }, [stopMobileAuto, stopSwipeReveal]);
 
-  const handleBuy = useCallback((productId, setId = gameRef.current.activeSet) => {
-    const next = buyProduct(gameRef.current, productId, setId);
-    if (next === gameRef.current) {
-      getAudio().sound("deny");
-      return false;
-    }
-    commit(next);
-    setBinderSetId(setId);
-    getAudio().sound("purchase");
-    return true;
-  }, [commit, getAudio]);
-
-  const handleBreak = useCallback((productId) => {
-    const next = breakProduct(gameRef.current, productId);
-    if (next === gameRef.current) return;
-    commit(next);
-    getAudio().sound("caseBreak");
-    pushToast("READY TO OPEN", `${PACK_PRODUCTS.find((product) => product.id === productId)?.packs || 0} packs moved to the table.`, "success");
-  }, [commit, getAudio, pushToast]);
-
-  const handleUpgrade = useCallback((upgradeId) => {
-    const next = buyUpgrade(gameRef.current, upgradeId);
-    if (next === gameRef.current) {
-      getAudio().sound("deny");
-      return;
-    }
-    commit(next);
-    getAudio().sound("purchase");
-  }, [commit, getAudio]);
-
-  const handleSellDuplicates = useCallback((maybeAuto) => {
-    const auto = maybeAuto === true;
-    const count = getDuplicateCount(gameRef.current);
-    const sale = sellDuplicatesDetailed(gameRef.current, {});
-    if (sale.state === gameRef.current) {
-      if (!auto) getAudio().sound("deny");
-      return;
-    }
-    commit(sale.state);
-    pushFx(sale.events);
-    getAudio().sound("purchase");
-    const mysteryNote = sale.salvages > 0
-      ? ` ${sale.salvages} Salvage${sale.salvages > 1 ? "s" : ""} fired — ${sale.mysteryCards.length} mystery cards joined your binder.`
-      : "";
-    pushToast(
-      auto ? "AUTO-PROCESSED" : "DUPLICATES SOLD",
-      `${count} cards sold for ${money(sale.saleValue)} cash.${mysteryNote}`,
-      sale.salvages ? "gold" : "success",
-      sale.salvages ? 6500 : 4200,
-    );
-  }, [commit, getAudio, pushFx, pushToast]);
-
-  const handleSet = useCallback((setId) => {
-    const next = selectSet(gameRef.current, setId);
-    if (next === gameRef.current) return;
-    commit(next);
-    setBinderSetId(setId);
-    getAudio().sound("switch");
-  }, [commit, getAudio]);
-
-  const handleReset = useCallback(() => {
-    if (!resetArmed) {
-      setResetArmed(true);
-      pushToast("RESET SAVE?", "Press reset once more to erase local progress.", "warning");
-      return;
-    }
-    window.localStorage.removeItem(adminActiveRef.current ? ADMIN_SAVE_KEY : SAVE_KEY);
-    const fresh = adminActiveRef.current ? createAdminState(Date.now()) : createInitialState(Date.now());
-    commit(fresh);
-    setBinderSetId(fresh.activeSet);
-    setDrawer(null);
-    setResetArmed(false);
-    closeOpening();
-  }, [closeOpening, commit, pushToast, resetArmed]);
-
   const handleDisplay = useCallback((cardId) => {
     const next = displayCard(gameRef.current, cardId, Date.now());
     if (next === gameRef.current) {
@@ -1641,8 +1578,8 @@ export default function PackworksGameClean() {
     }
     commit(next);
     getAudio().sound("switch");
-    pushToast("ON DISPLAY", `${getCard(cardId)?.name} now augments the shop.`, "success");
-  }, [commit, getAudio, pushToast]);
+    playGameplayCue("case", getCard(cardId)?.name?.toUpperCase() || "CARD SEATED", "ACTIVE IN THE CASE");
+  }, [commit, getAudio, playGameplayCue]);
 
   const handleUndisplay = useCallback((cardId) => {
     const next = undisplayCard(gameRef.current, cardId);
@@ -1651,10 +1588,24 @@ export default function PackworksGameClean() {
     getAudio().sound("switch");
   }, [commit, getAudio]);
 
+  const handleReset = useCallback(() => {
+    if (!resetArmed) {
+      setResetArmed(true);
+      return;
+    }
+    window.localStorage.removeItem(adminActiveRef.current ? ADMIN_SAVE_KEY : SAVE_KEY);
+    const fresh = adminActiveRef.current ? createAdminState(Date.now()) : createInitialState(Date.now());
+    legacyAutoSoldRef.current = false;
+    commit(fresh);
+    setBinderSetId(fresh.activeSet);
+    setDrawer(null);
+    setResetArmed(false);
+    closeOpening();
+  }, [closeOpening, commit, resetArmed]);
+
   const handleRewrite = useCallback(() => {
     if (!rewriteArmed) {
       setRewriteArmed(true);
-      pushToast("REWRITE?", "This resets your binder and cash for permanent Inscriptions. Press again to confirm.", "warning", 6000);
       return;
     }
     const earned = getInscriptionsEarned(gameRef.current, Date.now());
@@ -1670,8 +1621,8 @@ export default function PackworksGameClean() {
     setSelectedCard(null);
     closeOpening();
     getAudio().sound("legendary", 17);
-    pushToast("THE STORY REWRITES", `+${formatNumber(earned)} Inscriptions. Everything begins again, stronger.`, "gold", 8000);
-  }, [closeOpening, commit, getAudio, pushToast, rewriteArmed]);
+    playGameplayCue("rewrite", "THE STORY REWRITES", `+${formatNumber(earned)} INSCRIPTIONS`, 3_600);
+  }, [closeOpening, commit, getAudio, playGameplayCue, rewriteArmed]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -1727,19 +1678,16 @@ export default function PackworksGameClean() {
   const derived = useMemo(() => getDerived(game), [game]);
   const activeSet = getSet(game.activeSet);
   const loosePacks = getProductCount(game, game.activeSet, "loose");
-  const breakableProduct = SHOP_PRODUCTS.find(
-    (product) => product.id !== "loose" && getProductCount(game, game.activeSet, product.id) > 0,
-  );
-  const mobileAutoDisabled = opening?.phase === "summary" && loosePacks <= 0;
+  const nextPackPrice = getPackPrice(game, "loose", game.activeSet);
   const mobileAutoTitle = mobileAutoHeld
     ? "AUTO-OPENING"
     : opening?.phase === "summary"
-      ? loosePacks > 0 ? "OPEN ANOTHER" : "VISIT SHOP"
+      ? "CONTINUE"
       : "HOLD TO AUTO-OPEN";
   const mobileAutoDetail = mobileAutoHeld
-    ? "RELEASE TO STOP"
+    ? loosePacks > 0 || game.coins >= nextPackPrice ? "RELEASE TO STOP" : `WAITING FOR ${money(nextPackPrice)} CASH`
     : opening?.phase === "summary"
-      ? loosePacks > 0 ? "TAP ONCE / HOLD TO KEEP OPENING" : "BACK TO TABLE TO BUY MORE"
+      ? "TAP ONCE / HOLD TO KEEP OPENING"
       : "SLOW REVEAL / CONTINUES INTO NEXT PACK";
 
   return (
@@ -1753,50 +1701,20 @@ export default function PackworksGameClean() {
           <span className="clean-brand-mark"><i /><i /><i /></span>
           <strong>PACKWORKS</strong>
         </div>
-        <div className="clean-wallet">
+        <div className={`clean-wallet ${cashStreams.length ? "is-cash-receiving" : ""}`}>
           <strong>{money(game.coins)}</strong>
           <span>
             CASH / +{rate(derived.passiveRate)} PER SECOND
             {derived.inscriptions > 0 ? ` / ${formatNumber(derived.inscriptions)} INSCRIPTIONS` : ""}
           </span>
         </div>
-        <nav>
-          <button className={drawer === "shop" ? "active" : ""} onClick={() => setDrawer(drawer === "shop" ? null : "shop")}>SHOP</button>
-          <button className={drawer === "binder" ? "active" : ""} onClick={() => setDrawer(drawer === "binder" ? null : "binder")}>BINDER</button>
-          <button className={drawer === "case" ? "active" : ""} onClick={() => { setRewriteArmed(false); setDrawer(drawer === "case" ? null : "case"); }}>
-            CASE{derived.displayedEntries.length ? ` ${derived.displayedEntries.length}/${derived.caseSlots}` : ""}
-          </button>
-          <button
-            className={game.settings.sound ? "active" : ""}
-            onClick={() => {
-              commit((current) => ({ ...current, settings: { ...current.settings, sound: !current.settings.sound } }));
-              getAudio().ensure();
-              getAudio().sound("switch");
-            }}
-          >
-            SOUND {game.settings.sound ? "ON" : "OFF"}
-          </button>
-          {hapticsAvailable && (
-            <button
-              className={game.settings.haptics !== false ? "active" : ""}
-              onClick={() => {
-                commit((current) => ({ ...current, settings: { ...current.settings, haptics: current.settings.haptics === false } }));
-                const haptics = getHaptics();
-                haptics.ensure();
-                haptics.pulse("open");
-              }}
-            >
-              HAPTICS {game.settings.haptics !== false ? "ON" : "OFF"}
-            </button>
-          )}
-        </nav>
       </header>
 
       <section className="clean-stage">
         <div className="clean-stage-light" />
         <div className="clean-floor"><i /><i /><i /><i /><i /></div>
         <div className="stage-case-dock">
-          <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} onOpenBinder={() => setDrawer("binder")} />
+          <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
           {Object.keys(game.discoverStack || {}).length > 0 && (
             <div className="discover-stack" aria-label="Pending Discover stacks">
               {Object.entries(game.discoverStack).map(([id, count]) => {
@@ -1806,66 +1724,35 @@ export default function PackworksGameClean() {
             </div>
           )}
         </div>
-        <div className="clean-set-title">
-          <strong>{activeSet.name}</strong>
-        </div>
 
-        <button
-          className="clean-pack-clicker"
-          onPointerDown={(event) => {
-            if (event.pointerType === "mouse") return;
-            if (!loosePacks) {
-              setDrawer("shop");
-              return;
-            }
-            startMobileAuto(event);
-            beginManualOpen();
-          }}
-          onPointerUp={stopMobileAuto}
-          onPointerCancel={stopMobileAuto}
-          onContextMenu={(event) => event.preventDefault()}
-          onClick={loosePacks ? beginManualOpen : () => setDrawer("shop")}
-          aria-label={loosePacks ? `Open a pack. ${loosePacks} ready.` : "Open the pack shop"}
-        >
-          <span className="clean-pack-shadow" />
-          <span className="clean-pack-stack">
-            <i /><i />
-            <PackFace set={activeSet} />
-          </span>
-          <span className="clean-open-copy">
-            <strong>OPEN PACK</strong>
-            <small>
-              {loosePacks
-                ? `${loosePacks} READY / TAP OR HOLD`
-                : breakableProduct
-                  ? `${breakableProduct.label.toUpperCase()} WAITING`
-                  : "TAP TO VISIT SHOP"}
-            </small>
-          </span>
-        </button>
-
-        {!loosePacks && breakableProduct && (
+        <div className="clean-pack-station">
           <button
-            className="clean-buy-one"
-            onClick={() => handleBreak(breakableProduct.id)}
+            className="clean-pack-clicker"
+            onPointerDown={(event) => {
+              if (event.pointerType === "mouse") return;
+              startMobileAuto(event);
+              beginManualOpen();
+            }}
+            onPointerUp={stopMobileAuto}
+            onPointerCancel={stopMobileAuto}
+            onContextMenu={(event) => event.preventDefault()}
+            onClick={beginManualOpen}
+            aria-label={loosePacks
+              ? `Open a pack. ${loosePacks} ready.`
+              : `Buy and open a pack for ${money(nextPackPrice)} cash.`}
           >
-            BREAK {breakableProduct.label.toUpperCase()}
-            <span>{breakableProduct.packs} PACKS</span>
+            <span className="clean-pack-shadow" />
+            <span className="clean-pack-stack">
+              <i /><i />
+              <PackFace set={activeSet} />
+            </span>
           </button>
-        )}
-
-        <button
-          className="clean-sell-duplicates"
-          disabled={!derived.duplicateCount}
-          onClick={() => handleSellDuplicates(false)}
-        >
-          <strong>SELL DUPLICATES</strong>
-          <span>
-            {derived.duplicateCount
-              ? `${formatNumber(derived.duplicateCount)} CARDS / +${money(derived.duplicateSaleValue)} CASH`
-              : "NO EXTRA COPIES"}
-          </span>
-        </button>
+          <div className="clean-simple-stats">
+            <div><strong>{formatNumber(game.packsOpened)}</strong><span>PACKS OPENED</span></div>
+            <i />
+            <div><strong>{formatNumber(derived.packStock)}</strong><span>PACKS READY</span></div>
+          </div>
+        </div>
 
         <SetTray
           game={game}
@@ -1875,24 +1762,16 @@ export default function PackworksGameClean() {
             setDrawer("binder");
           }}
         />
-
-        <div className="clean-simple-stats">
-          <div><strong>{formatNumber(game.packsOpened)}</strong><span>PACKS OPENED</span></div>
-          <i />
-          <div><strong>{formatNumber(derived.packStock)}</strong><span>PACKS READY</span></div>
-        </div>
       </section>
 
-      {drawer && <button className="clean-drawer-scrim" aria-label="Close panel" onClick={() => setDrawer(null)} />}
-      {drawer === "shop" && (
-        <ShopDrawer
-          game={game}
-          onClose={() => setDrawer(null)}
-          onBuy={handleBuy}
-          onBreak={handleBreak}
-          onUpgrade={handleUpgrade}
-          onSet={handleSet}
-          onReset={handleReset}
+      {drawer && (
+        <button
+          className="clean-drawer-scrim"
+          aria-label="Close panel"
+          onClick={() => {
+            setDrawer(null);
+            setResetArmed(false);
+          }}
         />
       )}
       {drawer === "case" && (
@@ -1917,6 +1796,41 @@ export default function PackworksGameClean() {
           displayedIds={new Set(derived.displayedEntries.map((entry) => entry.id))}
         />
       )}
+      {drawer === "settings" && (
+        <SettingsPanel
+          game={game}
+          hapticsAvailable={hapticsAvailable}
+          resetArmed={resetArmed}
+          onClose={() => {
+            setDrawer(null);
+            setResetArmed(false);
+          }}
+          onToggleSound={() => {
+            commit((current) => ({ ...current, settings: { ...current.settings, sound: !current.settings.sound } }));
+            getAudio().ensure();
+            getAudio().sound("switch");
+          }}
+          onToggleHaptics={() => {
+            commit((current) => ({ ...current, settings: { ...current.settings, haptics: current.settings.haptics === false } }));
+            const haptics = getHaptics();
+            haptics.ensure();
+            haptics.pulse("open");
+          }}
+          onReset={handleReset}
+        />
+      )}
+
+      <button
+        type="button"
+        className={`clean-settings-gear ${drawer === "settings" ? "is-active" : ""}`}
+        onClick={() => {
+          setResetArmed(false);
+          setDrawer(drawer === "settings" ? null : "settings");
+        }}
+        aria-label="Settings"
+      >
+        <span aria-hidden="true">⚙</span>
+      </button>
 
       {opening && (
         <div
@@ -1929,7 +1843,7 @@ export default function PackworksGameClean() {
         >
           <div className="opening-haze" />
           <div className="opening-topline">
-            <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} onOpenBinder={() => setDrawer("binder")} />
+            <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
             <small>
               {opening.result.cards.filter((pull) => pull.revealed).length}
               {" / "}
@@ -1995,10 +1909,10 @@ export default function PackworksGameClean() {
           {opening.phase === "summary" && (
             <div className="opening-summary pw-opening-summary clean-opening-summary">
               <div className="summary-total">
-                <span>SELL PILE</span>
+                <span>PACK RESULTS</span>
                 <strong>
                   {opening.result.cards.some((pull) => pull.revealed && !pull.isNew)
-                    ? `+${money(Math.ceil(opening.result.cards.filter((pull) => pull.revealed && !pull.isNew).reduce((sum, pull) => sum + getCardValue(pull.card), 0) * (1 + (game.upgrades?.shelf || 0) * 0.2)))} CASH VALUE`
+                    ? `${opening.result.cards.filter((pull) => pull.revealed && !pull.isNew).length} DUPLICATES AUTO-SOLD`
                     : "NO DUPLICATES"}
                 </strong>
                 <small>
@@ -2011,19 +1925,13 @@ export default function PackworksGameClean() {
               </div>
               <div className="summary-actions">
                 <button className="summary-secondary" onClick={closeOpening}>BACK TO TABLE</button>
-                {getProductCount(game, game.activeSet, "loose") > 0 && (
-                  <button className="summary-primary desktop-open-another" onClick={beginManualOpen}>OPEN ANOTHER</button>
-                )}
               </div>
             </div>
           )}
           <button
             type="button"
             className={`mobile-auto-control ${mobileAutoHeld ? "is-held" : ""}`}
-            disabled={mobileAutoDisabled}
-            aria-label={mobileAutoDisabled
-              ? "No packs ready"
-              : "Open another pack. Hold to reveal cards and continue opening automatically."}
+            aria-label="Continue opening. Hold to reveal cards, buy packs when needed, and continue automatically."
             aria-pressed={mobileAutoHeld}
             onPointerDown={startMobileAuto}
             onPointerUp={finishMobileAuto}
@@ -2031,10 +1939,7 @@ export default function PackworksGameClean() {
             onLostPointerCapture={stopMobileAuto}
             onContextMenu={(event) => event.preventDefault()}
             onClick={() => {
-              if (
-                openingRef.current?.phase === "summary"
-                && getProductCount(gameRef.current, gameRef.current.activeSet, "loose") > 0
-              ) beginManualOpen();
+              if (openingRef.current?.phase === "summary") beginManualOpen();
             }}
           >
             <span className="mobile-auto-fill" aria-hidden="true" />
@@ -2094,6 +1999,9 @@ export default function PackworksGameClean() {
         />
       )}
 
+      <CashStreamLayer streams={cashStreams} />
+      <GameplayCueLayer cues={gameplayCues} />
+
       {globalBursts.length > 0 && (
         <GlobalBurstLayer
           bursts={globalBursts}
@@ -2102,14 +2010,6 @@ export default function PackworksGameClean() {
           }}
         />
       )}
-
-      <div className="clean-toasts" aria-live="polite">
-        {toasts.map((toast) => (
-          <article key={toast.id} className={`tone-${toast.tone}`}>
-            <strong>{toast.title}</strong><span>{toast.detail}</span>
-          </article>
-        ))}
-      </div>
 
       {!ready && <div className="loading-screen"><span>PACKWORKS</span><i /></div>}
     </main>

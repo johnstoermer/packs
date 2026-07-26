@@ -3,7 +3,11 @@
 import { useEffect } from "react";
 import { RARITIES } from "../lib/gameData";
 
-const BURST_RARITIES = ["uncommon", "rare", "common", "epic", "common", "uncommon", "rare"];
+const BURST_RARITIES = [
+  "common", "uncommon", "rare", "common", "epic", "uncommon", "common",
+  "rare", "common", "legendary", "uncommon", "common", "rare", "epic",
+  "common", "uncommon", "rare", "common",
+];
 
 function Burst({ burst, onComplete }) {
   useEffect(() => {
@@ -15,7 +19,10 @@ function Burst({ burst, onComplete }) {
   return (
     <div
       className={`global-burst burst-${fracture ? "fracture" : "salvage"}`}
-      style={{ "--burst-slot": burst.id % 3 }}
+      style={{
+        "--burst-x": `${22 + (burst.id * 37) % 56}%`,
+        "--burst-y": `${28 + (burst.id * 29) % 42}%`,
+      }}
       aria-hidden="true"
     >
       <div className="global-burst-pack">

@@ -29,9 +29,11 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   expect(selectStartAllowed).toBe(false);
 
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "SELL DUPLICATES" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "SELL DUPLICATES" })).toHaveCount(0);
+  await expect(page.locator(".clean-topbar nav")).toHaveCount(0);
   await expect(page.locator(".clean-set-progress")).toBeVisible();
   await expect(page.locator(".clean-set-progress")).toContainText("0/98");
+  await expect(page.locator(".clean-pack-station > .clean-simple-stats")).toBeVisible();
   await expect(page.getByText("MANUAL HEAT")).toHaveCount(0);
   await expect(page.getByText("RULES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PLAY", { exact: true })).toHaveCount(0);
@@ -51,12 +53,12 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   await revealAll(page);
   await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
   await expect(page.locator(".reveal-card.is-revealed")).toHaveCount(6);
-  await expect(page.locator(".summary-total")).toContainText("SELL PILE");
+  await expect(page.locator(".summary-total")).toContainText("PACK RESULTS");
   await page.screenshot({ path: "test-results/clean-pack-summary.png" });
 
   await page.getByRole("button", { name: "BACK TO TABLE" }).click();
   await expect(page.locator(".clean-set-progress")).not.toContainText("0/98");
-  await page.getByRole("button", { name: "BINDER", exact: true }).click();
+  await page.locator(".clean-set-progress").click();
   await expect(page.locator(".clean-binder-grid button.found").first()).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
@@ -185,54 +187,39 @@ test("the large mobile hold control runs complete packs until released", async (
   await page.screenshot({ path: "test-results/clean-mobile-auto.png" });
 });
 
-test("the shop reveals product and upgrade choices gradually", async ({ page }) => {
+test("the top bar is only the brand and wallet, with options on the corner gear", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "SHOP", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Pack shop" })).toBeVisible();
-  await expect(page.getByText("SEALED VALUE")).toHaveCount(0);
-  await expect(page.locator(".clean-set-stock")).toHaveCount(1);
-  await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(1);
-  await expect(page.locator(".clean-set-stock")).toContainText(SETS[0].name);
-  await expect(page.getByText("Booster box")).toHaveCount(0);
-  await expect(page.getByText("THREE SIMPLE TRACKS")).toHaveCount(0);
-  await expect(page.locator(".clean-upgrades")).toContainText("Open 5 more packs");
-  await expect(page.getByText("Standing orders")).toHaveCount(0);
-  await expect(page.getByText("Filing rules")).toHaveCount(0);
-
-  const state = advanceBeat({
-    ...createInitialState(Date.now()),
-    packsOpened: 25,
-    coins: 600,
-    collection: Object.fromEntries(SETS[0].cards.slice(0, 24).map((card) => [card.id, 1])),
-    bestRarities: Object.fromEntries(SETS[0].cards.slice(0, 24).map((card) => [card.id, card.rarity])),
-    settings: { sound: false, reducedEffects: false, quickOpen: true },
-    lastSavedAt: Date.now(),
-  });
-  await seedState(page, state);
-  await page.reload();
-  await page.getByRole("button", { name: "SHOP", exact: true }).click();
-  await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(1);
-  await expect(page.locator(".clean-upgrade", { hasText: "Dealer tray" })).toBeVisible();
-  await expect(page.locator(".clean-set-title")).toContainText(SETS[0].name);
-  await page.screenshot({ path: "test-results/clean-shop.png" });
+  await expect(page.locator(".clean-topbar .clean-brand")).toContainText("PACKWORKS");
+  await expect(page.locator(".clean-topbar .clean-wallet")).toBeVisible();
+  await expect(page.locator(".clean-topbar nav")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "SHOP", exact: true })).toHaveCount(0);
+  await expect(page.locator(".clean-upgrades")).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.locator(".clean-settings")).toBeVisible();
+  await expect(page.locator(".clean-settings-options > button")).toHaveCount(3);
+  await expect(page.locator(".clean-settings")).toContainText("Sound");
+  await expect(page.locator(".clean-settings")).toContainText("Haptics");
+  await expect(page.locator(".clean-settings")).toContainText("Reset save");
 });
 
-test("the empty table shows no shop cue overlay, only the pack label", async ({ page }) => {
+test("clicking an empty pack stack buys and opens without visiting a shop", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
   state.sealed[SETS[0].id].loose = 0;
+  state.coins = 200;
+  state.lifetimeCoins = 200;
   state.settings.sound = false;
+  state.settings.quickOpen = true;
   state.lastSavedAt = Date.now();
   await seedState(page, state);
   await page.goto("/");
 
-  await expect(page.locator(".clean-open-copy")).toContainText("TAP TO VISIT SHOP");
-  await expect(page.locator(".clean-shop-cue")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Buy .* pack/i })).toHaveCount(0);
-
-  await page.screenshot({ path: "test-results/clean-mobile-no-shop-cue.png" });
-  await page.getByRole("button", { name: "SHOP", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Pack shop" })).toBeVisible();
+  await expect(page.locator(".clean-open-copy")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Buy and open a pack/ })).toBeVisible();
+  await page.getByRole("button", { name: /Buy and open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await expect(page.locator(".clean-wallet strong")).not.toHaveText("200");
+  await expect(page.getByRole("heading", { name: "Pack shop" })).toHaveCount(0);
 });
 
 test("clicking an undiscovered card shows its rarity without spoiling the card", async ({ page }) => {
@@ -242,13 +229,9 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await seedState(page, state);
   await page.goto("/");
 
-  await page.getByRole("button", { name: "BINDER", exact: true }).click();
-  const borderOf = (label) => page.getByRole("button", { name: label }).first()
-    .evaluate((node) => getComputedStyle(node).borderTopColor);
-  const commonBorder = await borderOf("Missing card 1, show rarity");
-  const chaseBorder = await borderOf("Missing card 98, show rarity");
-  expect(commonBorder).not.toBe(chaseBorder);
-  expect(commonBorder).not.toBe("rgba(255, 255, 255, 0.1)");
+  await page.locator(".clean-set-progress").click();
+  await expect(page.locator(".clean-binder-tools")).toBeVisible();
+  await expect(page.locator(".clean-binder-grid > button")).toHaveCount(98);
 
   await page.getByRole("button", { name: "Missing card 1, show rarity" }).first().click();
   const detail = page.locator(".clean-card-detail");
@@ -262,7 +245,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await detail.getByRole("button", { name: "CLOSE" }).click();
   await expect(detail).toHaveCount(0);
 
-  await page.locator(".clean-binder-grid > button.missing").last().click();
+  await page.getByRole("button", { name: "Missing card 98, show rarity" }).click();
   await expect(page.locator(".clean-card-detail")).toContainText("Card 98");
   await expect(page.locator(".clean-card-detail .clean-detail-effect")).toHaveCount(0);
   await expect(page.locator(".clean-card-detail .clean-detail-art.is-missing")).toBeVisible();
@@ -281,58 +264,55 @@ test("the display case holds cards whose unique effects augment the game", async
 
   await expect(page.locator(".case-strip").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "BINDER", exact: true }).click();
-  await page.getByRole("button", { name: "Pennigeon, 2 copies" }).click();
+  await page.locator(".clean-set-progress").click();
+  await page.getByRole("button", { name: /Pennigeon, 1 cop/ }).click();
   const detail = page.locator(".clean-card-detail");
   await expect(detail.locator(".clean-detail-art .card-front")).toBeVisible();
   await expect(detail.locator("canvas")).toHaveCount(0);
   await expect(detail.locator(".clean-detail-copy")).toHaveCount(0);
   await expect(detail).toContainText("Whenever you reveal a Common");
+  await expect(detail.locator(".card-head")).toContainText("Pennigeon");
+  await expect(detail.locator(".card-copy > strong")).toHaveCount(0);
+  expect(await detail.locator(".card-rules-copy").evaluate((node) => node.scrollHeight <= node.clientHeight + 1)).toBe(true);
   await detail.getByRole("button", { name: "DISPLAY IN CASE" }).click();
   await expect(detail.getByRole("button", { name: "UNSEAT FROM CASE" })).toBeVisible();
   await detail.getByRole("button", { name: "CLOSE" }).click();
   await expect(page.locator(".clean-binder-grid")).toContainText("ON DISPLAY");
   await expect(page.locator(".case-strip-slot.is-filled").first()).toBeVisible();
 
-  await page.getByRole("button", { name: /^CASE/ }).click();
+  await page.getByRole("button", { name: "Close binder" }).click();
+  await page.locator(".case-strip-label").first().click();
   const caseDrawer = page.locator(".clean-case");
   await expect(caseDrawer).toBeVisible();
   await expect(caseDrawer).toContainText("Pennigeon");
-  await expect(caseDrawer).toContainText("1/1 slots filled");
+  await expect(caseDrawer).toContainText("1/1 available slots filled");
   await expect(caseDrawer.locator(".clean-case-slot.is-locked")).toHaveCount(5);
   await expect(caseDrawer).toContainText("Rewrite");
   await page.screenshot({ path: "test-results/clean-display-case.png" });
 
   await caseDrawer.getByRole("button", { name: "UNSEAT" }).click();
-  await expect(caseDrawer).toContainText("0/1 slots filled");
+  await expect(caseDrawer).toContainText("0/1 available slots filled");
 });
 
-test("holding a shop pack price rapidly buys that selected set and stops on release", async ({ page }) => {
+test("holding Space buys the next pack automatically when stock reaches zero", async ({ page }) => {
   const state = createInitialState(Date.now());
   state.coins = 200;
   state.lifetimeCoins = 200;
+  state.sealed[SETS[0].id].loose = 0;
   state.settings.sound = false;
+  state.settings.quickOpen = true;
   state.lastSavedAt = Date.now();
   await seedState(page, state);
   await page.goto("/");
-  await page.getByRole("button", { name: "SHOP", exact: true }).click();
-
-  const row = page.locator(".clean-set-stock").filter({
-    has: page.getByRole("heading", { name: SETS[0].name, exact: true }),
-  });
-  const buy = row.getByRole("button", { name: new RegExp(`Buy ${SETS[0].name} pack`) });
-  await expect(row.locator(".clean-owned")).toHaveText("3 owned");
-  const bounds = await buy.boundingBox();
-  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
-  await page.mouse.down();
-  await expect(buy).toHaveClass(/is-repeating/, { timeout: 1_000 });
-  await page.waitForTimeout(520);
-  await page.mouse.up();
-
-  const boughtCount = Number.parseInt(await row.locator(".clean-owned").innerText(), 10);
-  expect(boughtCount).toBeGreaterThan(5);
-  await page.waitForTimeout(500);
-  await expect(row.locator(".clean-owned")).toHaveText(`${boughtCount} owned`);
+  await page.getByRole("button", { name: /Buy and open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await revealAll(page);
+  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
+  await page.keyboard.down("Space");
+  await expect(page.locator(".clean-simple-stats div").first().locator("strong")).toHaveText("2", { timeout: 4_000 });
+  await page.keyboard.up("Space");
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pack shop" })).toHaveCount(0);
 });
 
 test("legendary pulls retain the full impact treatment", async ({ page }) => {
@@ -419,7 +399,10 @@ test("reveals fire haptic pulses through the vibration API when enabled", async 
   });
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "HAPTICS ON" })).toBeVisible();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const haptics = page.locator(".clean-settings-options > button").filter({ hasText: "Haptics" });
+  await expect(haptics).toContainText("ON");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
 
   await page.getByRole("button", { name: /Open a pack/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 6_000 });
@@ -429,8 +412,10 @@ test("reveals fire haptic pulses through the vibration API when enabled", async 
   expect(withHaptics).toBeGreaterThanOrEqual(7); // pack open + six reveals
 
   await page.getByRole("button", { name: "BACK TO TABLE" }).click();
-  await page.getByRole("button", { name: "HAPTICS ON" }).click();
-  await expect(page.getByRole("button", { name: "HAPTICS OFF" })).toBeVisible();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await haptics.click();
+  await expect(haptics).toContainText("OFF");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   const beforeMuted = await page.evaluate(() => window.__vibrations.length);
   await page.getByRole("button", { name: /Open a pack/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 6_000 });
@@ -440,7 +425,7 @@ test("reveals fire haptic pulses through the vibration API when enabled", async 
   expect(afterMuted).toBe(beforeMuted);
 });
 
-test("duplicate selling keeps one copy and pays cash from the table", async ({ page }) => {
+test("duplicates auto-sell on load and their values stream toward the wallet", async ({ page }) => {
   const state = createInitialState(Date.now());
   state.collection = { "corner-01": 3, "corner-02": 2 };
   state.bestRarities = { "corner-01": "rare", "corner-02": "common" };
@@ -450,12 +435,29 @@ test("duplicate selling keeps one copy and pays cash from the table", async ({ p
   await seedState(page, state);
   await page.goto("/");
 
-  const sell = page.getByRole("button", { name: "SELL DUPLICATES" });
-  await expect(sell).toContainText("3 CARDS");
-  await sell.click();
-  await expect(sell).toContainText("NO EXTRA COPIES");
-  await expect(page.locator(".clean-wallet strong")).toContainText("42");
+  await expect(page.getByRole("button", { name: "SELL DUPLICATES" })).toHaveCount(0);
+  await expect(page.locator(".cash-stream-value").first()).toBeVisible();
+  await expect(page.locator(".clean-wallet strong")).not.toHaveText("10");
   await expect(page.locator(".clean-set-progress")).toContainText("2/98");
+});
+
+test("Salvage erupts into a roaming blast of small cards", async ({ page }) => {
+  const state = createInitialState(Date.now());
+  state.collection = { "tideworks-01": 100 };
+  state.bestRarities = { "tideworks-01": "common" };
+  state.duplicateBank = 990;
+  state.displayed = [{ id: "tideworks-01", at: Date.now() }];
+  state.settings.sound = false;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  await expect(page.locator(".global-burst.burst-salvage")).toBeVisible();
+  await expect(page.locator(".global-burst.burst-salvage .global-burst-card")).toHaveCount(18);
+  const origin = await page.locator(".global-burst-pack").boundingBox();
+  expect(origin.x).toBeGreaterThan(0);
+  expect(origin.y).toBeGreaterThan(64);
+  await expect(page.locator(".cash-stream-value").first()).toBeVisible();
 });
 
 test("the clean table remains usable inside the compact game frame", async ({ page }) => {

@@ -2056,69 +2056,6 @@
   color: #e07869;
 }
 
-.pw-toasts {
-  position: fixed;
-  z-index: 135;
-  top: 82px;
-  right: calc(var(--desk-panel) + 14px);
-  display: grid;
-  width: min(330px, calc(100vw - 28px));
-  gap: 7px;
-  pointer-events: none;
-}
-
-.pw-toasts article {
-  display: grid;
-  grid-template-columns: 4px 1fr;
-  min-height: 54px;
-  border: 1px solid var(--line);
-  background: rgba(17, 26, 29, 0.95);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.32);
-  animation: pw-toast-in 280ms ease both;
-}
-
-.pw-toasts article > i {
-  background: #839194;
-}
-
-.pw-toasts article.tone-success > i {
-  background: var(--green);
-}
-
-.pw-toasts article.tone-warning > i {
-  background: var(--orange);
-}
-
-.pw-toasts article.tone-gold > i,
-.pw-toasts article.tone-legendary > i {
-  background: var(--gold);
-  box-shadow: 0 0 15px rgba(240, 198, 103, 0.45);
-}
-
-.pw-toasts article > div {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 9px 11px;
-}
-
-.pw-toasts strong {
-  color: #ded6c7;
-  font: 800 8px/1 Consolas, monospace;
-  letter-spacing: 0.05em;
-}
-
-.pw-toasts small {
-  margin-top: 6px;
-  color: #78868a;
-  font-size: 8px;
-}
-
-@keyframes pw-toast-in {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
 .pw-intro {
   position: fixed;
   z-index: 180;
@@ -2998,11 +2935,6 @@
     width: 22px;
     height: 22px;
     font-size: 6px;
-  }
-
-  .pw-toasts {
-    top: 62px;
-    right: 10px;
   }
 
   .pw-intro {
