@@ -415,90 +415,60 @@
   color: #535d58;
 }
 
-.clean-set-tray {
+.clean-set-progress {
   position: absolute;
   z-index: 6;
-  bottom: 18px;
+  bottom: 22px;
   left: 20px;
-  width: 310px;
+  display: flex;
+  width: 250px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 12px 10px;
+  border: 1px solid rgba(240, 233, 216, 0.16);
+  border-radius: 3px;
+  background: rgba(19, 28, 25, 0.82);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease;
 }
 
-.clean-set-tray > header {
+.clean-set-progress:hover,
+.clean-set-progress:focus-visible {
+  border-color: color-mix(in srgb, var(--set-a) 55%, #77817d);
+  background: color-mix(in srgb, var(--set-a) 8%, rgba(19, 28, 25, 0.88));
+}
+
+.clean-set-progress header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
-  color: #737d78;
+  color: #8d9792;
   font-size: 7px;
   font-weight: 750;
   letter-spacing: 0.09em;
 }
 
-.clean-set-tray > header span {
+.clean-set-progress header span {
   color: var(--set-a);
+  font-size: 9px;
 }
 
-.clean-set-tray > div {
-  display: grid;
-  grid-template-columns: repeat(16, 1fr);
-  gap: 3px;
-}
-
-.clean-set-tray button {
-  position: relative;
-  width: 100%;
-  min-width: 0;
-  aspect-ratio: 0.7;
+.clean-set-progress-track {
+  display: block;
+  height: 6px;
   overflow: hidden;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1px;
-  background: #17201e;
-  color: #5a6560;
+  border: 1px solid rgba(240, 233, 216, 0.14);
+  border-radius: 3px;
+  background: #101815;
 }
 
-.clean-set-tray button.found {
-  border-color: color-mix(in srgb, var(--rarity) 72%, #6a746f);
-  box-shadow: 0 0 7px color-mix(in srgb, var(--rarity) 20%, transparent);
-  cursor: pointer;
-}
-
-.clean-set-tray button.found:hover {
-  z-index: 3;
-  border-color: var(--rarity);
-  transform: translateY(-3px) scale(1.12);
-}
-
-.clean-set-tray button.missing {
-  border-color: color-mix(in srgb, var(--rarity) 72%, #6a746f);
-  background:
-    linear-gradient(45deg, transparent 45%, rgba(255, 255, 255, 0.035) 46% 54%, transparent 55%),
-    #16201d;
-  cursor: pointer;
-}
-
-.clean-set-tray button.missing:hover {
-  z-index: 3;
-  border-color: var(--rarity);
-  transform: translateY(-3px) scale(1.12);
-}
-
-.clean-set-tray button > span {
-  display: grid;
+.clean-set-progress-track i {
+  display: block;
   height: 100%;
-  place-items: center;
-  font-size: 5px;
-  font-weight: 800;
-}
-
-.clean-set-tray .card-art {
-  width: 100%;
-  height: 100%;
-}
-
-.clean-set-tray .card-art-index,
-.clean-set-tray .card-art-grade {
-  display: none;
+  min-width: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--set-a) 75%, #2c3a34), var(--set-a));
+  transition: width 420ms ease;
 }
 
 .clean-simple-stats {
@@ -971,6 +941,7 @@
 .clean-binder-grid > button.missing {
   cursor: pointer;
   opacity: 0.55;
+  border-color: color-mix(in srgb, var(--rarity) 55%, #3a453f);
 }
 
 .clean-binder-grid > button.missing:hover {
@@ -1798,8 +1769,7 @@
   animation: rarity-nameless-shift 1.9s linear infinite;
 }
 
-.clean-binder-grid > button.found,
-.clean-set-tray button.found {
+.clean-binder-grid > button.found {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rarity) 68%, transparent);
 }
 
@@ -1814,19 +1784,7 @@
 .clean-binder-grid > button.rarity-empyrean,
 .clean-binder-grid > button.rarity-absolute,
 .clean-binder-grid > button.rarity-singularity,
-.clean-binder-grid > button.rarity-nameless,
-.clean-set-tray button.rarity-exalted,
-.clean-set-tray button.rarity-ascendant,
-.clean-set-tray button.rarity-celestial,
-.clean-set-tray button.rarity-divine,
-.clean-set-tray button.rarity-astral,
-.clean-set-tray button.rarity-eternal,
-.clean-set-tray button.rarity-primordial,
-.clean-set-tray button.rarity-transcendent,
-.clean-set-tray button.rarity-empyrean,
-.clean-set-tray button.rarity-absolute,
-.clean-set-tray button.rarity-singularity,
-.clean-set-tray button.rarity-nameless {
+.clean-binder-grid > button.rarity-nameless {
   animation: rarity-owned-breathe 3.6s ease-in-out infinite;
 }
 
@@ -2045,18 +2003,11 @@
     font-size: 12px;
   }
 
-  .clean-set-tray {
+  .clean-set-progress {
     bottom: 8px;
     left: 12px;
-    width: 172px;
-  }
-
-  .clean-set-tray > div {
-    grid-template-columns: repeat(6, 1fr);
-  }
-
-  .clean-set-tray > header {
-    margin-bottom: 4px;
+    width: 180px;
+    padding: 7px 10px 8px;
   }
 
   .clean-sell-duplicates {
@@ -2150,18 +2101,12 @@
     min-width: 68px;
   }
 
-  .clean-set-tray {
+  .clean-set-progress {
     bottom: max(10px, env(safe-area-inset-bottom));
     left: 10px;
     width: calc(50% - 15px);
-  }
-
-  .clean-set-tray > div {
-    grid-template-columns: repeat(6, 1fr);
-  }
-
-  .clean-set-tray > header {
-    margin-bottom: 4px;
+    min-height: 47px;
+    padding: 7px 10px 8px;
   }
 
   .clean-sell-duplicates {
@@ -2901,50 +2846,6 @@ button.clean-case-slot.is-empty:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal-echo-flash { animation-iteration-count: 1; }
-}
-
-/* --- Auto-process duplicates (threshold chips under the sell button) --- */
-
-.clean-auto-process {
-  position: absolute;
-  z-index: 8;
-  bottom: 4px;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transform: translateX(-50%);
-  font-size: 8px;
-  letter-spacing: 0.08em;
-  color: #9aa39e;
-  white-space: nowrap;
-}
-
-.clean-auto-process > span { padding-right: 2px; }
-
-.clean-auto-process button {
-  border: 1px solid rgba(240, 233, 216, 0.16);
-  border-radius: 2px;
-  background: #131c19;
-  color: #b9c2bc;
-  font: inherit;
-  font-size: 8px;
-  letter-spacing: 0.06em;
-  padding: 2px 6px;
-  cursor: pointer;
-  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
-}
-
-.clean-auto-process button:hover,
-.clean-auto-process button:focus-visible {
-  border-color: rgba(240, 233, 216, 0.4);
-  color: #efe9da;
-}
-
-.clean-auto-process button.is-active {
-  border-color: color-mix(in srgb, var(--set-a) 70%, #77817d);
-  background: color-mix(in srgb, var(--set-a) 18%, #131c19);
-  color: #efe9da;
 }
 
 /* --- Salvage burst: Mystery Packs rip open on screen --- */

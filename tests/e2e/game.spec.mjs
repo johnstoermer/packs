@@ -30,8 +30,8 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
 
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "SELL DUPLICATES" })).toBeVisible();
-  await expect(page.locator(".clean-set-tray button")).toHaveCount(48);
-  await expect(page.locator(".clean-set-tray button.found")).toHaveCount(0);
+  await expect(page.locator(".clean-set-progress")).toBeVisible();
+  await expect(page.locator(".clean-set-progress")).toContainText("0/48");
   await expect(page.getByText("MANUAL HEAT")).toHaveCount(0);
   await expect(page.getByText("RULES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PLAY", { exact: true })).toHaveCount(0);
@@ -54,7 +54,7 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   await page.screenshot({ path: "test-results/clean-pack-summary.png" });
 
   await page.getByRole("button", { name: "BACK TO TABLE" }).click();
-  await expect(page.locator(".clean-set-tray button.found").first()).toBeVisible();
+  await expect(page.locator(".clean-set-progress")).not.toContainText("0/48");
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
   await expect(page.locator(".clean-binder-grid button.found").first()).toBeVisible();
   expect(pageErrors).toEqual([]);
@@ -248,6 +248,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await seedState(page, state);
   await page.goto("/");
 
+  await page.getByRole("button", { name: "BINDER", exact: true }).click();
   const borderOf = (label) => page.getByRole("button", { name: label }).first()
     .evaluate((node) => getComputedStyle(node).borderTopColor);
   const commonBorder = await borderOf("Missing card 1, show rarity");
@@ -267,7 +268,6 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await detail.getByRole("button", { name: "CLOSE" }).click();
   await expect(detail).toHaveCount(0);
 
-  await page.getByRole("button", { name: "BINDER", exact: true }).click();
   await page.locator(".clean-binder-grid > button.missing").last().click();
   await expect(page.locator(".clean-card-detail")).toContainText("Card 48");
   await expect(page.locator(".clean-card-detail .clean-detail-effect")).toBeVisible();
@@ -410,7 +410,7 @@ test("duplicate selling keeps one copy and pays cash from the table", async ({ p
   await sell.click();
   await expect(sell).toContainText("NO EXTRA COPIES");
   await expect(page.locator(".clean-wallet strong")).toContainText("42");
-  await expect(page.locator(".clean-set-tray button.found")).toHaveCount(2);
+  await expect(page.locator(".clean-set-progress")).toContainText("2/48");
 });
 
 test("the clean table remains usable inside the compact game frame", async ({ page }) => {
@@ -424,7 +424,7 @@ test("the clean table remains usable inside the compact game frame", async ({ pa
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
   await expect(page.locator(".clean-simple-stats")).toBeVisible();
-  await expect(page.locator(".clean-set-tray button")).toHaveCount(48);
+  await expect(page.locator(".clean-set-progress")).toBeVisible();
   const packBounds = await page.locator(".clean-pack-clicker").boundingBox();
   expect(packBounds.x).toBeGreaterThanOrEqual(0);
   expect(packBounds.x + packBounds.width).toBeLessThanOrEqual(800);

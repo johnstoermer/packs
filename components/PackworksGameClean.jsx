@@ -60,8 +60,6 @@ import {
 import { createAudioEngine } from "../lib/audio";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
-// Auto-process thresholds, in multiples of a loose pack's price (0 = off).
-const AUTO_SELL_STEPS = [0, 1, 4, 12];
 const SHOP_PRODUCTS = PACK_PRODUCTS.filter((product) => ["loose", "case"].includes(product.id));
 const CASE_PRODUCT = PACK_PRODUCTS.find((product) => product.id === "case");
 const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
@@ -761,30 +759,26 @@ function CaseStrip({ game, derived, fx, onOpenCase, onOpenBinder }) {
   );
 }
 
-function SetTray({ game, set, onCard }) {
+// Bottom-left collection meter: one compact progress bar for the active
+// set. Click-through to the binder for per-card detail.
+function SetTray({ game, set, onOpenBinder }) {
   const found = set.cards.filter((card) => game.collection[card.id]).length;
+  const percent = Math.round((found / set.cards.length) * 100);
   return (
-    <section className="clean-set-tray" aria-label={`${set.name} collection, ${found} of ${set.cards.length} found`}>
-      <header><strong>{set.short} COLLECTION</strong><span>{found}/{set.cards.length}</span></header>
-      <div>
-        {set.cards.map((card) => {
-          const count = game.collection[card.id] || 0;
-          const rarityId = card.rarity;
-          const rarity = RARITIES[rarityId];
-          return (
-            <button
-              key={card.id}
-              className={`${count ? "found" : "missing"} rarity-${rarityId}`}
-              onClick={() => onCard(card.id)}
-              style={{ "--rarity": rarity.color }}
-              aria-label={count ? `${card.name}, ${rarity.label}` : `Missing card ${card.number}, show rarity`}
-            >
-              {count ? <CardArt card={card} compact /> : <span>PW</span>}
-            </button>
-          );
-        })}
-      </div>
-    </section>
+    <button
+      type="button"
+      className="clean-set-progress"
+      onClick={onOpenBinder}
+      aria-label={`${set.name} collection, ${found} of ${set.cards.length} found. Open binder.`}
+    >
+      <header>
+        <strong>{set.short} COLLECTION</strong>
+        <span>{found}/{set.cards.length}</span>
+      </header>
+      <span className="clean-set-progress-track" aria-hidden="true">
+        <i style={{ width: `${percent}%` }} />
+      </span>
+    </button>
   );
 }
 
@@ -1459,21 +1453,6 @@ export default function PackworksGameClean() {
     );
   }, [commit, getAudio, pushFx, pushToast, showSalvageBurst]);
 
-  // Automated processing: once the sell pile is worth the chosen number of
-  // loose packs, it sells itself. A coin threshold, never a timer.
-  const autoSellAt = AUTO_SELL_STEPS.includes(game.settings?.autoSell) ? game.settings.autoSell : 0;
-  const handleAutoSellSetting = useCallback((value) => {
-    commit((current) => ({ ...current, settings: { ...current.settings, autoSell: value } }));
-    getAudio().sound("switch");
-  }, [commit, getAudio]);
-  useEffect(() => {
-    if (!ready || !autoSellAt || openingRef.current) return;
-    const value = getDuplicateSaleValue(game);
-    if (value > 0 && value >= autoSellAt * getPackPrice(game, "loose", game.activeSet)) {
-      handleSellDuplicates(true);
-    }
-  }, [autoSellAt, game, handleSellDuplicates, ready]);
-
   const handleSet = useCallback((setId) => {
     const next = selectSet(gameRef.current, setId);
     if (next === gameRef.current) return;
@@ -1705,20 +1684,14 @@ export default function PackworksGameClean() {
           </span>
         </button>
 
-        <div className="clean-auto-process" role="group" aria-label="Auto-process duplicates">
-          <span title="Sells the pile automatically once it's worth this many loose packs. Salvage effects still fire.">AUTO-PROCESS</span>
-          {AUTO_SELL_STEPS.map((step) => (
-            <button
-              key={`auto-${step}`}
-              className={autoSellAt === step ? "is-active" : ""}
-              onClick={() => handleAutoSellSetting(step)}
-            >
-              {step === 0 ? "OFF" : `AT ${step} PACK${step > 1 ? "S" : ""}`}
-            </button>
-          ))}
-        </div>
-
-        <SetTray game={game} set={activeSet} onCard={setSelectedCard} />
+        <SetTray
+          game={game}
+          set={activeSet}
+          onOpenBinder={() => {
+            setBinderSetId(game.activeSet);
+            setDrawer("binder");
+          }}
+        />
 
         <div className="clean-simple-stats">
           <div><strong>{formatNumber(game.packsOpened)}</strong><span>PACKS OPENED</span></div>
