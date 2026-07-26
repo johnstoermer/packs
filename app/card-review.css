@@ -298,12 +298,7 @@
   transition: transform 130ms ease;
 }
 
-.review-three-card {
-  width: 280px;
-  justify-self: center;
-}
-
-.review-three-pack {
+.review-pack-preview {
   display: grid;
   width: 260px;
   justify-self: center;
@@ -311,58 +306,17 @@
   text-align: center;
 }
 
-.review-three-pack > span {
+.review-pack-preview > .pack-face {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 0.71;
+}
+
+.review-pack-preview > span {
   color: #d6f2ff;
   font-size: 8px;
   font-weight: 850;
   line-height: 1.3;
-}
-
-.three-pack-scene {
-  position: relative;
-  display: block;
-  width: 100%;
-  aspect-ratio: 0.71;
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  background: transparent;
-  cursor: grab;
-  touch-action: none;
-}
-
-.three-pack-scene:active {
-  cursor: grabbing;
-}
-
-.three-pack-mount,
-.three-pack-canvas {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.three-pack-canvas {
-  filter: drop-shadow(0 20px 16px rgba(2, 20, 45, 0.4));
-}
-
-.three-pack-label {
-  position: absolute;
-  z-index: 3;
-  right: 3%;
-  bottom: 2%;
-  padding: 6px 9px;
-  border: 2px solid #052752;
-  border-radius: 8px;
-  background: #ffd63d;
-  box-shadow: 0 3px 0 #052752;
-  color: #052752;
-  font-size: 8px;
-  font-weight: 950;
-  letter-spacing: 0.08em;
-  pointer-events: none;
 }
 
 .review-flip-inner {
@@ -385,6 +339,28 @@
 
 .review-flip-card .card-front {
   transform: rotateY(180deg);
+}
+
+.review-flip-card .back-style-orbit {
+  background:
+    radial-gradient(circle, #ffd63d 0 12%, #fff9dc 12.5% 20%, #0c5aa0 20.5% 34%, transparent 34.5%),
+    repeating-radial-gradient(circle, #0b65ad 0 8px, #084a86 9px 16px);
+}
+
+.review-flip-card .back-style-seal .back-orbit {
+  width: 58%;
+  height: auto;
+  aspect-ratio: 1;
+  border: 7px double #ffd63d;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px #052752, inset 0 0 0 4px #fff9dc;
+}
+
+.review-flip-card .back-style-seal .back-mark {
+  width: 38%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
 }
 
 /* Mechanics Arena -------------------------------------------------------- */
@@ -686,98 +662,6 @@
   background:
     linear-gradient(180deg, rgba(1, 18, 48, 0.28), transparent 18%, transparent 75%, rgba(1, 17, 44, 0.34)),
     radial-gradient(ellipse at center, transparent 45%, rgba(1, 19, 49, 0.58) 112%);
-}
-
-.three-mechanic-stage,
-.three-mechanic-mount,
-.three-mechanic-canvas {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.three-mechanic-stage {
-  z-index: 2;
-  overflow: hidden;
-  cursor: crosshair;
-  touch-action: none;
-}
-
-.three-mechanic-canvas {
-  filter: drop-shadow(0 18px 16px rgba(3, 24, 53, 0.35));
-}
-
-.three-mechanic-hud {
-  position: absolute;
-  z-index: 4;
-  top: 14px;
-  left: 16px;
-  display: grid;
-  gap: 2px;
-  padding: 7px 10px;
-  border: 2px solid #052752;
-  border-radius: 4px;
-  background: rgba(232, 249, 255, 0.94);
-  box-shadow: 0 3px 0 #052752, 0 8px 20px rgba(1, 18, 46, 0.2);
-  color: #052752;
-  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
-  pointer-events: none;
-}
-
-.three-mechanic-hud span {
-  color: #3975a3;
-  font-size: 6px;
-  font-weight: 950;
-  letter-spacing: 0.1em;
-}
-
-.three-mechanic-hud b {
-  font-size: 11px;
-}
-
-.three-discover-controls {
-  position: absolute;
-  z-index: 5;
-  bottom: 12px;
-  left: 50%;
-  display: flex;
-  gap: 8px;
-  transform: translateX(-50%);
-}
-
-.three-discover-controls button {
-  display: grid;
-  min-width: 94px;
-  gap: 2px;
-  padding: 7px 9px;
-  border: 2px solid #052752;
-  border-radius: 8px;
-  background: #e5f5fc;
-  box-shadow: 0 3px 0 #052752;
-  color: #052752;
-  cursor: pointer;
-}
-
-.three-discover-controls button.is-selected {
-  background: #ffd63d;
-  transform: translateY(-4px);
-}
-
-.three-discover-controls button:disabled {
-  cursor: default;
-  opacity: 1;
-}
-
-.three-discover-controls b {
-  font-size: 8px;
-}
-
-.three-discover-controls small {
-  color: #3975a3;
-  font-size: 6px;
-  font-weight: 950;
 }
 
 .mechanic-readout {
@@ -2163,9 +2047,12 @@
   animation: review-zoom-in 420ms cubic-bezier(0.2, 1.2, 0.35, 1) both;
 }
 
-.review-zoom > .review-zoom-three {
-  width: min(430px, 84vw);
-  filter: none;
+.review-zoom > .review-zoom-card {
+  --review-tilt-x: 0deg;
+  --review-tilt-y: 0deg;
+  width: min(370px, 76vw);
+  transform: rotateX(var(--review-tilt-x)) rotateY(var(--review-tilt-y));
+  transition: transform 130ms ease;
 }
 
 .review-zoom-close {
@@ -2210,7 +2097,7 @@
     grid-template-columns: 1fr 250px;
   }
 
-  .review-three-pack {
+  .review-pack-preview {
     width: 240px;
   }
 
@@ -2290,8 +2177,7 @@
   }
 
   .review-flip-card,
-  .review-three-card,
-  .review-three-pack {
+  .review-pack-preview {
     width: min(270px, 78vw);
   }
 

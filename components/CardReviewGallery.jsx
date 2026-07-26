@@ -4,10 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ALL_CARDS, RARITIES, SETS, getCardArtId, getSet } from "../lib/gameData";
 import { cardMatchesAudit, getCardAudit } from "../lib/cardAudit";
 import { getCardRules } from "../lib/engineCards";
-import { PrintedCard } from "./PackworksGameClean";
+import { PackFace, PrintedCard } from "./PackworksGameClean";
 import MechanicsSimulator from "./MechanicsSimulator";
-import ThreeCardScene from "./ThreeCardScene";
-import ThreePackScene from "./ThreePackScene";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
 const RARITY_OPTIONS = Object.values(RARITIES);
@@ -18,9 +16,9 @@ const CARD_BACK_OPTIONS = [
   { id: "seal", label: "COLLECTOR SEAL", note: "Round tournament-style stamp" },
 ];
 
-function CardBack({ set }) {
+function CardBack({ set, style = "crest" }) {
   return (
-    <span className="card-back back-style-crest">
+    <span className={`card-back back-style-${style}`}>
       <span className="back-set">{set.short}</span>
       <span className="back-orbit"><i /><i /><i /></span>
       <span className="back-mark"><span><b>PW</b><small>PACKWORKS</small></span></span>
@@ -239,11 +237,11 @@ export default function CardReviewGallery() {
 
       <section className="review-motion-lab">
         <div className="review-motion-copy">
-          <span>THREE.JS OBJECT BAY</span>
+          <span>2D PRINT BAY</span>
           <h2>Printed card + sealed pack</h2>
           <p>
-            Move across either object to inspect physical depth and light response. Click to turn
-            it over. Holo portrait animation and foil are confined to the card front.
+            Inspect the exact lightweight prints used in the game. Click the card to turn it over.
+            Holo portrait animation and foil remain confined to the card front.
           </p>
           <button type="button" onClick={() => setFlipCard((current) => !current)}>
             {flipCard ? "TURN FACE DOWN" : "REVEAL CARD"}
@@ -266,22 +264,25 @@ export default function CardReviewGallery() {
             ))}
           </div>
         </div>
-        <ThreeCardScene
-          card={pilot}
-          foil={isHolo}
-          faceUp={flipCard}
-          onFlip={setFlipCard}
-          backStyle={backStyle}
-          className="review-three-card"
-          copyLabel={isHolo ? "HOLO TEST" : "STANDARD TEST"}
-          label="THREE.JS CARD"
-        />
-        <div className="review-three-pack">
-          <ThreePackScene
-            set={getSet(pilot.setId)}
-            paused={!playing}
-            label="CLICK TO TURN PACK"
-          />
+        <button
+          type="button"
+          className={`review-flip-card ${flipCard ? "is-revealed" : ""}`}
+          onClick={() => setFlipCard((current) => !current)}
+          onPointerMove={applyTilt}
+          onPointerLeave={clearTilt}
+          aria-label={`${flipCard ? "Turn" : "Reveal"} ${pilot.name}`}
+        >
+          <span className="review-flip-inner">
+            <CardBack set={getSet(pilot.setId)} style={backStyle} />
+            <PrintedCard
+              card={pilot}
+              foil={isHolo}
+              copyLabel={isHolo ? "HOLO TEST" : "STANDARD TEST"}
+            />
+          </span>
+        </button>
+        <div className="review-pack-preview">
+          <PackFace set={getSet(pilot.setId)} />
           <span>Same creature scene and print line used in the shop and opener.</span>
         </div>
         <div className="review-motion-spec">
@@ -292,8 +293,8 @@ export default function CardReviewGallery() {
           <span>Transparent PNG</span>
           <span>PixelLab v2 generation</span>
           <span>Front-only holo surface</span>
-          <span>Rounded thin card stock</span>
-          <span>Modeled foil pack seams</span>
+          <span>Rounded 2D card print</span>
+          <span>Lightweight CSS motion</span>
         </div>
       </section>
 
@@ -361,14 +362,16 @@ export default function CardReviewGallery() {
       {selected && (
         <div className="review-zoom" onMouseDown={() => setSelectedCard(null)}>
           <button className="review-zoom-close" type="button" onClick={() => setSelectedCard(null)}>CLOSE</button>
-          <div className="review-zoom-three" onMouseDown={(event) => event.stopPropagation()}>
-            <ThreeCardScene
+          <div
+            className="review-zoom-card"
+            onMouseDown={(event) => event.stopPropagation()}
+            onPointerMove={applyTilt}
+            onPointerLeave={clearTilt}
+          >
+            <PrintedCard
               card={selected}
               foil={isHolo}
-              initialFaceUp
               copyLabel={isHolo ? "HOLO QA" : "STANDARD QA"}
-              backStyle={backStyle}
-              label="DRAG LIGHT / CLICK TO TURN"
             />
           </div>
         </div>

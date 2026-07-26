@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ALL_CARDS, RARITIES, getCardRulesId, getSet } from "../lib/gameData";
 import { DISCOVER_POOL } from "../lib/engineCards";
 import { OpeningImpact, PrintedCard } from "./PackworksGameClean";
-import ThreeGlobalBurstLayer from "./ThreeGlobalBurstLayer";
-import ThreeMechanicsStage from "./ThreeMechanicsStage";
+import GlobalBurstLayer from "./GlobalBurstLayer";
 
 const MECHANICS = [
   {
@@ -538,13 +537,10 @@ export default function MechanicsSimulator({ paused = false }) {
             data-mechanic={mechanic.id}
             data-run={runId}
           >
-            <ThreeMechanicsStage
+            <MechanicVisual
               key={`${mechanicId}-${fxStyle}-${runId}`}
               mechanicId={mechanicId}
               runId={runId}
-              paused={paused}
-              slow={slow}
-              fxStyle={fxStyle}
               picked={picked}
               onPick={setPicked}
             />
@@ -561,9 +557,8 @@ export default function MechanicsSimulator({ paused = false }) {
         </div>
       </div>
       {globalBursts.length > 0 && (
-        <ThreeGlobalBurstLayer
+        <GlobalBurstLayer
           bursts={globalBursts}
-          size="compact"
           onComplete={(id) => {
             setGlobalBursts((current) => current.filter((burst) => burst.id !== id));
           }}

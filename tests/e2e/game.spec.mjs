@@ -45,6 +45,7 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   const first = page.locator(".reveal-card").first();
   await first.hover();
   await expect(first.locator(".rarity-signal")).toHaveCSS("opacity", "1");
+  await expect(first.locator(".rarity-signal")).toHaveText("");
   await page.screenshot({ path: "test-results/clean-pack-signals.png" });
 
   await revealAll(page);
@@ -283,7 +284,8 @@ test("the display case holds cards whose unique effects augment the game", async
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
   await page.getByRole("button", { name: "Pennigeon, 2 copies" }).click();
   const detail = page.locator(".clean-card-detail");
-  await expect(detail.locator(".game-detail-three-card canvas")).toBeVisible();
+  await expect(detail.locator(".clean-detail-art .card-front")).toBeVisible();
+  await expect(detail.locator("canvas")).toHaveCount(0);
   await expect(detail.locator(".clean-detail-copy")).toHaveCount(0);
   await expect(detail).toContainText("Whenever you reveal a Common");
   await detail.getByRole("button", { name: "DISPLAY IN CASE" }).click();
@@ -490,14 +492,14 @@ test("the card lab exposes every standard, holo, filter, zoom, and flip state", 
   await expect(mechanics.getByRole("heading", { name: "Mechanics Arena" })).toBeVisible();
   await expect(mechanics.locator(".mechanic-selector button")).toHaveCount(14);
   await expect(mechanics.locator(".mechanic-visual")).toHaveAttribute("data-mechanic", "discover");
-  const insight = mechanics.locator(".three-discover-controls button").filter({ hasText: "Insight" });
+  const insight = mechanics.locator(".mechanic-discover .discover-card").filter({ hasText: "Insight" });
   await insight.click();
-  await expect(insight).toHaveClass(/is-selected/);
+  await expect(insight).toHaveClass(/is-picked/);
 
   await mechanics.locator(".mechanic-selector button").nth(5).click();
   await expect(mechanics.locator(".mechanic-visual")).toHaveAttribute("data-mechanic", "fusion");
-  await expect(mechanics.locator(".three-mechanic-stage canvas")).toBeVisible();
-  await expect(mechanics.locator(".back-mark")).toHaveCount(0);
+  await expect(mechanics.locator(".mechanic-fusion")).toBeVisible();
+  await expect(mechanics.locator("canvas")).toHaveCount(0);
   await mechanics.getByRole("button", { name: "BROADCAST" }).click();
   await expect(mechanics).toHaveClass(/fx-broadcast/);
 
@@ -514,7 +516,8 @@ test("the card lab exposes every standard, holo, filter, zoom, and flip state", 
   await turn.click();
   await expect(page.getByRole("button", { name: "Turn Coinbud" })).toBeVisible();
   await page.waitForTimeout(720);
-  await expect(page.getByRole("button", { name: "Turn Coinbud" }).locator("canvas")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Turn Coinbud" }).locator(".card-front")).toBeVisible();
+  await expect(page.locator("canvas")).toHaveCount(0);
 
   await page.getByRole("button", { name: "STANDARD" }).click();
   await expect(page.locator(".review-grid .is-pixel-animated")).toHaveCount(0);

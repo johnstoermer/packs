@@ -60,9 +60,7 @@ import {
 } from "../lib/engineCards";
 import { createAudioEngine } from "../lib/audio";
 import { createHapticsEngine } from "../lib/haptics";
-import ThreeCardScene from "./ThreeCardScene";
-import ThreeGlobalBurstLayer from "./ThreeGlobalBurstLayer";
-import ThreePackScene from "./ThreePackScene";
+import GlobalBurstLayer from "./GlobalBurstLayer";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
 const PIXEL_ART_VERSION = "20260726-2";
@@ -208,7 +206,7 @@ function PackCreatureArt({ card }) {
   );
 }
 
-function PackFace({ set, small = false }) {
+export function PackFace({ set, small = false }) {
   const featured = [...set.cards]
     .sort((left, right) => (
       RARITIES[right.rarity].order - RARITIES[left.rarity].order
@@ -360,42 +358,25 @@ function RevealCard({
           <b className="reveal-echo-chip">ECHO{echo.count > 1 ? ` ×${echo.count}` : ""}</b>
         </span>
       )}
-      <span className="reveal-card-inner has-three-card">
-        <span className="reveal-card-fallback" aria-hidden="true">
-          <span className="card-back back-style-crest">
-            <span className="back-set">{set.short}</span>
-            <span className="back-orbit"><i /><i /><i /></span>
-            <span className="back-mark"><span><b>PW</b><small>PACKWORKS</small></span></span>
-            <span className="back-rule" />
-          </span>
-          <PrintedCard
-            card={pull.card}
-            rarityId={pull.rarity}
-            copyLabel={copyLabel}
-            foil={pull.foil}
-            misprintDetected={pull.misprintDetected}
-          />
+      <span className="reveal-card-inner">
+        <span className="card-back back-style-crest">
+          <span className="back-set">{set.short}</span>
+          <span className="back-orbit"><i /><i /><i /></span>
+          <span className="back-mark"><span><b>PW</b><small>PACKWORKS</small></span></span>
+          <span className="back-rule" />
+          {!revealed && (
+            <span className="rarity-signal rarity-signal-quiet" style={{ "--rarity": signal.color }} aria-hidden="true">
+              <i />
+            </span>
+          )}
         </span>
-        <ThreeCardScene
+        <PrintedCard
           card={pull.card}
           rarityId={pull.rarity}
-          foil={pull.foil}
-          faceUp={revealed}
-          interactive={false}
-          paused={phase === "summary"}
-          autoFloat={false}
-          backStyle="crest"
           copyLabel={copyLabel}
-          wrapper="span"
-          className="reveal-three-card"
+          foil={pull.foil}
+          misprintDetected={pull.misprintDetected}
         />
-        {!revealed && (
-          <span className="rarity-signal three-rarity-signal" style={{ "--rarity": signal.color }}>
-            <i />
-            <b>{signal.label}</b>
-            <small>{signal.rateLabel} BASE / CLICK TO REVEAL</small>
-          </span>
-        )}
       </span>
     </button>
   );
@@ -574,15 +555,8 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
                 key={set.id}
                 style={{ "--stock-a": set.colors[0], "--stock-b": set.colors[1], "--stock-c": set.colors[2] }}
               >
-                <span className="shop-pack-preview shop-pack-preview-three" aria-hidden="true">
-                  <ThreePackScene
-                    set={set}
-                    interactive={false}
-                    paused
-                    wrapper="span"
-                    label=""
-                    className="shop-three-pack"
-                  />
+                <span className="shop-pack-preview" aria-hidden="true">
+                  <PackFace set={set} small />
                 </span>
                 <button
                   className="clean-stock-info"
@@ -752,17 +726,10 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
         </button>
         <div className={`clean-detail-art card-zoom-card${count ? "" : " is-missing"}`}>
           {count ? (
-            <ThreeCardScene
+            <PrintedCard
               card={card}
               rarityId={rarityId}
-              foil={false}
-              faceUp
-              initialFaceUp
-              interactive
-              autoFloat
-              backStyle="crest"
               copyLabel={`${count} ${count === 1 ? "COPY" : "COPIES"}`}
-              className="game-detail-three-card"
             />
           ) : (
             <span className="card-back card-zoom-back back-style-crest" aria-label={`Card ${String(card.number).padStart(2, "0")}, not found`}>
@@ -1861,15 +1828,9 @@ export default function PackworksGameClean() {
           aria-label={loosePacks ? `Open a pack. ${loosePacks} ready.` : "Open the pack shop"}
         >
           <span className="clean-pack-shadow" />
-          <span className="clean-pack-stack clean-pack-stack-three">
+          <span className="clean-pack-stack">
             <i /><i />
-            <ThreePackScene
-              set={activeSet}
-              interactive={false}
-              wrapper="span"
-              label=""
-              className="game-table-three-pack"
-            />
+            <PackFace set={activeSet} />
           </span>
           <span className="clean-open-copy">
             <strong>OPEN PACK</strong>
@@ -2134,9 +2095,8 @@ export default function PackworksGameClean() {
       )}
 
       {globalBursts.length > 0 && (
-        <ThreeGlobalBurstLayer
+        <GlobalBurstLayer
           bursts={globalBursts}
-          size="compact"
           onComplete={(id) => {
             setGlobalBursts((current) => current.filter((burst) => burst.id !== id));
           }}

@@ -2867,76 +2867,159 @@ button.clean-case-slot.is-empty:hover {
   .reveal-echo-flash { animation-iteration-count: 1; }
 }
 
-/* Shared, compact Three.js bursts can fire over any menu without taking over
-   the screen. One renderer handles independently timed retriggers. */
+/* Shared lightweight bursts can fire over any menu without taking it over. */
 
-.three-global-burst-layer,
-.three-global-burst-canvas {
+.global-burst-layer {
   position: fixed;
   inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
+  z-index: 180;
   pointer-events: none;
 }
 
-.three-global-burst-layer {
-  z-index: 180;
-}
-
-.three-global-burst-canvas {
-  z-index: 0;
-}
-
-.reduced-effects .three-global-burst-layer {
+.reduced-effects .global-burst-layer {
   display: none;
 }
 
-.global-burst-label {
-  --burst-accent: #77efff;
+.global-burst {
   position: fixed;
-  top: calc(50px + var(--burst-slot) * 34px);
-  right: clamp(28px, 8vw, 112px);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  animation: global-burst-fade 1.4s ease-out both;
+}
+
+.global-burst-pack {
+  position: relative;
   z-index: 2;
-  padding: 5px 9px 4px;
-  border: 2px solid #042650;
-  border-radius: 4px;
-  background: #f4fbff;
-  box-shadow:
-    inset 0 -3px color-mix(in srgb, var(--burst-accent) 55%, #ffffff),
-    0 3px 0 #042650,
-    0 8px 18px rgba(1, 19, 45, 0.24);
+  width: 88px;
+  height: 122px;
+}
+
+.global-burst-pack b {
+  position: absolute;
+  top: -36px;
+  left: 50%;
+  min-width: max-content;
+  padding: 7px 11px 6px;
+  border: 3px solid #052752;
+  border-radius: 9px;
+  background: #ffd63d;
+  box-shadow: 0 4px 0 #052752;
   color: #052752;
-  font: 950 9px/1 "Trebuchet MS", Arial, sans-serif;
+  font: 950 10px/1 "Trebuchet MS", Arial, sans-serif;
   letter-spacing: 0.08em;
-  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
-  animation: global-burst-label 1.18s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  transform: translateX(-50%);
 }
 
-.global-burst-label.is-salvage {
-  --burst-accent: #63e7d6;
+.global-burst-half {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  border: 3px solid #052752;
+  background: repeating-linear-gradient(135deg, #ffd63d 0 10px, #f2673d 10px 20px);
+  box-shadow: 0 0 0 3px #fff9dc, 0 0 24px rgba(255, 214, 61, 0.7);
 }
 
-.global-burst-label.is-fracture {
-  --burst-accent: #ff7a61;
+.global-burst-half.is-left {
+  left: 0;
+  border-radius: 12px 0 0 12px;
+  animation: global-burst-left 520ms cubic-bezier(0.15, 0.75, 0.25, 1) both;
 }
 
-@keyframes global-burst-label {
-  0% { opacity: 0; transform: translateY(-7px) scale(0.72); }
-  14%, 72% { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: translateY(-4px) scale(0.92); }
+.global-burst-half.is-right {
+  right: 0;
+  border-radius: 0 12px 12px 0;
+  animation: global-burst-right 520ms cubic-bezier(0.15, 0.75, 0.25, 1) both;
 }
 
-@media (max-width: 719px) {
-  .global-burst-label {
-    top: calc(38px + var(--burst-slot) * 30px);
-    right: 50%;
-    transform: translateX(50%);
-  }
+.global-burst-cards {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
 
-  @keyframes global-burst-label {
-    0% { opacity: 0; transform: translateX(50%) translateY(-7px) scale(0.72); }
-    14%, 72% { opacity: 1; transform: translateX(50%); }
-    100% { opacity: 0; transform: translateX(50%) translateY(-4px) scale(0.92); }
+.global-burst-card {
+  --angle: calc((var(--i) - (var(--n) - 1) / 2) * (160deg / max(var(--n) - 1, 1)));
+  position: absolute;
+  width: 44px;
+  height: 62px;
+  border: 3px solid #052752;
+  border-radius: 7px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rarity) 55%, white), #e9f7ff);
+  box-shadow: 0 4px 0 #052752, 0 0 16px color-mix(in srgb, var(--rarity) 55%, transparent);
+  opacity: 0;
+  animation: global-burst-card 1.1s cubic-bezier(0.16, 0.8, 0.3, 1) both;
+  animation-delay: calc(80ms + var(--i) * 42ms);
+}
+
+.burst-fracture .global-burst-pack b {
+  background: #ff8a68;
+}
+
+.burst-fracture .global-burst-half {
+  background: repeating-linear-gradient(45deg, #72e5ff 0 9px, #0b65ad 9px 18px);
+  box-shadow: 0 0 0 3px #e9f8ff, 0 0 30px rgba(114, 229, 255, 0.78);
+}
+
+.burst-fracture .global-burst-half.is-left {
+  animation-name: global-fracture-left;
+}
+
+.burst-fracture .global-burst-half.is-right {
+  animation-name: global-fracture-right;
+}
+
+.burst-fracture .global-burst-card {
+  animation-name: global-fracture-card;
+}
+
+@keyframes global-burst-fade {
+  0% { opacity: 0; }
+  8%, 78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes global-burst-left {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate(-78px, -20px) rotate(-24deg); }
+}
+
+@keyframes global-burst-right {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate(78px, -20px) rotate(24deg); }
+}
+
+@keyframes global-fracture-left {
+  0%, 20% { opacity: 1; transform: none; }
+  38% { transform: translateX(-10px) rotate(-3deg); }
+  100% { opacity: 0; transform: translate(-118px, 34px) rotate(-42deg); }
+}
+
+@keyframes global-fracture-right {
+  0%, 20% { opacity: 1; transform: none; }
+  38% { transform: translateX(10px) rotate(3deg); }
+  100% { opacity: 0; transform: translate(118px, -34px) rotate(42deg); }
+}
+
+@keyframes global-burst-card {
+  0% { opacity: 0; transform: rotate(var(--angle)) translateY(0) rotate(calc(var(--angle) * -1)) scale(0.4); }
+  20% { opacity: 1; }
+  62% { opacity: 1; transform: rotate(var(--angle)) translateY(-122px) rotate(calc(var(--angle) * -1)) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--angle)) translateY(-150px) rotate(calc(var(--angle) * -1)) scale(0.9); }
+}
+
+@keyframes global-fracture-card {
+  0%, 16% { opacity: 0; transform: translateY(0) rotate(0) scale(0.35); }
+  34% { opacity: 1; }
+  74% { opacity: 1; transform: translate(calc((var(--i) - 3) * 54px), calc((var(--i) % 2) * 80px - 92px)) rotate(calc((var(--i) - 3) * 7deg)) scale(1); }
+  100% { opacity: 0; transform: translate(calc((var(--i) - 3) * 62px), calc((var(--i) % 2) * 92px - 112px)) rotate(calc((var(--i) - 3) * 9deg)) scale(0.94); }
+}
+
+@media (max-width: 620px) {
+  .global-burst {
+    transform: scale(0.78);
   }
 }
