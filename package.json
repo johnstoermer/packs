@@ -11,13 +11,16 @@
     "start": "next start",
     "test": "node --test tests/*.test.mjs",
     "test:e2e": "playwright test",
+    "art:pixellab": "node scripts/generate-pixellab-art.mjs",
+    "art:audit": "node scripts/audit-pixellab-art.mjs",
     "simulate": "node scripts/simulate-balance.mjs"
   },
   "dependencies": {
     "augmented-ui": "^2.0.0",
     "next": "16.2.11",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@playwright/test": "1.62.0"

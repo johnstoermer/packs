@@ -1,0 +1,905 @@
+{
+  "provider": "PixelLab v2",
+  "frameCount": 4,
+  "frameSize": 128,
+  "generatedAt": "2026-07-26T14:31:21.461Z",
+  "cards": [
+    {
+      "id": "marquee-01",
+      "legacyId": "corner-01",
+      "name": "Coinbud",
+      "generated": true,
+      "static": "/card-art-pixel/corner/01/frame-0.png",
+      "holo": "/card-art-pixel/corner/01/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Coinbud's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-02",
+      "legacyId": "corner-02",
+      "name": "Pennigeon",
+      "generated": true,
+      "static": "/card-art-pixel/corner/02/frame-0.png",
+      "holo": "/card-art-pixel/corner/02/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Pennigeon's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-03",
+      "legacyId": "corner-03",
+      "name": "Duplop",
+      "generated": true,
+      "static": "/card-art-pixel/corner/03/frame-0.png",
+      "holo": "/card-art-pixel/corner/03/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Duplop's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-05",
+      "legacyId": "corner-05",
+      "name": "Bankslime",
+      "generated": true,
+      "static": "/card-art-pixel/corner/05/frame-0.png",
+      "holo": "/card-art-pixel/corner/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Bankslime's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, a few chunky golden coin tokens bouncing nearby, a bead counter clicking to its final notch. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-09",
+      "legacyId": "corner-09",
+      "name": "Packross",
+      "generated": true,
+      "static": "/card-art-pixel/corner/09/frame-0.png",
+      "holo": "/card-art-pixel/corner/09/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Packross's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-10",
+      "legacyId": "corner-10",
+      "name": "Echowl",
+      "generated": true,
+      "static": "/card-art-pixel/corner/10/frame-0.png",
+      "holo": "/card-art-pixel/corner/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Echowl's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-12",
+      "legacyId": "circuit-01",
+      "name": "Marklet",
+      "generated": true,
+      "static": "/card-art-pixel/circuit/01/frame-0.png",
+      "holo": "/card-art-pixel/circuit/01/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Marklet's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-13",
+      "legacyId": "circuit-02",
+      "name": "Bountibot",
+      "generated": true,
+      "static": "/card-art-pixel/circuit/02/frame-0.png",
+      "holo": "/card-art-pixel/circuit/02/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Bountibot's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-14",
+      "legacyId": "circuit-03",
+      "name": "Cresthopper",
+      "generated": true,
+      "static": "/card-art-pixel/circuit/03/frame-0.png",
+      "holo": "/card-art-pixel/circuit/03/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Cresthopper's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-15",
+      "legacyId": "circuit-04",
+      "name": "Glyphguard",
+      "generated": true,
+      "static": "/card-art-pixel/circuit/04/frame-0.png",
+      "holo": "/card-art-pixel/circuit/04/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Glyphguard's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-19",
+      "legacyId": "observatory-11",
+      "name": "Questchrome",
+      "generated": true,
+      "static": "/card-art-pixel/observatory/11/frame-0.png",
+      "holo": "/card-art-pixel/observatory/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Questchrome's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a floating compass and three sparkling path icons, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-20",
+      "legacyId": "circuit-09",
+      "name": "Reverbogre",
+      "generated": true,
+      "static": "/card-art-pixel/circuit/09/frame-0.png",
+      "holo": "/card-art-pixel/circuit/09/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Reverbogre's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "marquee-22",
+      "legacyId": "corner-07",
+      "name": "Echoboard",
+      "generated": true,
+      "static": "/card-art-pixel/corner/07/frame-0.png",
+      "holo": "/card-art-pixel/corner/07/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Echoboard's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-23",
+      "legacyId": "unwritten-09",
+      "name": "Resonash",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/09/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/09/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Resonash's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a small sealed card pack tucked into its gear, a faceted rarity gem shining above it. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-28",
+      "legacyId": "prism-07",
+      "name": "Questhorn",
+      "generated": true,
+      "static": "/card-art-pixel/prism/07/frame-0.png",
+      "holo": "/card-art-pixel/prism/07/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Questhorn's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons, a small sealed card pack tucked into its gear, a faceted rarity gem shining above it. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-29",
+      "legacyId": "crown-07",
+      "name": "Pacturion",
+      "generated": true,
+      "static": "/card-art-pixel/crown/07/frame-0.png",
+      "holo": "/card-art-pixel/crown/07/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Pacturion's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "marquee-30",
+      "legacyId": "crown-08",
+      "name": "Heraldthorn",
+      "generated": true,
+      "static": "/card-art-pixel/crown/08/frame-0.png",
+      "holo": "/card-art-pixel/crown/08/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Heraldthorn's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear, two sonar rings switching from blue to gold. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "marquee-32",
+      "legacyId": "crown-09",
+      "name": "Coincrow",
+      "generated": true,
+      "static": "/card-art-pixel/crown/09/frame-0.png",
+      "holo": "/card-art-pixel/crown/09/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Coincrow's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "marquee-33",
+      "legacyId": "crown-10",
+      "name": "Regalynx",
+      "generated": true,
+      "static": "/card-art-pixel/crown/10/frame-0.png",
+      "holo": "/card-art-pixel/crown/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Regalynx's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear, a bead counter clicking to its final notch. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "marquee-34",
+      "legacyId": "circuit-12",
+      "name": "Zeraph",
+      "generated": true,
+      "static": "/card-art-pixel/circuit/12/frame-0.png",
+      "holo": "/card-art-pixel/circuit/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Zeraph's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "marquee-35",
+      "legacyId": "crown-11",
+      "name": "Locklure",
+      "generated": true,
+      "static": "/card-art-pixel/crown/11/frame-0.png",
+      "holo": "/card-art-pixel/crown/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Locklure's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "marquee-36",
+      "legacyId": "corner-08",
+      "name": "Questcap",
+      "generated": true,
+      "static": "/card-art-pixel/corner/08/frame-0.png",
+      "holo": "/card-art-pixel/corner/08/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Questcap's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-37",
+      "legacyId": "observatory-02",
+      "name": "Truescope",
+      "generated": true,
+      "static": "/card-art-pixel/observatory/02/frame-0.png",
+      "holo": "/card-art-pixel/observatory/02/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Truescope's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-39",
+      "legacyId": "observatory-04",
+      "name": "Halomorph",
+      "generated": true,
+      "static": "/card-art-pixel/observatory/04/frame-0.png",
+      "holo": "/card-art-pixel/observatory/04/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Halomorph's exact anatomy, colors, markings, scale, outline, and centered position unchanged. color-shifting crystal bands transforming around its body, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-41",
+      "legacyId": "lastlight-10",
+      "name": "Questhound",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/10/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Questhound's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-42",
+      "legacyId": "observatory-06",
+      "name": "Lunaglyph",
+      "generated": true,
+      "static": "/card-art-pixel/observatory/06/frame-0.png",
+      "holo": "/card-art-pixel/observatory/06/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Lunaglyph's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "marquee-43",
+      "legacyId": "observatory-07",
+      "name": "Firstseer",
+      "generated": true,
+      "static": "/card-art-pixel/observatory/07/frame-0.png",
+      "holo": "/card-art-pixel/observatory/07/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Firstseer's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-01",
+      "legacyId": "apocalypse-04",
+      "name": "Scrapactus",
+      "generated": true,
+      "static": "/card-art-pixel/apocalypse/04/frame-0.png",
+      "holo": "/card-art-pixel/apocalypse/04/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Scrapactus's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-02",
+      "legacyId": "apocalypse-03",
+      "name": "Salvatort",
+      "generated": true,
+      "static": "/card-art-pixel/apocalypse/03/frame-0.png",
+      "holo": "/card-art-pixel/apocalypse/03/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Salvatort's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, a bead counter clicking to its final notch. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-07",
+      "legacyId": "signal-12",
+      "name": "Salvoon",
+      "generated": true,
+      "static": "/card-art-pixel/signal/12/frame-0.png",
+      "holo": "/card-art-pixel/signal/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Salvoon's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-09",
+      "legacyId": "unwritten-08",
+      "name": "Goldgorge",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/08/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/08/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Goldgorge's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-11",
+      "legacyId": "lastlight-11",
+      "name": "Reclaimotive",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/11/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Reclaimotive's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a tiny mystery pack assembled from colorful reclaimed scraps. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-15",
+      "legacyId": "unwritten-05",
+      "name": "Futurwake",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/05/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Futurwake's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-19",
+      "legacyId": "lastlight-09",
+      "name": "Twinmoon",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/09/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/09/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Twinmoon's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-22",
+      "legacyId": "harbor-11",
+      "name": "Resofleet",
+      "generated": true,
+      "static": "/card-art-pixel/harbor/11/frame-0.png",
+      "holo": "/card-art-pixel/harbor/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Resofleet's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-25",
+      "legacyId": "signal-03",
+      "name": "Acceloray",
+      "generated": true,
+      "static": "/card-art-pixel/signal/03/frame-0.png",
+      "holo": "/card-art-pixel/signal/03/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Acceloray's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-26",
+      "legacyId": "signal-04",
+      "name": "Mystinaut",
+      "generated": true,
+      "static": "/card-art-pixel/signal/04/frame-0.png",
+      "holo": "/card-art-pixel/signal/04/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Mystinaut's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-34",
+      "legacyId": "harbor-12",
+      "name": "Portalink",
+      "generated": true,
+      "static": "/card-art-pixel/harbor/12/frame-0.png",
+      "holo": "/card-art-pixel/harbor/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Portalink's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear, a chain of light hopping toward a companion off-frame. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "tideworks-35",
+      "legacyId": "signal-01",
+      "name": "Omniocean",
+      "generated": true,
+      "static": "/card-art-pixel/signal/01/frame-0.png",
+      "holo": "/card-art-pixel/signal/01/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Omniocean's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-36",
+      "legacyId": "signal-05",
+      "name": "Scrapcup",
+      "generated": true,
+      "static": "/card-art-pixel/signal/05/frame-0.png",
+      "holo": "/card-art-pixel/signal/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Scrapcup's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, a small sealed card pack tucked into its gear, a faceted rarity gem shining above it. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-37",
+      "legacyId": "apocalypse-02",
+      "name": "Coinhalo",
+      "generated": true,
+      "static": "/card-art-pixel/apocalypse/02/frame-0.png",
+      "holo": "/card-art-pixel/apocalypse/02/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Coinhalo's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-41",
+      "legacyId": "hollow-09",
+      "name": "Accelence",
+      "generated": true,
+      "static": "/card-art-pixel/hollow/09/frame-0.png",
+      "holo": "/card-art-pixel/hollow/09/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Accelence's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-43",
+      "legacyId": "apocalypse-08",
+      "name": "Rarehouse",
+      "generated": true,
+      "static": "/card-art-pixel/apocalypse/08/frame-0.png",
+      "holo": "/card-art-pixel/apocalypse/08/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Rarehouse's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear, a faceted rarity gem shining above it. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "tideworks-45",
+      "legacyId": "apocalypse-10",
+      "name": "Foldouble",
+      "generated": true,
+      "static": "/card-art-pixel/apocalypse/10/frame-0.png",
+      "holo": "/card-art-pixel/apocalypse/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Foldouble's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-01",
+      "legacyId": "unwritten-02",
+      "name": "Tripmoss",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/02/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/02/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Tripmoss's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-02",
+      "legacyId": "unwritten-06",
+      "name": "Coinfern",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/06/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/06/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Coinfern's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-03",
+      "legacyId": "hollow-08",
+      "name": "Mergeimp",
+      "generated": true,
+      "static": "/card-art-pixel/hollow/08/frame-0.png",
+      "holo": "/card-art-pixel/hollow/08/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Mergeimp's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-04",
+      "legacyId": "unwritten-07",
+      "name": "Fusihare",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/07/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/07/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Fusihare's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-05",
+      "legacyId": "foundry-11",
+      "name": "Recyclen",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/11/frame-0.png",
+      "holo": "/card-art-pixel/foundry/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Recyclen's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, two small energy motes merging into a stronger crystal, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-06",
+      "legacyId": "foundry-02",
+      "name": "Liftvine",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/02/frame-0.png",
+      "holo": "/card-art-pixel/foundry/02/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Liftvine's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-07",
+      "legacyId": "lastlight-08",
+      "name": "Orchiforge",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/08/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/08/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Orchiforge's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-08",
+      "legacyId": "prism-11",
+      "name": "Catalystag",
+      "generated": true,
+      "static": "/card-art-pixel/prism/11/frame-0.png",
+      "holo": "/card-art-pixel/prism/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Catalystag's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a small sealed card pack tucked into its gear, a faceted rarity gem shining above it. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-09",
+      "legacyId": "foundry-01",
+      "name": "Boiloreverb",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/01/frame-0.png",
+      "holo": "/card-art-pixel/foundry/01/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Boiloreverb's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, two small energy motes merging into a stronger crystal, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-10",
+      "legacyId": "prism-10",
+      "name": "Crosscanopy",
+      "generated": true,
+      "static": "/card-art-pixel/prism/10/frame-0.png",
+      "holo": "/card-art-pixel/prism/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Crosscanopy's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-11",
+      "legacyId": "corner-11",
+      "name": "Fusigrove",
+      "generated": true,
+      "static": "/card-art-pixel/corner/11/frame-0.png",
+      "holo": "/card-art-pixel/corner/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Fusigrove's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a floating compass and three sparkling path icons, a bead counter clicking to its final notch. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-12",
+      "legacyId": "unwritten-10",
+      "name": "Cracktoad",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/10/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Cracktoad's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a harmless glowing rift cracking open behind a sealed card pack, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-14",
+      "legacyId": "apocalypse-05",
+      "name": "Coalcrack",
+      "generated": true,
+      "static": "/card-art-pixel/apocalypse/05/frame-0.png",
+      "holo": "/card-art-pixel/apocalypse/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Coalcrack's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a harmless glowing rift cracking open behind a sealed card pack, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-16",
+      "legacyId": "hollow-10",
+      "name": "Sootroc",
+      "generated": true,
+      "static": "/card-art-pixel/hollow/10/frame-0.png",
+      "holo": "/card-art-pixel/hollow/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Sootroc's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear, a faceted rarity gem shining above it. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-17",
+      "legacyId": "unwritten-11",
+      "name": "Wildductor",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/11/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Wildductor's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a harmless glowing rift cracking open behind a sealed card pack, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-19",
+      "legacyId": "lastlight-04",
+      "name": "Sigilnomad",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/04/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/04/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Sigilnomad's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a harmless glowing rift cracking open behind a sealed card pack, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-21",
+      "legacyId": "prism-06",
+      "name": "Riftclipse",
+      "generated": true,
+      "static": "/card-art-pixel/prism/06/frame-0.png",
+      "holo": "/card-art-pixel/prism/06/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Riftclipse's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a harmless glowing rift cracking open behind a sealed card pack, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-22",
+      "legacyId": "unwritten-04",
+      "name": "Cinderscrap",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/04/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/04/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Cinderscrap's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, a harmless glowing rift cracking open behind a sealed card pack, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-23",
+      "legacyId": "corner-12",
+      "name": "Resonewt",
+      "generated": true,
+      "static": "/card-art-pixel/corner/12/frame-0.png",
+      "holo": "/card-art-pixel/corner/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Resonewt's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-27",
+      "legacyId": "hollow-05",
+      "name": "Encorekeep",
+      "generated": true,
+      "static": "/card-art-pixel/hollow/05/frame-0.png",
+      "holo": "/card-art-pixel/hollow/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Encorekeep's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-28",
+      "legacyId": "hollow-06",
+      "name": "Meteormint",
+      "generated": true,
+      "static": "/card-art-pixel/hollow/06/frame-0.png",
+      "holo": "/card-art-pixel/hollow/06/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Meteormint's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-31",
+      "legacyId": "verdant-12",
+      "name": "Heartmerge",
+      "generated": true,
+      "static": "/card-art-pixel/verdant/12/frame-0.png",
+      "holo": "/card-art-pixel/verdant/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Heartmerge's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "forgeline-35",
+      "legacyId": "hollow-11",
+      "name": "Rootpack",
+      "generated": true,
+      "static": "/card-art-pixel/hollow/11/frame-0.png",
+      "holo": "/card-art-pixel/hollow/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Rootpack's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-38",
+      "legacyId": "foundry-03",
+      "name": "Foilpress",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/03/frame-0.png",
+      "holo": "/card-art-pixel/foundry/03/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Foilpress's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a controlled rainbow-metal glint across its markings, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-39",
+      "legacyId": "foundry-04",
+      "name": "Coinwelder",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/04/frame-0.png",
+      "holo": "/card-art-pixel/foundry/04/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Coinwelder's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-40",
+      "legacyId": "foundry-05",
+      "name": "Bellpack",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/05/frame-0.png",
+      "holo": "/card-art-pixel/foundry/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Bellpack's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-41",
+      "legacyId": "foundry-06",
+      "name": "Scrapanvil",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/06/frame-0.png",
+      "holo": "/card-art-pixel/foundry/06/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Scrapanvil's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a tiny mystery pack assembled from colorful reclaimed scraps, two small energy motes merging into a stronger crystal, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-42",
+      "legacyId": "foundry-07",
+      "name": "Riftforge",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/07/frame-0.png",
+      "holo": "/card-art-pixel/foundry/07/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Riftforge's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a harmless glowing rift cracking open behind a sealed card pack, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "forgeline-43",
+      "legacyId": "foundry-08",
+      "name": "Coincrucible",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/08/frame-0.png",
+      "holo": "/card-art-pixel/foundry/08/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Coincrucible's exact anatomy, colors, markings, scale, outline, and centered position unchanged. color-shifting crystal bands transforming around its body, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-45",
+      "legacyId": "foundry-10",
+      "name": "Questhammer",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/10/frame-0.png",
+      "holo": "/card-art-pixel/foundry/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Questhammer's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal, a floating compass and three sparkling path icons, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "forgeline-47",
+      "legacyId": "foundry-12",
+      "name": "Twinforge",
+      "generated": true,
+      "static": "/card-art-pixel/foundry/12/frame-0.png",
+      "holo": "/card-art-pixel/foundry/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Twinforge's exact anatomy, colors, markings, scale, outline, and centered position unchanged. two small energy motes merging into a stronger crystal. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "mirrorfield-01",
+      "legacyId": "abyss-01",
+      "name": "Mimipolyp",
+      "generated": true,
+      "static": "/card-art-pixel/abyss/01/frame-0.png",
+      "holo": "/card-art-pixel/abyss/01/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Mimipolyp's exact anatomy, colors, markings, scale, outline, and centered position unchanged. one friendly mirrored double made of light, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "mirrorfield-04",
+      "legacyId": "observatory-09",
+      "name": "Sigilshell",
+      "generated": true,
+      "static": "/card-art-pixel/observatory/09/frame-0.png",
+      "holo": "/card-art-pixel/observatory/09/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Sigilshell's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, one friendly mirrored double made of light, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-05",
+      "legacyId": "lastlight-03",
+      "name": "Firstfin",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/03/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/03/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Firstfin's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-06",
+      "legacyId": "observatory-10",
+      "name": "Twinjelly",
+      "generated": true,
+      "static": "/card-art-pixel/observatory/10/frame-0.png",
+      "holo": "/card-art-pixel/observatory/10/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Twinjelly's exact anatomy, colors, markings, scale, outline, and centered position unchanged. one friendly mirrored double made of light, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-13",
+      "legacyId": "lastlight-05",
+      "name": "Shiftguin",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/05/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Shiftguin's exact anatomy, colors, markings, scale, outline, and centered position unchanged. color-shifting crystal bands transforming around its body, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-14",
+      "legacyId": "prism-05",
+      "name": "Cryoworm",
+      "generated": true,
+      "static": "/card-art-pixel/prism/05/frame-0.png",
+      "holo": "/card-art-pixel/prism/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Cryoworm's exact anatomy, colors, markings, scale, outline, and centered position unchanged. color-shifting crystal bands transforming around its body. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-18",
+      "legacyId": "circuit-05",
+      "name": "Glyphcurator",
+      "generated": true,
+      "static": "/card-art-pixel/circuit/05/frame-0.png",
+      "holo": "/card-art-pixel/circuit/05/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Glyphcurator's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, color-shifting crystal bands transforming around its body, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-22",
+      "legacyId": "glass-11",
+      "name": "Reflectome",
+      "generated": true,
+      "static": "/card-art-pixel/glass/11/frame-0.png",
+      "holo": "/card-art-pixel/glass/11/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Reflectome's exact anatomy, colors, markings, scale, outline, and centered position unchanged. color-shifting crystal bands transforming around its body, a small sealed card pack tucked into its gear, a faceted rarity gem shining above it. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-24",
+      "legacyId": "lastlight-01",
+      "name": "Parcelglyph",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/01/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/01/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Parcelglyph's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a bright star-shaped sigil pulsing above its brow, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-26",
+      "legacyId": "corner-06",
+      "name": "Foilmonk",
+      "generated": true,
+      "static": "/card-art-pixel/corner/06/frame-0.png",
+      "holo": "/card-art-pixel/corner/06/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Foilmonk's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a controlled rainbow-metal glint across its markings, a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-28",
+      "legacyId": "prism-02",
+      "name": "Foilvan",
+      "generated": true,
+      "static": "/card-art-pixel/prism/02/frame-0.png",
+      "holo": "/card-art-pixel/prism/02/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Foilvan's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a controlled rainbow-metal glint across its markings, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-31",
+      "legacyId": "abyss-12",
+      "name": "Mimistar",
+      "generated": true,
+      "static": "/card-art-pixel/abyss/12/frame-0.png",
+      "holo": "/card-art-pixel/abyss/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Mimistar's exact anatomy, colors, markings, scale, outline, and centered position unchanged. one friendly mirrored double made of light, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "mirrorfield-34",
+      "legacyId": "polar-12",
+      "name": "Absolumute",
+      "generated": true,
+      "static": "/card-art-pixel/polar/12/frame-0.png",
+      "holo": "/card-art-pixel/polar/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Absolumute's exact anatomy, colors, markings, scale, outline, and centered position unchanged. color-shifting crystal bands transforming around its body, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "mirrorfield-45",
+      "legacyId": "prism-09",
+      "name": "Prismorph",
+      "generated": true,
+      "static": "/card-art-pixel/prism/09/frame-0.png",
+      "holo": "/card-art-pixel/prism/09/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Prismorph's exact anatomy, colors, markings, scale, outline, and centered position unchanged. color-shifting crystal bands transforming around its body. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "mirrorfield-48",
+      "legacyId": "prism-12",
+      "name": "Omniecho",
+      "generated": true,
+      "static": "/card-art-pixel/prism/12/frame-0.png",
+      "holo": "/card-art-pixel/prism/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Omniecho's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "lastarchive-06",
+      "legacyId": "unwritten-01",
+      "name": "Casecho",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/01/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/01/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Casecho's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a few chunky golden coin tokens bouncing nearby, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "lastarchive-13",
+      "legacyId": "corner-04",
+      "name": "Choicopper",
+      "generated": true,
+      "static": "/card-art-pixel/corner/04/frame-0.png",
+      "holo": "/card-art-pixel/corner/04/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Choicopper's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "lastarchive-24",
+      "legacyId": "lastlight-02",
+      "name": "Nightecho",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/02/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/02/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Nightecho's exact anatomy, colors, markings, scale, outline, and centered position unchanged. soft spectral afterimages orbiting in rhythm, a small sealed card pack tucked into its gear, a faceted rarity gem shining above it. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "lastarchive-29",
+      "legacyId": "lastlight-07",
+      "name": "Dawnrift",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/07/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/07/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Dawnrift's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a harmless glowing rift cracking open behind a sealed card pack, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "lastarchive-34",
+      "legacyId": "orchard-12",
+      "name": "Autoharvest",
+      "generated": true,
+      "static": "/card-art-pixel/orchard/12/frame-0.png",
+      "holo": "/card-art-pixel/orchard/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Autoharvest's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one.",
+      "skipped": false
+    },
+    {
+      "id": "lastarchive-38",
+      "legacyId": "unwritten-03",
+      "name": "Futureword",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/03/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/03/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Futureword's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a sealed mystery parcel with a question-star emblem, a small sealed card pack tucked into its gear. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "lastarchive-47",
+      "legacyId": "lastlight-12",
+      "name": "Luxquest",
+      "generated": true,
+      "static": "/card-art-pixel/lastlight/12/frame-0.png",
+      "holo": "/card-art-pixel/lastlight/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Luxquest's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a floating compass and three sparkling path icons. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    },
+    {
+      "id": "lastarchive-48",
+      "legacyId": "unwritten-12",
+      "name": "Nameling",
+      "generated": true,
+      "static": "/card-art-pixel/unwritten/12/frame-0.png",
+      "holo": "/card-art-pixel/unwritten/12/holo-strip.png",
+      "animation": "Create a seamless four-frame collectible-card idle loop. Keep Nameling's exact anatomy, colors, markings, scale, outline, and centered position unchanged. a small sealed card pack tucked into its gear, living ink strokes rewriting a page beneath its feet. Use subtle breathing, a tiny weight shift, gentle secondary motion, and light parallax only. The creature must remain fully visible. Do not rotate the camera, redraw the design, add limbs, add text, or crop. Frame four should flow naturally back into frame one."
+    }
+  ]
+}

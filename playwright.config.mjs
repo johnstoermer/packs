@@ -4,7 +4,10 @@ import { defineConfig } from "@playwright/test";
 // Prefer a preinstalled Chromium when one is provided (e.g. sandboxed CI
 // images), instead of downloading the revision this Playwright version pins.
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_PATH
-  || (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : null);
+  || (existsSync("/opt/pw-browsers/chromium") ? "/opt/pw-browsers/chromium" : null)
+  || (existsSync("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+    ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    : null);
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -23,7 +26,7 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --hostname 127.0.0.1 --port 4317",
     url: "http://127.0.0.1:4317",
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
 });

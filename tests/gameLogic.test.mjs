@@ -27,6 +27,8 @@ import {
   tickEconomy,
 } from "../lib/gameLogic.js";
 import { ALL_CARDS, LEGACY_CARD_MAP, PACK_PRODUCTS, RARITIES, SETS, getCard } from "../lib/gameData.js";
+import { CORE_ART_TRANSFERS } from "../lib/coreArtTransfers.js";
+import { CORE_CARD_IDS } from "../lib/coreSetManifest.js";
 
 const L = (legacyId) => LEGACY_CARD_MAP[legacyId] || legacyId;
 const FIRST = SETS[0].id;
@@ -148,45 +150,54 @@ test("the complete 18-tier rarity ladder uses the four-hour-arc base rates", () 
   assert.ok(Object.values(RARITIES).every((rarity, index, all) => index === 0 || rarity.sellValue > all[index - 1].sellValue));
 });
 
-test("five 48-card print lines share one rarity ladder; the finale closes the last", () => {
-  assert.equal(SETS.length, 5);
-  assert.equal(ALL_CARDS.length, 240);
+test("one 98-card Core mega-set uses the rebalanced full rarity ladder", () => {
+  assert.equal(SETS.length, 1);
+  assert.equal(SETS[0].id, "core");
+  assert.equal(ALL_CARDS.length, 98);
+  assert.deepEqual(ALL_CARDS.map((card) => card.id), CORE_CARD_IDS);
   assert.equal(new Set(SETS.map((set) => set.id)).size, SETS.length);
   assert.equal(new Set(ALL_CARDS.map((card) => card.id)).size, ALL_CARDS.length);
-  assert.ok(SETS.every((set) => set.cards.length === 48));
+  assert.equal(new Set(ALL_CARDS.map((card) => card.name)).size, ALL_CARDS.length);
+  assert.ok(ALL_CARDS.every((card) => /^[A-Z][A-Za-z]+$/.test(card.name)));
+  assert.ok(ALL_CARDS.every((card) => card.flavor && card.flavor.endsWith(".")));
+  assert.equal(SETS[0].cards.length, 98);
   assert.deepEqual(new Set(ALL_CARDS.map((card) => card.rarity)), new Set(Object.keys(RARITIES)));
 
-  // Every set uses the same rarity distribution; the last swaps its
-  // Singularity for the Nameless finale.
-  const distribution = (set) => {
-    const counts = {};
-    for (const card of set.cards) counts[card.rarity] = (counts[card.rarity] || 0) + 1;
-    return counts;
-  };
-  const base = distribution(SETS[0]);
-  for (const set of SETS.slice(1, -1)) assert.deepEqual(distribution(set), base, set.id);
-  const finale = distribution(SETS.at(-1));
-  assert.equal(finale.nameless, 1);
-  assert.equal(finale.singularity, undefined);
-  assert.deepEqual(
-    { ...finale, singularity: 1, nameless: undefined },
-    { ...base, nameless: undefined },
-  );
-  assert.equal(SETS.at(-1).cards.at(-1).name, "What Was Never Named");
-  assert.equal(SETS.at(-1).cards.at(-1).rarity, "nameless");
-
-  // The chain: each line opens by finding 20 cards in the previous one.
-  assert.deepEqual(SETS[0].unlockRequirements, []);
-  SETS.slice(1).forEach((set, index) => {
-    assert.deepEqual(set.unlockRequirements, [{ type: "collectFromSet", setId: SETS[index].id, count: 20 }], set.id);
+  const distribution = Object.fromEntries(Object.keys(RARITIES).map((rarity) => [
+    rarity,
+    ALL_CARDS.filter((card) => card.rarity === rarity).length,
+  ]));
+  assert.deepEqual(distribution, {
+    common: 21,
+    uncommon: 18,
+    rare: 14,
+    epic: 10,
+    legendary: 8,
+    mythic: 6,
+    exalted: 4,
+    ascendant: 3,
+    celestial: 3,
+    divine: 2,
+    astral: 2,
+    eternal: 1,
+    primordial: 1,
+    transcendent: 1,
+    empyrean: 1,
+    absolute: 1,
+    singularity: 1,
+    nameless: 1,
   });
+  assert.equal(SETS[0].cards.at(-1).name, "Nameling");
+  assert.equal(SETS[0].cards.at(-1).rarity, "nameless");
+  assert.deepEqual(SETS[0].unlockRequirements, []);
 
-  // Every legacy card id maps onto exactly one live card.
-  assert.equal(Object.keys(LEGACY_CARD_MAP).length, 240);
-  assert.equal(new Set(Object.values(LEGACY_CARD_MAP)).size, 240);
+  assert.equal(Object.keys(LEGACY_CARD_MAP).length, 98);
+  assert.equal(new Set(Object.values(LEGACY_CARD_MAP)).size, 98);
   for (const [legacyId, liveId] of Object.entries(LEGACY_CARD_MAP)) {
     assert.ok(getCard(liveId), legacyId);
   }
+  assert.equal(Object.keys(CORE_ART_TRANSFERS).length, 47);
+  assert.equal(ALL_CARDS.filter((card) => card.artTransferredFrom).length, 47);
 });
 
 test("every card keeps its authored rarity in pulls and migrated saves", () => {
@@ -200,7 +211,7 @@ test("every card keeps its authored rarity in pulls and migrated saves", () => {
 
   const highRoll = openAndRevealAll(migrated, { manual: true, free: true, now: 2_000, rng: () => 0 });
   assert.ok(highRoll.result.cards.every((pull) => pull.rarity === pull.card.rarity));
-  assert.ok(!Object.values(highRoll.state.bestRarities).includes("nameless"));
+  assert.ok(Object.entries(highRoll.state.bestRarities).every(([id, rarity]) => getCard(id)?.rarity === rarity));
 
   const commonRoll = openAndRevealAll(createInitialState(1), {
     manual: true,
@@ -239,7 +250,7 @@ test("duplicate counts remain explicit at the legacy collection milestones", () 
 test("selling duplicates keeps one of every card and pays the full sell pile", () => {
   const state = hydrateState({
     ...createInitialState(1),
-    collection: { [L("corner-01")]: 4, [L("corner-06")]: 2 },
+    collection: { [L("corner-01")]: 4, [L("corner-02")]: 2 },
   }, 2);
   const count = getDuplicateCount(state);
   const value = getDuplicateSaleValue(state);
@@ -247,7 +258,7 @@ test("selling duplicates keeps one of every card and pays the full sell pile", (
   assert.equal(count, 4);
   assert.equal(Number.isInteger(value), true);
   assert.equal(sold.collection[L("corner-01")], 1);
-  assert.equal(sold.collection[L("corner-06")], 1);
+  assert.equal(sold.collection[L("corner-02")], 1);
   assert.equal(getDuplicateCount(sold), 0);
   assert.equal(sold.coins, state.coins + value);
 });
@@ -295,7 +306,7 @@ test("breaking a case moves its packs to the opening table", () => {
   assert.deepEqual(broken.collection, state.collection);
 });
 
-test("set stock unlocks along the five-line chain", () => {
+test("the single Core stock is always unlocked across progression beats", () => {
   const state = createInitialState(1);
   assert.equal(getCurrentBeat(state), 1);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 9 }), 1);
@@ -303,43 +314,17 @@ test("set stock unlocks along the five-line chain", () => {
   assert.equal(getCurrentBeat({ ...state, packsOpened: 30 }), 3);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 75 }), 4);
   assert.equal(getCurrentBeat({ ...state, packsOpened: 150 }), 5);
-
-  const collectN = (setId, count) => Object.fromEntries(
-    SETS.find((set) => set.id === setId).cards.slice(0, count).map((card) => [card.id, 1]),
-  );
-  const second = SETS[1];
-  assert.equal(getSetUnlockStatus(state, second.id).unlocked, false);
-  assert.equal(
-    getSetUnlockStatus(state, second.id).requirements[0].label,
-    `Find 20 cards in ${SETS[0].name}`,
-  );
-  const nineteen = advanceBeat({ ...state, collection: collectN(FIRST, 19) });
-  assert.equal(getSetUnlockStatus(nineteen, second.id).unlocked, false);
-  const twenty = advanceBeat({ ...state, collection: collectN(FIRST, 20) });
-  assert.equal(getSetUnlockStatus(twenty, second.id).unlocked, true);
-  assert.deepEqual(twenty.unlockedSets, [FIRST, second.id]);
-  assert.equal(getPackPrice(twenty, "loose", second.id), second.packCost);
-  const purchase = buyProduct({ ...twenty, coins: second.packCost }, "loose", second.id);
-  assert.equal(getProductCount(purchase, second.id, "loose"), 1);
-  assert.equal(purchase.activeSet, second.id);
-
-  // The chain never skips: finding cards two lines ahead needs the line
-  // between them first.
-  assert.equal(getSetUnlockStatus(twenty, SETS[2].id).unlocked, false);
-  const deep = advanceBeat({
-    ...state,
-    collection: { ...collectN(FIRST, 20), ...collectN(SETS[1].id, 20), ...collectN(SETS[2].id, 20), ...collectN(SETS[3].id, 20) },
-  });
-  assert.deepEqual(deep.unlockedSets, SETS.map((set) => set.id));
-
-  const legacyUnlocks = advanceBeat({ ...state, unlockedSets: SETS.map((set) => set.id) });
-  assert.deepEqual(legacyUnlocks.unlockedSets, [FIRST]);
+  assert.equal(getSetUnlockStatus(state, FIRST).unlocked, true);
+  assert.deepEqual(getSetUnlockStatus(state, FIRST).requirements, []);
+  const late = advanceBeat({ ...state, packsOpened: 500 });
+  assert.deepEqual(late.unlockedSets, [FIRST]);
+  assert.equal(late.activeSet, FIRST);
 });
 
 test("economy ticks add exactly one cash per second and never buy or open product", () => {
   const state = {
     ...createInitialState(1),
-    collection: { [L("corner-01")]: 2, [L("corner-06")]: 1 },
+    collection: { [L("corner-01")]: 2, [L("corner-02")]: 1 },
     standingOrder: {
       ...createInitialState(1).standingOrder,
       enabled: true,
@@ -358,7 +343,7 @@ test("offline progress pays cash but cannot source or open packs", () => {
   const now = 10_000_000;
   const state = {
     ...createInitialState(1),
-    collection: { [L("corner-01")]: 2, [L("corner-06")]: 1 },
+    collection: { [L("corner-01")]: 2, [L("corner-02")]: 1 },
     lastSavedAt: now - 60 * 60 * 1000,
   };
   const stockBefore = clone(state.sealed);

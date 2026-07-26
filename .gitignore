@@ -7,3 +7,6 @@ test-results/
 playwright-report/
 *.tgz
 *.log
+.env
+.env.*
+!.env.example

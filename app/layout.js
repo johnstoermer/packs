@@ -2,6 +2,9 @@ import "augmented-ui/augmented-ui.min.css";
 import "./globals.css";
 import "./gameplay-v2.css";
 import "./gameplay-clean.css";
+import "./league-overhaul.css";
+import "./card-review.css";
+import "./subset-selector.css";
 
 export const metadata = {
   title: "PACKWORKS",
