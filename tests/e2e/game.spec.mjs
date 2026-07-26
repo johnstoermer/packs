@@ -395,6 +395,45 @@ test("the Nameless tier uses its shifting border treatment", async ({ page }) =>
   await page.screenshot({ path: "test-results/clean-nameless.png" });
 });
 
+test("reveals fire haptic pulses through the vibration API when enabled", async ({ page }) => {
+  const state = createInitialState(Date.now());
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.addInitScript(() => {
+    window.__vibrations = [];
+    Object.defineProperty(navigator, "maxTouchPoints", { get: () => 2 });
+    navigator.vibrate = (pattern) => {
+      // Ignore cancel calls (vibrate(0)) — only count real pulses.
+      const shape = Array.isArray(pattern) ? pattern : [pattern];
+      if (shape.some((ms) => ms > 0)) window.__vibrations.push(pattern);
+      return true;
+    };
+  });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "HAPTICS ON" })).toBeVisible();
+
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 6_000 });
+  await revealAll(page);
+  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
+  const withHaptics = await page.evaluate(() => window.__vibrations.length);
+  expect(withHaptics).toBeGreaterThanOrEqual(7); // pack open + six reveals
+
+  await page.getByRole("button", { name: "BACK TO TABLE" }).click();
+  await page.getByRole("button", { name: "HAPTICS ON" }).click();
+  await expect(page.getByRole("button", { name: "HAPTICS OFF" })).toBeVisible();
+  const beforeMuted = await page.evaluate(() => window.__vibrations.length);
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 6_000 });
+  await revealAll(page);
+  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
+  const afterMuted = await page.evaluate(() => window.__vibrations.length);
+  expect(afterMuted).toBe(beforeMuted);
+});
+
 test("duplicate selling keeps one copy and pays cash from the table", async ({ page }) => {
   const state = createInitialState(Date.now());
   state.collection = { "corner-01": 3, "corner-06": 2 };

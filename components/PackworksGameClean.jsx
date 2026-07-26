@@ -58,6 +58,7 @@ import {
   getCaseSlots,
 } from "../lib/engineCards";
 import { createAudioEngine } from "../lib/audio";
+import { createHapticsEngine } from "../lib/haptics";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
 const SHOP_PRODUCTS = PACK_PRODUCTS.filter((product) => ["loose", "case"].includes(product.id));
@@ -784,6 +785,7 @@ function SetTray({ game, set, onOpenBinder }) {
 
 export default function PackworksGameClean() {
   const audioRef = useRef(null);
+  const hapticsRef = useRef(null);
   const gameRef = useRef(createInitialState(0));
   const openingRef = useRef(null);
   const openingTimersRef = useRef([]);
@@ -809,6 +811,7 @@ export default function PackworksGameClean() {
   const [revealEchoes, setRevealEchoes] = useState({});
   const [adminActive, setAdminActive] = useState(false);
   const [viewport, setViewport] = useState({ w: 1200, h: 800 });
+  const [hapticsAvailable, setHapticsAvailable] = useState(false);
   const adminActiveRef = useRef(false);
   const fxSerialRef = useRef(0);
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -836,6 +839,15 @@ export default function PackworksGameClean() {
     audioRef.current.setEnabled(gameRef.current.settings.sound);
     return audioRef.current;
   }, []);
+
+  const getHaptics = useCallback(() => {
+    if (!hapticsRef.current) hapticsRef.current = createHapticsEngine();
+    hapticsRef.current.setEnabled(gameRef.current.settings.haptics !== false);
+    return hapticsRef.current;
+  }, []);
+  useEffect(() => {
+    setHapticsAvailable(getHaptics().supported());
+  }, [getHaptics]);
 
   const pushToast = useCallback((title, detail, tone = "neutral", duration = 4200) => {
     const id = ++toastSerialRef.current;
@@ -867,10 +879,14 @@ export default function PackworksGameClean() {
     const mysteries = events.filter((event) => event.t === "mystery").length;
     if (mysteries > 0) {
       getAudio().sound("caseBreak");
+      getHaptics().pulse("burst");
       pushToast("SALVAGE", `${mysteries} Mystery Pack${mysteries > 1 ? "s" : ""} burst open!`, "gold");
     }
     const fractures = events.filter((event) => event.t === "fracture").length;
-    if (fractures > 0) pushToast("FRACTURE", "The pack split — more cards join this reveal.", "gold");
+    if (fractures > 0) {
+      getHaptics().pulse("burst");
+      pushToast("FRACTURE", "The pack split — more cards join this reveal.", "gold");
+    }
     const encore = events.find((event) => event.t === "encore");
     if (encore) pushToast("ENCORE", `The pack continues — ${encore.count} bonus cards.`, "gold");
     const freePacks = events.filter((event) => event.t === "packs").reduce((sum, event) => sum + event.count, 0);
@@ -884,7 +900,7 @@ export default function PackworksGameClean() {
     }
     const sets = events.filter((event) => event.t === "setComplete");
     for (const done of sets) pushToast("SET COMPLETE", `${getSet(done.setId).name} is finished.`, "gold", 6000);
-  }, [getAudio, pushToast]);
+  }, [getAudio, getHaptics, pushToast]);
 
   // Salvage burst: the Mystery Packs a sale or idle sweep rips open, shown
   // as a full-screen card burst so Salvage is never a silent toast.
@@ -1186,6 +1202,7 @@ export default function PackworksGameClean() {
 
     const audio = getAudio();
     audio.sound("reveal", rarity.order);
+    getHaptics().pulse("reveal", rarity.order);
     if (revealedPull.misprintDetected) audio.sound("misprint");
     else if (rarity.order >= RARITIES.legendary.order) audio.sound("legendary", rarity.order);
     if (outcome.events.some((event) => event.t === "echo")) audio.sound("fusion", 2);
@@ -1198,6 +1215,7 @@ export default function PackworksGameClean() {
           commit(fusion.state);
           pushFx(fusion.events);
           audio.sound("fusion", 4);
+          getHaptics().pulse("fuse");
           pushToast("FUSION", "Duplicates fuse upward — reveal them again.", "gold");
           commitOpening((current) => current?.id === currentOpening.id
             ? { ...current, result: { ...current.result, cards: fusion.cards }, phase: "ready", impact: null }
@@ -1242,6 +1260,9 @@ export default function PackworksGameClean() {
     const audio = getAudio();
     audio.ensure();
     audio.sound("pack");
+    const haptics = getHaptics();
+    haptics.ensure();
+    haptics.pulse("open");
 
     const unlockedProduct = SHOP_PRODUCTS.find((product) => product.unlockBeat > priorBeat && product.unlockBeat <= rolled.state.beat);
     const unlockedSet = SETS.find((set) => rolled.state.unlockedSets.includes(set.id) && !priorSets.has(set.id));
@@ -1611,6 +1632,19 @@ export default function PackworksGameClean() {
           >
             SOUND {game.settings.sound ? "ON" : "OFF"}
           </button>
+          {hapticsAvailable && (
+            <button
+              className={game.settings.haptics !== false ? "active" : ""}
+              onClick={() => {
+                commit((current) => ({ ...current, settings: { ...current.settings, haptics: current.settings.haptics === false } }));
+                const haptics = getHaptics();
+                haptics.ensure();
+                haptics.pulse("open");
+              }}
+            >
+              HAPTICS {game.settings.haptics !== false ? "ON" : "OFF"}
+            </button>
+          )}
         </nav>
       </header>
 
