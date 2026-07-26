@@ -30,7 +30,7 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
 
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "SELL DUPLICATES" })).toBeVisible();
-  await expect(page.locator(".clean-set-tray button")).toHaveCount(12);
+  await expect(page.locator(".clean-set-tray button")).toHaveCount(48);
   await expect(page.locator(".clean-set-tray button.found")).toHaveCount(0);
   await expect(page.getByText("MANUAL HEAT")).toHaveCount(0);
   await expect(page.getByText("RULES", { exact: true })).toHaveCount(0);
@@ -151,7 +151,7 @@ test("the large mobile hold control runs complete packs until released", async (
   test.setTimeout(35_000);
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
-  state.sealed.corner.loose = 4;
+  state.sealed[SETS[0].id].loose = 4;
   state.settings.sound = false;
   state.settings.quickOpen = true;
   state.lastSavedAt = Date.now();
@@ -189,19 +189,15 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await page.getByRole("button", { name: "SHOP", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Pack shop" })).toBeVisible();
   await expect(page.getByText("SEALED VALUE")).toHaveCount(0);
-  await expect(page.locator(".clean-set-stock")).toHaveCount(20);
+  await expect(page.locator(".clean-set-stock")).toHaveCount(5);
   await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(1);
   const stockRow = (name) => page.locator(".clean-set-stock").filter({
     has: page.getByRole("heading", { name, exact: true }),
   });
-  await expect(stockRow("Neon Circuit")).toContainText("Finish Corner Critters 0/12");
-  await expect(stockRow("Gilded Frontier")).toContainText("Finish Neon Circuit 0/12");
-  await expect(stockRow("Abyssal Bloom")).toContainText("Finish Neon Circuit 0/12");
-  await expect(stockRow("Crownfall")).toContainText("Finish Neon Circuit 0/12");
-  await expect(stockRow("Verdant Machine")).toContainText("Finish Gilded Frontier or Abyssal Bloom 0/12");
-  await expect(stockRow("Sunken Signal")).toContainText("Finish Nocturne Harbor 0/12");
-  await expect(stockRow("Unwritten")).toContainText("Complete every other set 0/19");
-  await expect(stockRow("Unwritten")).not.toContainText("chase");
+  await expect(stockRow(SETS[1].name)).toContainText(`Find 20 cards in ${SETS[0].name} 0/20`);
+  await expect(stockRow(SETS[2].name)).toContainText(`Find 20 cards in ${SETS[1].name} 0/20`);
+  await expect(stockRow(SETS.at(-1).name)).toContainText(`Find 20 cards in ${SETS.at(-2).name} 0/20`);
+  await expect(stockRow(SETS.at(-1).name)).not.toContainText("chase");
   await expect(page.getByText("Booster box")).toHaveCount(0);
   await expect(page.getByText("THREE SIMPLE TRACKS")).toHaveCount(0);
   await expect(page.locator(".clean-upgrades")).toContainText("Open 5 more packs");
@@ -212,8 +208,8 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
     ...createInitialState(Date.now()),
     packsOpened: 25,
     coins: 600,
-    collection: Object.fromEntries(SETS[0].cards.map((card) => [card.id, 1])),
-    bestRarities: Object.fromEntries(SETS[0].cards.map((card) => [card.id, card.rarity])),
+    collection: Object.fromEntries(SETS[0].cards.slice(0, 24).map((card) => [card.id, 1])),
+    bestRarities: Object.fromEntries(SETS[0].cards.slice(0, 24).map((card) => [card.id, card.rarity])),
     settings: { sound: false, reducedEffects: false, quickOpen: true },
     lastSavedAt: Date.now(),
   });
@@ -222,15 +218,15 @@ test("the shop reveals product and upgrade choices gradually", async ({ page }) 
   await page.getByRole("button", { name: "SHOP", exact: true }).click();
   await expect(page.locator(".clean-set-stock.is-stocked")).toHaveCount(2);
   await expect(page.locator(".clean-upgrade", { hasText: "Dealer tray" })).toBeVisible();
-  await page.getByRole("button", { name: "Select Neon Circuit" }).click();
-  await expect(page.locator(".clean-set-title")).toContainText("Neon Circuit");
+  await page.getByRole("button", { name: `Select ${SETS[1].name}` }).click();
+  await expect(page.locator(".clean-set-title")).toContainText(SETS[1].name);
   await page.screenshot({ path: "test-results/clean-shop.png" });
 });
 
 test("the empty table shows no shop cue overlay, only the pack label", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
-  state.sealed.corner.loose = 0;
+  state.sealed[SETS[0].id].loose = 0;
   state.settings.sound = false;
   state.lastSavedAt = Date.now();
   await seedState(page, state);
@@ -255,7 +251,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   const borderOf = (label) => page.getByRole("button", { name: label }).first()
     .evaluate((node) => getComputedStyle(node).borderTopColor);
   const commonBorder = await borderOf("Missing card 1, show rarity");
-  const chaseBorder = await borderOf("Missing card 12, show rarity");
+  const chaseBorder = await borderOf("Missing card 48, show rarity");
   expect(commonBorder).not.toBe(chaseBorder);
   expect(commonBorder).not.toBe("rgba(255, 255, 255, 0.1)");
 
@@ -273,7 +269,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
 
   await page.getByRole("button", { name: "BINDER", exact: true }).click();
   await page.locator(".clean-binder-grid > button.missing").last().click();
-  await expect(page.locator(".clean-card-detail")).toContainText("Card 12");
+  await expect(page.locator(".clean-card-detail")).toContainText("Card 48");
   await expect(page.locator(".clean-card-detail .clean-detail-effect")).toBeVisible();
   await expect(page.locator(".clean-card-detail .clean-detail-art.is-missing")).toBeVisible();
 });
@@ -324,9 +320,9 @@ test("holding a shop pack price rapidly buys that selected set and stops on rele
   await page.getByRole("button", { name: "SHOP", exact: true }).click();
 
   const row = page.locator(".clean-set-stock").filter({
-    has: page.getByRole("heading", { name: "Corner Critters", exact: true }),
+    has: page.getByRole("heading", { name: SETS[0].name, exact: true }),
   });
-  const buy = row.getByRole("button", { name: /Buy Corner Critters pack/ });
+  const buy = row.getByRole("button", { name: new RegExp(`Buy ${SETS[0].name} pack`) });
   await expect(row.locator(".clean-owned")).toHaveText("3 owned");
   const bounds = await buy.boundingBox();
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
@@ -348,14 +344,14 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
   state.packsOpened = 1;
   state.manualPacks = 1;
   state.pityLegendary = 10_000;
-  state.sealed.corner.loose = 1;
+  state.sealed[SETS[0].id].loose = 1;
   state.settings = { sound: false, reducedEffects: false, quickOpen: true };
   state.lastSavedAt = Date.now();
   await seedState(page, state);
   await page.goto("/");
   await expect(page.locator(".loading-screen")).toHaveCount(0);
   await page.evaluate(() => {
-    Math.random = () => 0.0004;
+    Math.random = () => 0.0015;
   });
   await page.getByRole("button", { name: /Open a pack/ }).click();
   expect(pageErrors).toEqual([]);
@@ -375,9 +371,9 @@ test("the Nameless tier uses its shifting border treatment", async ({ page }) =>
   const state = advanceBeat({
     ...createInitialState(Date.now()),
     collection,
-    activeSet: "unwritten",
+    activeSet: SETS.at(-1).id,
   });
-  state.sealed.unwritten.loose = 1;
+  state.sealed[SETS.at(-1).id].loose = 1;
   state.settings = { sound: false, reducedEffects: false, quickOpen: true };
   state.lastSavedAt = Date.now();
   await seedState(page, state);
@@ -428,7 +424,7 @@ test("the clean table remains usable inside the compact game frame", async ({ pa
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
   await expect(page.locator(".clean-simple-stats")).toBeVisible();
-  await expect(page.locator(".clean-set-tray button")).toHaveCount(12);
+  await expect(page.locator(".clean-set-tray button")).toHaveCount(48);
   const packBounds = await page.locator(".clean-pack-clicker").boundingBox();
   expect(packBounds.x).toBeGreaterThanOrEqual(0);
   expect(packBounds.x + packBounds.width).toBeLessThanOrEqual(800);

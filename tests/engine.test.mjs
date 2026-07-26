@@ -1,11 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ALL_CARDS, RARITIES, SETS, seededRandom } from "../lib/gameData.js";
+import { ALL_CARDS, LEGACY_CARD_MAP, RARITIES, SETS, getCard, seededRandom } from "../lib/gameData.js";
+
+const L = (legacyId) => LEGACY_CARD_MAP[legacyId] || legacyId;
 import {
   CARD_DEFS,
   DISCOVER_POOL,
   KINGS,
   SET_KINGS,
+  SIGNATURE_CARDS,
   describeCard,
   getCardDef,
   getEngine,
@@ -30,6 +33,7 @@ import {
 } from "../lib/gameLogic.js";
 
 const CORNER_IDS = SETS[0].cards.map((card) => card.id);
+const FIRST = SETS[0].id;
 
 function withCards(state, ids, extra = {}) {
   return advanceBeat({
@@ -73,29 +77,32 @@ test("every card has a verb-engine definition with player-facing text", () => {
   }
 });
 
-test("each of the twelve signature verbs sits on a chase card with a real effect", () => {
-  const sigVerbs = new Set(Object.values(SET_KINGS));
-  assert.equal(sigVerbs.size, 12);
-  assert.deepEqual([...sigVerbs].sort(), Object.keys(KINGS).sort());
-  for (const [setId, verb] of Object.entries(SET_KINGS)) {
-    const set = SETS.find((candidate) => candidate.id === setId);
-    const chase = set.cards[11];
-    const def = getCardDef(chase.id);
-    assert.equal(def.signature, true, setId);
-    assert.equal(def.sig, verb, setId);
+test("all twelve signatures live on high-rarity cards with real effects", () => {
+  const verbs = Object.keys(KINGS).sort();
+  assert.deepEqual(Object.keys(SIGNATURE_CARDS).sort(), verbs);
+  assert.deepEqual([...new Set(Object.values(SET_KINGS))].sort(), verbs);
+  const allowed = new Set(["legendary", "mythic", "celestial"]);
+  for (const [verb, cardId] of Object.entries(SIGNATURE_CARDS)) {
+    const card = getCard(cardId);
+    const def = getCardDef(cardId);
+    assert.ok(card, cardId);
+    assert.ok(allowed.has(card.rarity), `${verb} signature sits at ${card.rarity}`);
+    assert.equal(def.signature, true, cardId);
+    assert.equal(def.sig, verb, cardId);
     // A signature is never a bare gate: it carries its own chance source or
     // rule, plus player-facing text.
-    assert.ok(def.mod || def.on, setId);
-    assert.ok(def.note && def.note.length > 20, setId);
+    assert.ok(def.mod || def.on, cardId);
+    assert.ok(def.note && def.note.length > 20, cardId);
   }
   assert.equal(getCardDef(NAMELESS_CARD_ID).prestige, true);
+  assert.equal(getCard(NAMELESS_CARD_ID).rarity, "nameless");
 });
 
 test("chance sources stand alone: a salvage support works with no signature displayed", () => {
-  const state = withSlots(createInitialState(1), ["frontier-01"]);
-  const solo = displayCard(state, "frontier-01", 0);
+  const state = withSlots(createInitialState(1), [L("frontier-01")]);
+  const solo = displayCard(state, L("frontier-01"), 0);
   const sale = sellDuplicatesDetailed(
-    { ...solo, collection: { ...solo.collection, "corner-01": 500 }, duplicateBank: 499 },
+    { ...solo, collection: { ...solo.collection, [L("corner-01")]: 500 }, duplicateBank: 499 },
     { rng: () => 0.0001 },
   );
   assert.ok(sale.salvages > 0);
@@ -103,8 +110,8 @@ test("chance sources stand alone: a salvage support works with no signature disp
 });
 
 test("pure dials stay inert without a source: fusion depth alone fuses nothing", () => {
-  const base = withSlots(createInitialState(1), ["verdant-04"]);
-  const built = displayAll(base, ["verdant-04"]);
+  const base = withSlots(createInitialState(1), [L("verdant-04")]);
+  const built = displayAll(base, [L("verdant-04")]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const all = revealAll(opened.state, opened.result.cards, () => 0.99);
   const fusion = resolveFusions(all.state, all.cards, { rng: () => 0.99 });
@@ -112,11 +119,11 @@ test("pure dials stay inert without a source: fusion depth alone fuses nothing",
 });
 
 test("Salvage signature turns duplicate sales into Mystery Packs", () => {
-  const base = withSlots(createInitialState(1), ["frontier-12", "frontier-01"]);
-  const built = displayAll(base, ["frontier-12", "frontier-01"]);
+  const base = withSlots(createInitialState(1), [L("frontier-12"), L("frontier-01")]);
+  const built = displayAll(base, [L("frontier-12"), L("frontier-01")]);
   const loaded = {
     ...built,
-    collection: { ...built.collection, "corner-01": 1_001 },
+    collection: { ...built.collection, [L("corner-01")]: 1_001 },
     duplicateBank: 1_000,
   };
   const sale = sellDuplicatesDetailed(loaded, { rng: () => 0.0001 });
@@ -128,8 +135,8 @@ test("Salvage signature turns duplicate sales into Mystery Packs", () => {
 });
 
 test("coin thresholds fire from any income source, never from timers", () => {
-  const base = withSlots(createInitialState(1), ["frontier-12", "corner-05"]);
-  const built = displayAll(base, ["frontier-12", "corner-05"]);
+  const base = withSlots(createInitialState(1), [L("frontier-12"), L("corner-05")]);
+  const built = displayAll(base, [L("frontier-12"), L("corner-05")]);
   const flush = { ...built, lifetimeCoins: built.lifetimeCoins + 10_000, coins: built.coins + 10_000 };
   const swept = evaluateIdleThresholds(flush, { rng: () => 0.5 });
   assert.ok(swept.events.some((event) => event.t === "mystery"));
@@ -144,8 +151,8 @@ test("coin thresholds fire from any income source, never from timers", () => {
 });
 
 test("Mark signature marks a visible card before reveal and marked reveals pay", () => {
-  const base = withSlots(createInitialState(1), ["circuit-12", "circuit-02"]);
-  const built = displayAll(base, ["circuit-12", "circuit-02"]);
+  const base = withSlots(createInitialState(1), [L("circuit-12"), L("circuit-02")]);
+  const built = displayAll(base, [L("circuit-12"), L("circuit-02")]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.4 });
   assert.ok(opened.result.cards.some((pull) => pull.marked));
   assert.ok(opened.result.events.some((event) => event.t === "mark"));
@@ -156,11 +163,11 @@ test("Mark signature marks a visible card before reveal and marked reveals pay",
 });
 
 test("Echo chance is additive from zero, boosts matter, and overflow doubles payoffs", () => {
-  const base = withSlots(createInitialState(1), ["corner-12", "corner-02", "lastlight-01"]);
+  const base = withSlots(createInitialState(1), [L("corner-12"), L("corner-02"), L("lastlight-01")]);
 
   // Signature alone: +50% chance — a high roll does NOT echo, so further
   // chance sources have real room to work in.
-  const kingOnly = displayAll(base, ["corner-12", "corner-02"]);
+  const kingOnly = displayAll(base, [L("corner-12"), L("corner-02")]);
   const openedKing = openPack(kingOnly, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const kingIndex = openedKing.result.cards.findIndex((pull) => pull.rarity === "common");
   const kingStep = revealPackCard(openedKing.state, openedKing.result.cards, kingIndex, { manual: true, rng: () => 0.99 });
@@ -170,20 +177,20 @@ test("Echo chance is additive from zero, boosts matter, and overflow doubles pay
   // Signature + Matchstick Moth (+100%): 150% -> exactly one guaranteed Echo
   // on the same high roll, doubling the reveal payoff. The echo event carries
   // the signature's card id so the case strip can pulse it.
-  const boosted = displayAll(base, ["corner-12", "corner-02", "lastlight-01"]);
+  const boosted = displayAll(base, [L("corner-12"), L("corner-02"), L("lastlight-01")]);
   const openedEcho = openPack(boosted, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const echoIndex = openedEcho.result.cards.findIndex((pull) => pull.rarity === "common");
   const echoStep = revealPackCard(openedEcho.state, openedEcho.result.cards, echoIndex, { manual: true, rng: () => 0.99 });
   const echoEvents = echoStep.events.filter((event) => event.t === "echo");
   assert.equal(echoEvents.length, 1);
-  assert.equal(echoEvents[0].cardId, "corner-12");
+  assert.equal(echoEvents[0].cardId, L("corner-12"));
   const echoGain = echoStep.state.coins - openedEcho.state.coins;
   assert.equal(echoGain, plainGain * 2);
 });
 
 test("Fusion signature fuses same-rarity pairs upward and they reveal again", () => {
-  const base = withSlots(createInitialState(1), ["verdant-12"]);
-  const built = displayAll(base, ["verdant-12"]);
+  const base = withSlots(createInitialState(1), [L("verdant-12")]);
+  const built = displayAll(base, [L("verdant-12")]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const all = revealAll(opened.state, opened.result.cards, () => 0.99);
   const fusion = resolveFusions(all.state, all.cards, { rng: () => 0.99 });
@@ -197,8 +204,8 @@ test("Fusion signature fuses same-rarity pairs upward and they reveal again", ()
 });
 
 test("Fracture signature spills extra packs into the same reveal", () => {
-  const base = withSlots(createInitialState(1), ["ember-12", "ember-01"]);
-  const built = displayAll(base, ["ember-12", "ember-01"]);
+  const base = withSlots(createInitialState(1), [L("ember-12"), L("ember-01")]);
+  const built = displayAll(base, [L("ember-12"), L("ember-01")]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.01 });
   assert.ok(opened.result.cards.length >= 12);
   assert.ok(opened.result.events.some((event) => event.t === "fracture"));
@@ -222,8 +229,8 @@ test("every pack carries at least one Uncommon-or-better from its set", () => {
 });
 
 test("Mimic signature copies one unrevealed card before reveal", () => {
-  const base = withSlots(createInitialState(1), ["abyss-12"]);
-  const built = displayAll(base, ["abyss-12"]);
+  const base = withSlots(createInitialState(1), [L("abyss-12")]);
+  const built = displayAll(base, [L("abyss-12")]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.7 });
   const mimicEvent = opened.result.events.find((event) => event.t === "mimic");
   assert.ok(mimicEvent);
@@ -234,8 +241,8 @@ test("Mimic signature copies one unrevealed card before reveal", () => {
 });
 
 test("Transmute signature morphs an unrevealed card toward the revealed rarity", () => {
-  const base = withSlots(createInitialState(1), ["polar-12", "polar-04"]);
-  const built = displayAll(base, ["polar-12", "polar-04"]);
+  const base = withSlots(createInitialState(1), [L("polar-12"), L("polar-04")]);
+  const built = displayAll(base, [L("polar-12"), L("polar-04")]);
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.3 });
   const step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0.001 });
   assert.ok(step.events.some((event) => event.t === "transmute"));
@@ -243,13 +250,13 @@ test("Transmute signature morphs an unrevealed card toward the revealed rarity",
 });
 
 test("Blueprint copies slot 1 and Relay chains to the right", () => {
-  const base = withSlots(createInitialState(1), ["glass-12", "harbor-12", "corner-02", "corner-01"]);
-  const blueprintCase = displayAll(base, ["corner-02", "glass-12"]);
+  const base = withSlots(createInitialState(1), [L("glass-12"), L("harbor-12"), L("corner-02"), L("corner-01")]);
+  const blueprintCase = displayAll(base, [L("corner-02"), L("glass-12")]);
   const engine = getEngine(blueprintCase);
   assert.equal(engine.reveal.length, 2);
-  assert.equal(engine.reveal[1].id, "glass-12");
+  assert.equal(engine.reveal[1].id, L("glass-12"));
 
-  const relayCase = displayAll(base, ["corner-02", "harbor-12", "corner-01"]);
+  const relayCase = displayAll(base, [L("corner-02"), L("harbor-12"), L("corner-01")]);
   const opened = openPack(relayCase, { manual: true, free: true, now: 5_000, rng: () => 0.99 });
   const commonIndex = opened.result.cards.findIndex((pull) => pull.rarity === "common");
   const step = revealPackCard(opened.state, opened.result.cards, commonIndex, { manual: true, rng: () => 0.99 });
@@ -257,8 +264,8 @@ test("Blueprint copies slot 1 and Relay chains to the right", () => {
 });
 
 test("Discover offers three options, stacks picks, and Autopilot self-picks", () => {
-  const base = withSlots(createInitialState(1), ["corner-08"]);
-  const built = displayAll(base, ["corner-08"]);
+  const base = withSlots(createInitialState(1), [L("corner-08")]);
+  const built = displayAll(base, [L("corner-08")]);
   const flush = { ...built, packsOpened: built.packsOpened + 60 };
   const opened = openPack(flush, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
   assert.ok(opened.state.discoverOffer);
@@ -269,8 +276,8 @@ test("Discover offers three options, stacks picks, and Autopilot self-picks", ()
   assert.ok(chosen.discoverStack[optionId] >= 1);
   assert.ok(DISCOVER_POOL.some((option) => option.id === optionId));
 
-  const autoBase = withSlots(createInitialState(1), ["orchard-12", "corner-08"]);
-  const autoBuilt = displayAll(autoBase, ["orchard-12", "corner-08"]);
+  const autoBase = withSlots(createInitialState(1), [L("orchard-12"), L("corner-08")]);
+  const autoBuilt = displayAll(autoBase, [L("orchard-12"), L("corner-08")]);
   const autoFlush = { ...autoBuilt, packsOpened: autoBuilt.packsOpened + 60 };
   const autoOpened = openPack(autoFlush, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
   assert.equal(autoOpened.state.discoverOffer, null);
@@ -282,15 +289,15 @@ test("editing the display case sells the duplicate stack first", () => {
   const base = withSlots(createInitialState(1), []);
   const dupped = {
     ...base,
-    collection: { ...base.collection, "corner-01": 5 },
+    collection: { ...base.collection, [L("corner-01")]: 5 },
     duplicateBank: 4,
   };
   assert.ok(getDuplicateCount(dupped) > 0);
-  const edited = displayCard(dupped, "corner-01", 10);
+  const edited = displayCard(dupped, L("corner-01"), 10);
   assert.equal(getDuplicateCount(edited), 0);
   assert.ok(edited.coins > dupped.coins);
   assert.equal(edited.displayed.length, 1);
-  const removed = undisplayCard({ ...edited, collection: { ...edited.collection, "corner-02": 3 }, duplicateBank: 2 }, "corner-01");
+  const removed = undisplayCard({ ...edited, collection: { ...edited.collection, [L("corner-02")]: 3 }, duplicateBank: 2 }, L("corner-01"));
   assert.equal(getDuplicateCount(removed), 0);
   assert.equal(removed.displayed.length, 0);
 });
@@ -309,15 +316,15 @@ test("the Nameless still opens the Rewrite and inscriptions persist", () => {
 });
 
 test("saves round-trip engine state and drop unknown discover entries", () => {
-  const state = withCards(createInitialState(1), ["corner-01"]);
+  const state = withCards(createInitialState(1), [L("corner-01")]);
   const withEngineBits = {
-    ...displayCard(state, "corner-01", 7),
+    ...displayCard(state, L("corner-01"), 7),
     discoverStack: { resonance: 3, bogus: 9 },
     counters: { "c:corner-05": 120, junk: Number.NaN },
     prestige: { inscriptions: 2, rewrites: 1 },
   };
   const hydrated = hydrateState(JSON.parse(JSON.stringify(withEngineBits)), 999);
-  assert.deepEqual(hydrated.displayed, [{ id: "corner-01", at: 7 }]);
+  assert.deepEqual(hydrated.displayed, [{ id: L("corner-01"), at: 7 }]);
   assert.deepEqual(hydrated.discoverStack, { resonance: 3 });
   assert.equal(hydrated.counters["c:corner-05"], 120);
   assert.equal(hydrated.prestige.inscriptions, 2);
@@ -424,27 +431,25 @@ test("audit: markSpread dial is live — revealed Marks spread more with it disp
     }
     return spreads;
   };
-  const withoutKnob = runMarks(["circuit-12"], 11);
-  const withKnob = runMarks(["circuit-12", "circuit-06"], 11);
+  const withoutKnob = runMarks([L("circuit-12")], 11);
+  const withKnob = runMarks([L("circuit-12"), L("circuit-06")], 11);
   assert.ok(withKnob > withoutKnob, `expected spreads with knob (${withKnob}) > without (${withoutKnob})`);
 });
 
 test("audit: transmute chance past 100% is guaranteed and hits extra cards", () => {
-  const ids = ["polar-12", "lastlight-05"];
+  const ids = [L("polar-12"), L("lastlight-05")];
   const built = displayAll(withSlots(createInitialState(1), ids), ids);
   // 50 signature + 100 boost = 150%: rng 0.97 would have failed the old
   // capped roll (0.97 > 0.95) — now one Transmute is guaranteed.
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.97 });
   const step = revealPackCard(opened.state, opened.result.cards, 0, { manual: true, rng: () => 0.97 });
   assert.ok(step.events.some((event) => event.t === "transmute"));
-  assert.equal(step.events.find((event) => event.t === "transmute").cardId, "polar-12");
+  assert.equal(step.events.find((event) => event.t === "transmute").cardId, L("polar-12"));
 });
 
 test("audit: catalyst spread past 100% can spread twice", () => {
-  const ids = ["cloud-12", "circuit-12", "prism-11", "lastlight-06"];
-  const built = displayAll(withSlots(createInitialState(1), [...ids, ...SETS[2].cards.map((c) => c.id)], {
-    collection: Object.fromEntries([...SETS[1].cards, ...SETS[2].cards, ...SETS[13].cards, ...SETS[17].cards, ...SETS[9].cards].map((c) => [c.id, 1])),
-  }), ids);
+  const ids = [L(L("cloud-12")), L(L("circuit-12")), L(L("prism-11")), L(L("lastlight-06"))];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
   // catalystChance 75 + 50 + 100 = 225: two guaranteed spreads (capped at
   // two per event), so the Mark signature's mark spreads twice.
   const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0.5 });
@@ -452,33 +457,33 @@ test("audit: catalyst spread past 100% can spread twice", () => {
   assert.ok(markEvents.length >= 3, `expected 3+ marks, got ${markEvents.length}`);
   const catalystEvents = opened.result.events.filter((event) => event.t === "catalyst");
   assert.ok(catalystEvents.length >= 2);
-  assert.equal(catalystEvents[0].cardId, "cloud-12");
+  assert.equal(catalystEvents[0].cardId, L(L("cloud-12")));
 });
 
 test("audit: threshold and duplicate-sale cards emit attributed trigger events", () => {
-  const idleIds = ["corner-05"];
+  const idleIds = [L("corner-05")];
   const idleState = {
     ...displayAll(withSlots(createInitialState(1), idleIds), idleIds),
     lifetimeCoins: 5_000,
   };
   const swept = evaluateIdleThresholds(idleState, { rng: () => 0.5 });
-  assert.ok(swept.events.some((event) => event.t === "trigger" && event.cardId === "corner-05"));
+  assert.ok(swept.events.some((event) => event.t === "trigger" && event.cardId === L("corner-05")));
 
-  const saleIds = ["frontier-12", "frontier-01", "frontier-06"];
+  const saleIds = [L("frontier-12"), L("frontier-01"), L("frontier-06")];
   const saleReady = displayAll(withSlots(createInitialState(1), saleIds), saleIds);
   const withDups = {
     ...saleReady,
-    collection: { ...saleReady.collection, "corner-01": 6 },
+    collection: { ...saleReady.collection, [L("corner-01")]: 6 },
     duplicateBank: 5,
   };
   const sale = sellDuplicatesDetailed(withDups, { rng: () => 0.99 });
-  assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === "frontier-01"));
-  assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === "frontier-06"));
-  assert.ok(sale.events.some((event) => event.t === "coins" && event.source === "frontier-06"));
+  assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === L("frontier-01")));
+  assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === L("frontier-06")));
+  assert.ok(sale.events.some((event) => event.t === "coins" && event.source === L("frontier-06")));
 });
 
 test("audit: direct-applied Mystery Pack cards fire reveal supports", () => {
-  const ids = ["frontier-12", "corner-05", "abyss-11"];
+  const ids = [L("frontier-12"), L("corner-05"), L("abyss-11")];
   const built = {
     ...displayAll(withSlots(createInitialState(1), ids), ids),
     lifetimeCoins: 2_000,
@@ -486,8 +491,8 @@ test("audit: direct-applied Mystery Pack cards fire reveal supports", () => {
   const swept = evaluateIdleThresholds(built, { rng: () => 0.5 });
   assert.ok(swept.mysteryCards.length > 0, "idle salvage produced mystery cards");
   assert.ok(
-    swept.events.some((event) => event.t === "trigger" && event.cardId === "abyss-11"),
+    swept.events.some((event) => event.t === "trigger" && event.cardId === L("abyss-11")),
     "mysteryReveal support fired for direct-applied mystery cards",
   );
-  assert.ok(swept.events.some((event) => event.t === "mystery" && event.cardId === "frontier-12"));
+  assert.ok(swept.events.some((event) => event.t === "mystery" && event.cardId === L("frontier-12")));
 });

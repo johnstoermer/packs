@@ -37,7 +37,7 @@ const OPEN_SECONDS = 1.7;
 
 const PATHS = {
   wide: SETS.map((set) => set.id),
-  salvageRush: ["corner", "circuit", "frontier", "abyss", "crown", "verdant", "polar", "ember", "cloud", "glass", "harbor", "orchard", "hollow", "prism", "signal", "observatory", "foundry", "apocalypse", "lastlight", "unwritten"],
+  salvageRush: SETS.map((set) => set.id),
 };
 
 // Score a card for a build: signatures of favored verbs first, then supports

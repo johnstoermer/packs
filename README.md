@@ -14,7 +14,7 @@ The display case is the core progression engine. There are no duel, filing-rule,
 
 ## The verb engine
 
-- The chase card of each of the first twelve sets is that verb's **signature** — its biggest chance source or defining rule: Common Echo, Mark, Salvage, Mimic, Rare Echo, Fusion, Transmute, Fracture, Catalyst, Blueprint, Relay, or Autopilot.
+- Each verb has one **signature** card — its biggest chance source or defining rule: Common Echo, Mark, Salvage, Mimic, Rare Echo, Fusion, Transmute, Fracture, Catalyst, Blueprint, Relay, or Autopilot. Signatures are the high-rarity anchors of their print line.
 - Every other card is a **support** that adds its own chance source or pays out on a trigger (reveals, duplicate sales, pack opens, coin or pack thresholds). Every chance source works standalone; pure dials (biases, depths, preferences) modify a verb and wait for a source to feed them.
 - Late sets carry **capstones** — cross-engine cards that bridge two verbs at once.
 - **Discover** is the universal support mechanic: qualifying triggers offer a choice of three boons (Insight, Resonance, Catalyst, Reflection, Acceleration); picks stack until an event consumes them.
@@ -30,7 +30,7 @@ The display case is the core progression engine. There are no duel, filing-rule,
 - Inspection lamps improve premium-card weight.
 - Supplier terms reduce the purchase price of packs.
 - Booster boxes do not exist. Cases remain a late bulk option.
-- There are 20 sets and 240 unique cards; each is a signature, a support, a capstone, or the prestige door, with player-facing rules text.
+- There are five 48-card print lines (240 unique cards) sharing one rarity distribution; each card is a signature, a support, a capstone, or the prestige door, with player-facing rules text. Signatures sit at each line's top Legendary/Mythic/Celestial slots, so rarity itself routes players into builds.
 - The display case holds up to six cards; slots unlock through milestones, and the displayed signatures-plus-supports engine drives the run. Editing the case first sells that card's duplicate stack — displaying is a commitment.
 - Sets unlock along a branching print tree: finishing Neon Circuit opens Gilded Frontier, Abyssal Bloom, and Crownfall at once; most mid-game sets open from either of two parents; Sunken Signal opens only through Nocturne Harbor; Unwritten requires completing every other set.
 - Each later set introduces permanently higher-rarity chase cards, culminating in the sole Nameless card in set 20.

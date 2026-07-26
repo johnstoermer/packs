@@ -23,6 +23,7 @@ import {
   undisplayCard,
 } from "../lib/gameLogic.js";
 import { getDisplayedEntries, getCaseSlots } from "../lib/engineCards.js";
+import { LEGACY_CARD_MAP } from "../lib/gameData.js";
 
 const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
   const [key, value] = arg.replace(/^--/, "").split("=");
@@ -37,7 +38,7 @@ const MILESTONES = [60, 120, 180, 220, 235, 240];
 
 // Display priorities per build: King(s) first, then the supports that define
 // the archetype. Cards come online as soon as they are pulled.
-const BUILDS = {
+const LEGACY_BUILDS = {
   "baseline: empty case": [],
   "common echo": ["corner-12", "lastlight-01", "unwritten-09", "corner-01", "corner-07", "corner-10"],
   "rare echo": ["crown-12", "lastlight-02", "observatory-08", "signal-10", "crown-02", "frontier-10"],
@@ -57,6 +58,13 @@ const BUILDS = {
   "autopilot discover": ["orchard-12", "orchard-01", "unwritten-02", "orchard-07", "prism-07", "abyss-09"],
   "kitchen sink endgame": ["frontier-12", "verdant-12", "unwritten-08", "unwritten-07", "lastlight-11", "signal-06"],
 };
+
+// Curated builds are written in legacy card ids; map them onto the live
+// print-line reprints.
+const BUILDS = Object.fromEntries(Object.entries(LEGACY_BUILDS).map(([label, ids]) => [
+  label,
+  ids.map((id) => LEGACY_CARD_MAP[id] || id),
+]));
 
 function refreshLoadout(state, priority, now) {
   if (!priority.length) return state;
@@ -87,7 +95,10 @@ function simulate({ label, priority, seed }) {
   let kingAt = null;
   let namelessVia = null;
   let lastLoadout = -Infinity;
-  const kingIds = priority.filter((id) => id.endsWith("-12"));
+  const kingIds = priority.filter((id) => {
+    const slot = Number(id.slice(id.lastIndexOf("-") + 1));
+    return slot >= 31;
+  });
 
   const absorb = (events) => {
     for (const event of events) {

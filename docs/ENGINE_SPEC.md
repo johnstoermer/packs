@@ -180,12 +180,21 @@ payoff is visible cause and effect, not a metaphor).
 Demoted to support space: Connected/Collector (relationship tags inside Mark
 and Mimic builds).
 
-## Set → signature mapping
+## Print lines → signature mapping
 
-The chase card at the end of a set IS that set's signature: pulling it
-completes the set and hands the player the verb's biggest chance source (or
-defining rule) at the same moment. Signatures are assigned to the first
-twelve sets in unlock-tree order; later sets' chase cards are cross-engine
-capstones (supports that fuse two verbs), and the final Unwritten chase card
-remains the prestige door. Nothing is gated on a signature — every chance
-source on every support works the moment it is displayed.
+The pool is five 48-card print lines, every line sharing one rarity
+distribution (10 Common, 8 Uncommon, 6 Rare, 4 Epic, 3 Legendary, 3 Mythic,
+2 Exalted, 2 Ascendant, 2 Celestial, then one of each deeper tier). Each
+line leans toward a family of verbs, and its signatures are pinned to high
+slots so rarity itself routes players into builds: signatures sit at the top
+Legendary, top Mythic, and top Celestial of their line; capstones take the
+Absolute and apex slots. The final line swaps its Singularity for the
+Nameless finale — the prestige door closes the collection. Nothing is gated
+on a signature — every chance source on every support works the moment it is
+displayed.
+
+- Midnight Marquee: Common Echo, Mark, Rare Echo
+- Tideworks: Salvage, Relay
+- Forgeline: Fusion, Fracture
+- Mirrorfield: Mimic, Transmute, Catalyst
+- The Last Archive: Blueprint, Autopilot, and the Nameless

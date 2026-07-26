@@ -34,7 +34,7 @@ Use this checklist for every reward path and system change.
 ## The display case is the engine
 
 - Up to six owned cards can be displayed; slots unlock through milestones. Slot 1 is always open.
-- Every chance source stands alone; pure dials modify a verb and stay inert until a source feeds them. The chase card of each of the first twelve sets is that verb's signature — its biggest chance source or defining rule; late sets carry cross-engine capstones.
+- Every chance source stands alone; pure dials modify a verb and stay inert until a source feeds them. Each verb's signature — its biggest chance source or defining rule — anchors a high-rarity slot of its print line; capstones take the Absolute and apex slots.
 - Discover is the universal support mechanic: three options drawn from a five-boon pool, picks stack, the next qualifying event consumes the stack. Autopilot picks automatically and enhances automatic picks.
 - Automation is thresholds, never timers: displayed cards watch coin and pack watermarks and fire when totals cross them, online or idle.
 - Editing the case sells that card's duplicate stack first — displaying is a commitment.

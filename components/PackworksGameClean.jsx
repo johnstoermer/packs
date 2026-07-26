@@ -97,7 +97,10 @@ function getCardPresentation(card, rarityId = card.rarity) {
 
 function CardArt({ card, compact = false }) {
   const set = getSet(card.setId);
-  const artPath = `${ASSET_BASE}/card-art/${card.setId}/${String(card.number).padStart(2, "0")}.webp`;
+  // Art is filed under the legacy print a card was reprinted from.
+  const artKey = card.legacy || card.id;
+  const artAt = artKey.lastIndexOf("-");
+  const artPath = `${ASSET_BASE}/card-art/${artKey.slice(0, artAt)}/${artKey.slice(artAt + 1)}.webp`;
   return (
     <span
       className={`card-art ${compact ? "compact" : ""}`}
@@ -139,6 +142,7 @@ function RevealCard({
   perRow,
   rows,
   shrink,
+  initialCount,
   revealed,
   echo,
   latest,
@@ -175,7 +179,12 @@ function RevealCard({
         "--set-a": set.colors[0],
         "--set-b": set.colors[1],
         "--set-c": set.colors[2],
-        "--deal-delay": `${index * 95}ms`,
+        // Cards that join an in-progress reveal (Mystery bursts, Fusion
+        // results, encores) deal in immediately with a short stagger instead
+        // of waiting out the whole board's delay chain.
+        "--deal-delay": initialCount != null && index >= initialCount
+          ? `${((index - initialCount) % 6) * 80}ms`
+          : `${Math.min(index * 95, 4_000)}ms`,
       }}
       onPointerEnter={() => canReveal && onSignal(signal.order)}
       onFocus={() => canReveal && onSignal(signal.order)}
@@ -418,7 +427,7 @@ function ShopDrawer({ game, onClose, onBuy, onBreak, onUpgrade, onSet, onReset }
                   <h3>{set.name}</h3>
                   <p>
                     {unlocked
-                      ? `${found}/12 found${set.id === game.activeSet ? " / selected" : ""}`
+                      ? `${found}/${set.cards.length} found${set.id === game.activeSet ? " / selected" : ""}`
                       : unmet.map((requirement) => `${requirement.label} ${requirement.current}/${requirement.target}`).join(" / ")}
                   </p>
                 </button>
@@ -517,7 +526,7 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
         </div>
       )}
       <div className="clean-binder-summary">
-        <strong>{found} / 12</strong>
+        <strong>{found} / {set.cards.length}</strong>
         <span>COLLECTED</span>
         <strong>{formatNumber(setDuplicates)}</strong>
         <span>DUPLICATES</span>
@@ -755,8 +764,8 @@ function CaseStrip({ game, derived, fx, onOpenCase, onOpenBinder }) {
 function SetTray({ game, set, onCard }) {
   const found = set.cards.filter((card) => game.collection[card.id]).length;
   return (
-    <section className="clean-set-tray" aria-label={`${set.name} collection, ${found} of 12 found`}>
-      <header><strong>{set.short} COLLECTION</strong><span>{found}/12</span></header>
+    <section className="clean-set-tray" aria-label={`${set.name} collection, ${found} of ${set.cards.length} found`}>
+      <header><strong>{set.short} COLLECTION</strong><span>{found}/{set.cards.length}</span></header>
       <div>
         {set.cards.map((card) => {
           const count = game.collection[card.id] || 0;
@@ -796,7 +805,7 @@ export default function PackworksGameClean() {
   const [game, setGame] = useState(() => createInitialState(0));
   const [ready, setReady] = useState(false);
   const [drawer, setDrawer] = useState(null);
-  const [binderSetId, setBinderSetId] = useState("corner");
+  const [binderSetId, setBinderSetId] = useState(SETS[0].id);
   const [opening, setOpening] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [toasts, setToasts] = useState([]);
@@ -1247,7 +1256,7 @@ export default function PackworksGameClean() {
     pushFx(rolled.result.events);
 
     const id = `${Date.now()}-${rolled.state.packsOpened}`;
-    commitOpening({ id, result: rolled.result, phase: "sealed", revealed: [], impact: null });
+    commitOpening({ id, result: rolled.result, phase: "sealed", revealed: [], impact: null, initialCount: rolled.result.cards.length });
     const quick = rolled.state.settings.quickOpen || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const tearDelay = quick ? 80 : 440;
     const dealDelay = quick ? 240 : 1250;
@@ -1520,7 +1529,7 @@ export default function PackworksGameClean() {
     }
     commit(next);
     setRewriteArmed(false);
-    setBinderSetId("corner");
+    setBinderSetId(SETS[0].id);
     setDrawer(null);
     setSelectedCard(null);
     closeOpening();
@@ -1795,6 +1804,7 @@ export default function PackworksGameClean() {
                 perRow={boardLayout.perRow}
                 rows={boardLayout.rows}
                 shrink={boardLayout.shrink}
+                initialCount={opening.initialCount}
                 revealed={!!pull.revealed}
                 echo={revealEchoes[index]}
                 latest={opening.impact?.index === index}
