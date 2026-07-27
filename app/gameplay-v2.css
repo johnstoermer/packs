@@ -2561,30 +2561,6 @@
   to { opacity: 1; transform: scale(1); }
 }
 
-.pw-misprint-stamp,
-.pw-file-stamp {
-  position: absolute;
-  z-index: 5;
-  right: 7px;
-  bottom: 26px;
-  padding: 4px 6px;
-  border: 1px solid rgba(242, 107, 85, 0.72);
-  background: rgba(54, 20, 17, 0.86);
-  color: #f2917e;
-  font: 800 5px/1 Consolas, monospace;
-  letter-spacing: 0.08em;
-  transform: rotate(-4deg);
-}
-
-.pw-file-stamp {
-  right: auto;
-  left: 7px;
-  border-color: rgba(173, 177, 169, 0.62);
-  background: rgba(30, 34, 34, 0.86);
-  color: #b6bab3;
-  transform: rotate(3deg);
-}
-
 .forged-pack::before {
   position: absolute;
   z-index: 4;
@@ -2604,10 +2580,6 @@
 .reveal-card.count-6 {
   --card-width: clamp(118px, 11.2vw, 160px);
   --card-gap: min(11.8vw, 164px);
-}
-
-.pw-opening-summary .summary-total strong {
-  white-space: nowrap;
 }
 
 @media (max-width: 1180px) {
@@ -3092,12 +3064,6 @@
       rotate(var(--mobile-r));
   }
 
-  .reveal-card.count-6.is-settled {
-    transform:
-      translate(calc(-50% + var(--mobile-x)), calc(-64% + var(--mobile-y)))
-      rotate(var(--mobile-r))
-      scale(0.86);
-  }
 }
 
 @media (max-width: 470px) {

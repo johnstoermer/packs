@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { LEGACY_CARD_MAP, SETS } from "../../lib/gameData.js";
+import { LEGACY_CARD_MAP, SETS, getCard } from "../../lib/gameData.js";
 import { SAVE_KEY, advanceBeat, createInitialState } from "../../lib/gameLogic.js";
 
 async function seedState(page, state) {
@@ -14,6 +14,12 @@ async function revealAll(page) {
   for (let index = 0; index < count; index += 1) {
     await cards.nth(index).click();
   }
+}
+
+async function waitForCollection(page, timeout = 7_000) {
+  await expect(page.locator(".opening-layer.phase-collecting")).toBeVisible({ timeout });
+  await expect(page.locator(".reveal-deck")).toHaveCSS("animation-name", "league-deck-collect");
+  await expect(page.locator(".opening-layer")).toHaveCount(0, { timeout: 3_000 });
 }
 
 test("the clean game presents one obvious loop and a manual six-card opening", async ({ page }) => {
@@ -31,9 +37,17 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "SELL DUPLICATES" })).toHaveCount(0);
   await expect(page.locator(".clean-topbar nav")).toHaveCount(0);
-  await expect(page.locator(".clean-set-progress")).toBeVisible();
-  await expect(page.locator(".clean-set-progress")).toContainText("0/98");
-  await expect(page.locator(".clean-pack-station > .clean-simple-stats")).toBeVisible();
+  const collection = page.locator(".clean-set-progress");
+  await expect(collection).toBeVisible();
+  await expect(collection.locator("header strong")).toHaveText("COLLECTION");
+  await expect(collection).toContainText("0/98");
+  await expect(page.locator(".clean-simple-stats")).toHaveCount(0);
+  await expect(page.getByText("PACKS OPENED", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("PACKS READY", { exact: true })).toHaveCount(0);
+  expect(await collection.evaluate((node) => {
+    const bounds = node.getBoundingClientRect();
+    return Math.round(bounds.left + bounds.width / 2 - window.innerWidth / 2);
+  })).toBe(0);
   await expect(page.getByText("MANUAL HEAT")).toHaveCount(0);
   await expect(page.getByText("RULES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("PLAY", { exact: true })).toHaveCount(0);
@@ -46,23 +60,24 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   await expect(page.locator(".case-strip")).toHaveCount(1);
   await expect(page.locator(".clean-stage")).toBeVisible();
   await expect(page.locator(".clean-set-progress")).toBeVisible();
-  await expect(page.locator(".clean-pack-station > .clean-simple-stats")).toBeVisible();
+  await expect(page.locator(".clean-simple-stats")).toHaveCount(0);
   await expect(page.locator(".opening-layer")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await expect(page.locator(".opening-topline")).toHaveCount(0);
 
   const first = page.locator(".reveal-card").first();
   await first.hover();
-  await expect(first.locator(".rarity-signal")).toHaveCSS("opacity", "1");
-  await expect(first.locator(".rarity-signal")).toHaveText("");
-  await page.screenshot({ path: "test-results/clean-pack-signals.png" });
+  await expect(first.locator(".rarity-signal")).toHaveCount(0);
+  await expect(page.locator(".opening-instruction")).toHaveCount(0);
+  await expect(page.getByText("HOVER FOR RARITY")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/clean-pack.png" });
 
   await revealAll(page);
-  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
-  await expect(page.locator(".reveal-card.is-revealed")).toHaveCount(6);
-  await expect(page.locator(".summary-total")).toContainText("PACK RESULTS");
-  await page.screenshot({ path: "test-results/clean-pack-summary.png" });
-
-  await page.getByRole("button", { name: "CLEAR TABLE" }).click();
+  await expect(page.getByText("PACK RESULTS")).toHaveCount(0);
+  await expect(page.locator(".card-art-index, .card-art-grade, .card-print-mark, .pw-misprint-stamp")).toHaveCount(0);
+  await expect(page.locator('[class*="treatment-"]')).toHaveCount(0);
+  await expect(page.locator(".card-identity small")).toHaveCount(0);
+  await expect(page.getByText(/PW-\d+|PW\s*\/\s*\d+/)).toHaveCount(0);
+  await waitForCollection(page);
   await expect(page.locator(".clean-set-progress")).not.toContainText("0/98");
   await page.locator(".clean-set-progress").click();
   await expect(page.locator(".clean-binder-grid button.found").first()).toBeVisible();
@@ -88,7 +103,7 @@ test("the pack rotunda presents every real pack type without duplicating wrapper
     {
       name: "Rare",
       price: "10,000 CASH",
-      description: "Common and Uncommon removed; every rarity shifts upward.",
+      description: "Common and Uncommon removed.",
       creatures: "Echowl, Portalink, and Catalystag",
     },
     {
@@ -100,7 +115,7 @@ test("the pack rotunda presents every real pack type without duplicating wrapper
     {
       name: "Mega Rare",
       price: "1,000,000 CASH",
-      description: "Common and Uncommon removed; every rarity shifts upward.",
+      description: "Common and Uncommon removed.",
       creatures: "Omniecho, Prismorph, and Luxquest",
     },
     {
@@ -162,8 +177,10 @@ test("Mega Standard stages readable batches and exposes the FINISH failsafe", as
   await expect(page.locator(".reveal-card").first()).toHaveCSS("animation-name", "league-file-card");
   await page.screenshot({ path: "test-results/clean-mega-pack.png" });
   await finish.click();
-  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible();
+  await expect(page.locator(".opening-layer.phase-collecting")).toBeVisible();
+  await expect(page.locator(".reveal-deck")).toHaveCSS("animation-name", "league-deck-collect");
   await expect(finish).toHaveCount(0);
+  await expect(page.locator(".opening-layer")).toHaveCount(0, { timeout: 3_000 });
 });
 
 test("mobile mounts only six cards from a large pack at once", async ({ page }) => {
@@ -210,11 +227,9 @@ test("holding Space reveals cards in order and releasing stops the sequence", as
   await expect(page.locator(".reveal-card.is-revealed")).toHaveCount(stoppedAt);
 
   await page.keyboard.down("Space");
-  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 7_000 });
-  await expect(page.locator(".reveal-card.is-revealed")).toHaveCount(6);
-  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 3_000 });
+  await expect(page.locator(".clean-pack-clicker")).toHaveAttribute("aria-label", /1 ready/, { timeout: 10_000 });
   await page.keyboard.up("Space");
-  await expect(page.locator(".clean-simple-stats div").first().locator("strong")).toHaveText("2");
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
 });
 
 test("all six cards remain tappable on a phone", async ({ page }) => {
@@ -244,8 +259,9 @@ test("all six cards remain tappable on a phone", async ({ page }) => {
   }
   await page.screenshot({ path: "test-results/clean-mobile-pack.png" });
   await revealAll(page);
-  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
-  await page.screenshot({ path: "test-results/clean-mobile-summary.png" });
+  await expect(page.locator(".opening-layer.phase-collecting")).toBeVisible({ timeout: 6_000 });
+  await page.screenshot({ path: "test-results/clean-mobile-collecting.png" });
+  await expect(page.locator(".opening-layer")).toHaveCount(0, { timeout: 3_000 });
 });
 
 test("a held mobile swipe reveals every face-down card it crosses", async ({ page }) => {
@@ -304,7 +320,7 @@ test("the large mobile hold control runs complete packs until released", async (
   await page.mouse.down();
   await expect(autoControl).toHaveClass(/is-held/);
   await expect(autoControl).toContainText("RELEASE TO STOP");
-  await expect(page.locator(".clean-simple-stats div").first().locator("strong")).toHaveText("2", { timeout: 15_000 });
+  await expect(page.locator(".clean-pack-clicker")).toHaveAttribute("aria-label", /2 ready/, { timeout: 15_000 });
   await page.mouse.up();
 
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 4_000 });
@@ -315,14 +331,17 @@ test("the large mobile hold control runs complete packs until released", async (
   await page.screenshot({ path: "test-results/clean-mobile-auto.png" });
 });
 
-test("the top bar is only the brand and wallet, with options on the corner gear", async ({ page }) => {
+test("the PACKWORKS title opens centered game options with no settings wheel", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator(".clean-topbar .clean-brand")).toContainText("PACKWORKS");
+  const title = page.getByRole("button", { name: "PACKWORKS game options" });
+  await expect(title).toContainText("PACKWORKS");
   await expect(page.locator(".clean-topbar .clean-wallet")).toBeVisible();
   await expect(page.locator(".clean-topbar nav")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "SHOP", exact: true })).toHaveCount(0);
   await expect(page.locator(".clean-upgrades")).toHaveCount(0);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.locator(".clean-settings-gear")).toHaveCount(0);
+  await title.click();
+  await expect(title).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator(".clean-settings")).toBeVisible();
   await expect(page.locator(".clean-settings-options > button")).toHaveCount(3);
   await expect(page.locator(".clean-settings")).toContainText("Sound");
@@ -361,6 +380,43 @@ test("Locklure shakes its display slot when it adds a Common card", async ({ pag
   await expect(slot).toHaveClass(/fx-trigger/);
   await expect(slot).toHaveCSS("animation-name", "league-strip-trigger");
   await expect(slot).toHaveAttribute("data-fx", /\d+/);
+});
+
+test("Fusion immediately replaces the earlier card and reveals it through display triggers", async ({ page }) => {
+  const fusionId = LEGACY_CARD_MAP["verdant-12"];
+  const fusedRevealId = LEGACY_CARD_MAP["verdant-02"];
+  const fusionName = getCard(fusionId).name;
+  const fusedRevealName = getCard(fusedRevealId).name;
+  const state = createInitialState(Date.now());
+  state.collection = Object.fromEntries(SETS[0].cards.map((card) => [card.id, 1]));
+  state.bestRarities = Object.fromEntries(SETS[0].cards.map((card) => [card.id, card.rarity]));
+  state.displayed = [
+    { id: fusionId, at: Date.now() },
+    { id: LEGACY_CARD_MAP["crown-11"], at: Date.now() + 1 },
+    { id: fusedRevealId, at: Date.now() + 2 },
+  ];
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, advanceBeat(state));
+  await page.goto("/");
+  await page.evaluate(() => {
+    Math.random = () => 0.99;
+  });
+
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  const first = page.locator(".reveal-card").nth(0);
+  await first.click();
+  const firstRevealLabel = await first.getAttribute("aria-label");
+  await page.locator(".reveal-card").nth(1).click();
+
+  await expect(page.locator(".opening-fusion-notice")).toContainText("FUSION");
+  await expect(first).toHaveClass(/is-revealed/);
+  await expect(first).toHaveClass(/rarity-uncommon/);
+  await expect.poll(() => first.getAttribute("aria-label")).not.toBe(firstRevealLabel);
+  await expect(page.locator(`.case-strip-slot[title="${fusionName}"]`)).toHaveClass(/is-triggered/);
+  await expect(page.locator(`.case-strip-slot[title="${fusedRevealName}"]`)).toHaveClass(/is-triggered/);
 });
 
 test("generated Mystery cards auto-reveal through the live opening", async ({ page }) => {
@@ -446,6 +502,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await page.locator(".clean-set-progress").click();
   await expect(page.locator(".clean-binder-tools")).toBeVisible();
   await expect(page.locator(".clean-binder-grid > button")).toHaveCount(98);
+  await expect(page.locator(".clean-binder-grid").getByText(/PW-\d+|PW\s*\/\s*\d+/)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Missing card 1, show rarity" }).first().click();
   const detail = page.locator(".clean-card-detail");
@@ -483,8 +540,20 @@ test("the display case holds cards whose unique effects augment the game", async
   await page.getByRole("button", { name: /Pennigeon, 1 cop/ }).click();
   const detail = page.locator(".clean-card-detail");
   await expect(detail.locator(".clean-detail-art .card-front")).toBeVisible();
+  await expect.poll(() => detail.locator(".card-zoom-card").evaluate((node) => {
+    const bounds = node.getBoundingClientRect();
+    return {
+      x: Math.round(bounds.left + bounds.width / 2 - window.innerWidth / 2),
+      y: Math.round(bounds.top + bounds.height / 2 - window.innerHeight / 2),
+    };
+  })).toEqual({ x: 0, y: 0 });
   await expect(detail.locator("canvas")).toHaveCount(0);
   await expect(detail.locator(".clean-detail-copy")).toHaveCount(0);
+  await expect(detail.locator(".card-art-index, .card-art-grade, .card-print-mark, .pw-misprint-stamp")).toHaveCount(0);
+  await expect(detail.locator('[class*="treatment-"]')).toHaveCount(0);
+  await expect(detail.locator(".card-identity small")).toHaveCount(0);
+  await expect(detail.locator(".card-zoom-close")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/clean-card-zoom-centered.png" });
   await expect(detail).toContainText("Whenever you reveal a Common");
   await expect(detail.locator(".card-head")).toContainText("Pennigeon");
   await expect(detail.locator(".card-copy > strong")).toHaveCount(0);
@@ -556,9 +625,10 @@ test("holding Space buys the next pack automatically when stock reaches zero", a
   await page.getByRole("button", { name: /Buy and open a pack/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
   await revealAll(page);
-  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
+  await waitForCollection(page);
   await page.keyboard.down("Space");
-  await expect(page.locator(".clean-simple-stats div").first().locator("strong")).toHaveText("2", { timeout: 4_000 });
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 4_000 });
+  await expect(page.locator(".clean-pack-clicker")).toHaveAttribute("aria-label", /Buy and open a pack/);
   await page.keyboard.up("Space");
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pack shop" })).toHaveCount(0);
@@ -597,8 +667,11 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
     (node) => Number.parseFloat(getComputedStyle(node).animationDuration),
   );
   expect(borderAnimationSeconds).toBeGreaterThan(0.1);
-  expect(await legendaryFace.evaluate((node) => getComputedStyle(node).transform)).not.toBe("none");
-  await expect(legendaryFace).toHaveCSS("backface-visibility", "hidden");
+  expect(await legendaryFace.evaluate((node) => {
+    const matrix = new DOMMatrix(getComputedStyle(node).transform);
+    return { x: Math.round(matrix.m11), z: Math.round(matrix.m33) };
+  })).toEqual({ x: 1, z: 1 });
+  await expect(legendaryFace).toHaveCSS("backface-visibility", "visible");
   await expect(legendaryBack).toHaveCSS("visibility", "hidden");
   await expect(legendaryBack).toHaveCSS("opacity", "0");
   await page.screenshot({ path: "test-results/clean-legendary-impact.png" });
@@ -653,28 +726,28 @@ test("reveals fire haptic pulses through the vibration API when enabled", async 
   });
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const options = page.getByRole("button", { name: "PACKWORKS game options" });
+  await options.click();
   const haptics = page.locator(".clean-settings-options > button").filter({ hasText: "Haptics" });
   await expect(haptics).toContainText("ON");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await options.click();
 
   await page.getByRole("button", { name: /Open a pack/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 6_000 });
   await revealAll(page);
-  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
+  await waitForCollection(page);
   const withHaptics = await page.evaluate(() => window.__vibrations.length);
   expect(withHaptics).toBeGreaterThanOrEqual(7); // pack open + six reveals
 
-  await page.getByRole("button", { name: "CLEAR TABLE" }).click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await options.click();
   await haptics.click();
   await expect(haptics).toContainText("OFF");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await options.click();
   const beforeMuted = await page.evaluate(() => window.__vibrations.length);
   await page.getByRole("button", { name: /Open a pack/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible({ timeout: 6_000 });
   await revealAll(page);
-  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible({ timeout: 6_000 });
+  await waitForCollection(page);
   const afterMuted = await page.evaluate(() => window.__vibrations.length);
   expect(afterMuted).toBe(beforeMuted);
 });
@@ -724,7 +797,7 @@ test("the clean table remains usable inside the compact game frame", async ({ pa
   await seedState(page, state);
   await page.goto("/");
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
-  await expect(page.locator(".clean-simple-stats")).toBeVisible();
+  await expect(page.locator(".clean-simple-stats")).toHaveCount(0);
   await expect(page.locator(".clean-set-progress")).toBeVisible();
   const packBounds = await page.locator(".clean-pack-clicker").boundingBox();
   expect(packBounds.x).toBeGreaterThanOrEqual(0);

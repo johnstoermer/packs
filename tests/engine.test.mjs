@@ -29,6 +29,7 @@ import {
   hydrateState,
   openPack,
   resolveFusions,
+  resolveImmediateFusion,
   revealPackCard,
   rewriteState,
   sellDuplicatesDetailed,
@@ -237,6 +238,59 @@ test("Fusion signature fuses same-rarity pairs upward and they reveal again", ()
   assert.ok(newCards.every((pull) => RARITIES[pull.rarity].order > RARITIES.common.order));
   const consumed = fusion.cards.filter((pull) => pull.fusedAway).length;
   assert.equal(consumed, newCards.length * 2);
+});
+
+test("immediate Fusion replaces the earlier card and normally reveals the result", () => {
+  const signature = L("verdant-12");
+  const fusedRevealSupport = L("verdant-02");
+  const built = displayAll(
+    withSlots(createInitialState(1), [signature, fusedRevealSupport]),
+    [signature, fusedRevealSupport],
+  );
+  const opened = openPack(built, {
+    manual: true,
+    free: true,
+    now: 5_000,
+    rng: () => 0.99,
+  });
+  let state = opened.state;
+  let cards = opened.result.cards.map((pull, index) => (
+    index === 1 || index === 4 ? { ...pull, rarity: "common" } : pull
+  ));
+  ({ state, cards } = revealPackCard(state, cards, 1, { manual: true, rng: () => 0.99 }));
+  ({ state, cards } = revealPackCard(state, cards, 4, { manual: true, rng: () => 0.99 }));
+
+  const beforeLength = cards.length;
+  const fused = resolveImmediateFusion(state, cards, { manual: true, rng: () => 0.99 });
+
+  assert.equal(fused.fused, true);
+  assert.equal(fused.index, 1);
+  assert.equal(fused.cards.length, beforeLength - 1);
+  assert.equal(fused.cards[1].revealed, true);
+  assert.equal(fused.cards[1].fusedFrom, "common");
+  assert.ok(RARITIES[fused.cards[1].rarity].order > RARITIES.common.order);
+  assert.ok(
+    fused.events.some((event) => (
+      event.t === "fusion"
+      && event.left === 1
+      && event.right === 4
+      && event.index === 1
+      && event.cardId === signature
+      && event.resultCardId === fused.cards[1].card.id
+    )),
+  );
+  assert.ok(
+    fused.events.some((event) => (
+      event.t === "reveal"
+      && event.index === 1
+      && event.cardId === fused.cards[1].card.id
+    )),
+    "the replacement used the normal reveal pipeline",
+  );
+  assert.ok(
+    fused.events.some((event) => event.t === "trigger" && event.cardId === fusedRevealSupport),
+    "display effects that listen for fused reveals fired",
+  );
 });
 
 test("selected Fracture sources spill extra packs into the same reveal", () => {
