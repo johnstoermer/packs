@@ -1975,11 +1975,12 @@ export default function PackworksGameClean() {
   const activeSet = getSet(game.activeSet);
   const selectedPackStock = getProductCount(game, game.activeSet, selectedPackType.id);
   const nextPackPrice = getPackPrice(game, selectedPackType.id, game.activeSet);
+  const packAffordable = selectedPackStock > 0 || game.coins >= nextPackPrice;
   const mobileAutoTitle = mobileAutoHeld
     ? "AUTO-OPENING"
     : "HOLD TO AUTO-OPEN";
   const mobileAutoDetail = mobileAutoHeld
-    ? selectedPackStock > 0 || game.coins >= nextPackPrice ? "RELEASE TO STOP" : `WAITING FOR ${money(nextPackPrice)} CASH`
+    ? packAffordable ? "RELEASE TO STOP" : `WAITING FOR ${money(nextPackPrice)} CASH`
     : "SLOW REVEAL / CONTINUES INTO NEXT PACK";
 
   return (
@@ -2035,7 +2036,10 @@ export default function PackworksGameClean() {
           )}
         </div>
 
-        <div className="clean-pack-station" data-pack-type={selectedPackType.id}>
+        <div
+          className={`clean-pack-station ${packAffordable ? "" : "is-unaffordable"}`}
+          data-pack-type={selectedPackType.id}
+        >
           <div className="pack-rotunda">
             <button
               type="button"
@@ -2058,9 +2062,12 @@ export default function PackworksGameClean() {
               onPointerCancel={stopMobileAuto}
               onContextMenu={(event) => event.preventDefault()}
               onClick={beginManualOpen}
+              aria-disabled={packAffordable ? undefined : true}
               aria-label={selectedPackStock
                 ? `Open a pack: ${selectedPackType.name}. ${selectedPackStock} ready.`
-                : `Buy and open a pack: ${selectedPackType.name} for ${exactMoney(nextPackPrice)} cash.`}
+                : packAffordable
+                  ? `Buy and open a pack: ${selectedPackType.name} for ${exactMoney(nextPackPrice)} cash.`
+                  : `${selectedPackType.name} pack unavailable: costs ${exactMoney(nextPackPrice)} cash, you have ${exactMoney(game.coins)}.`}
             >
               <span className="clean-pack-shadow" />
               <span
@@ -2084,7 +2091,7 @@ export default function PackworksGameClean() {
           </div>
           <div className="pack-type-copy" aria-live="polite">
             <strong>{exactMoney(nextPackPrice)} CASH</strong>
-            <small>{selectedPackType.description}</small>
+            <small>{packAffordable ? selectedPackType.description : "NOT ENOUGH CASH"}</small>
           </div>
         </div>
 

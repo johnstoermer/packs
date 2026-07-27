@@ -3139,6 +3139,35 @@
   pointer-events: none;
 }
 
+/* Can't afford this pack type — grey it out so the shortfall reads at a glance. */
+/* Dim via filter, not opacity — the rotate-in keyframes animate opacity with fill both. */
+.theme-league .clean-pack-station.is-unaffordable .clean-pack-stack {
+  filter: grayscale(1) brightness(0.7) contrast(0.9) opacity(0.6);
+}
+
+.theme-league .clean-pack-station.is-unaffordable .clean-pack-shadow {
+  opacity: 0.35;
+}
+
+.theme-league .clean-pack-station.is-unaffordable .clean-pack-clicker {
+  cursor: not-allowed;
+}
+
+/* No hover/hold lift while it can't be bought. */
+.theme-league .clean-pack-station.is-unaffordable .clean-pack-clicker:hover .clean-pack-stack,
+.theme-league .clean-pack-station.is-unaffordable .clean-pack-clicker:focus-visible .clean-pack-stack,
+.theme-league .clean-pack-station.is-unaffordable .clean-pack-clicker:active .clean-pack-stack {
+  transform: translate(-50%, -50%);
+}
+
+.theme-league .clean-pack-station.is-unaffordable .pack-type-copy strong {
+  color: #9fb4c9;
+}
+
+.theme-league .clean-pack-station.is-unaffordable .pack-type-copy small {
+  color: #ff9c8f;
+}
+
 /* Card title belongs to the identity rail, leaving the rules box for rules. */
 
 .theme-league .card-front {
