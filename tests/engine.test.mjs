@@ -641,6 +641,35 @@ test("audit: Catalystag can grant the Catalyst Fusion boon", () => {
   assert.ok(fusion.events.some((event) => event.t === "boon" && event.option === "catalyst"));
 });
 
+test("audit: Boiloreverb carries its Fusion Echo chance onto the fused reveal", () => {
+  const ids = [L("forgeline-09"), L("forgeline-31")];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  const opened = openPack(built, {
+    manual: true,
+    free: true,
+    now: 5_000,
+    rng: () => 0.99,
+  });
+  const all = revealAll(opened.state, opened.result.cards, () => 0.99);
+  const fusion = resolveFusions(all.state, all.cards, { rng: () => 0.99 });
+  const fusedIndex = fusion.cards.findIndex((pull) => pull.fusedFrom && !pull.revealed);
+  assert.ok(fusedIndex >= 0, "Fusion created a new card to reveal");
+  assert.equal(fusion.cards[fusedIndex].echoBoost, 30);
+  assert.ok(
+    fusion.events.some((event) => event.t === "trigger" && event.cardId === L("forgeline-09")),
+    "Boiloreverb emitted its attributed Fusion trigger",
+  );
+
+  const revealed = revealPackCard(fusion.state, fusion.cards, fusedIndex, {
+    manual: true,
+    rng: () => 0,
+  });
+  assert.ok(
+    revealed.events.some((event) => event.t === "echo" && event.index === fusedIndex),
+    "the carried +30% chance produced an Echo on the fused reveal",
+  );
+});
+
 test("audit: threshold and duplicate-sale cards emit attributed trigger events", () => {
   const idleIds = [L("corner-05")];
   const idleState = {
