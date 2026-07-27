@@ -15,6 +15,32 @@ function Burst({ burst, onComplete }) {
     return () => window.clearTimeout(timer);
   }, [burst.id, onComplete]);
 
+  // A single card that turned itself over with nothing on screen. Same family
+  // as the Salvage burst, but one card and no pack to tear open — nothing was
+  // opened here, a card just resolved.
+  if (burst.type === "reveal" && burst.card) {
+    const rarity = RARITIES[burst.card.rarity] || RARITIES.common;
+    return (
+      <div
+        className={`global-burst burst-reveal rarity-${burst.card.rarity}`}
+        style={{
+          // Alternate sides and keep off the middle: the pack stack owns the
+          // centre of the stage, and catching up can float three of these at
+          // once. Inset far enough that the name chip never runs off a phone.
+          "--burst-x": `${(burst.id % 2 ? 20 : 66) + (burst.id * 7) % 14}%`,
+          "--burst-y": `${32 + (burst.id * 23) % 30}%`,
+          "--rarity": rarity.color,
+        }}
+      >
+        <div className="global-burst-single">
+          <span className="global-burst-card is-single" />
+          <b>{burst.card.name}</b>
+          <small>REVEALED</small>
+        </div>
+      </div>
+    );
+  }
+
   const fracture = burst.type === "fracture";
   return (
     <div

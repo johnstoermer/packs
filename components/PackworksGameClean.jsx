@@ -66,6 +66,10 @@ const TABLET_REVEAL_BATCH_SIZE = 12;
 const MOBILE_REVEAL_BATCH_SIZE = 18;
 const MOBILE_REVEAL_COLUMNS = 6;
 const COLLECTION_ANIMATION_MS = 950;
+// Catching up on a long idle can credit several thresholds at once. Two per
+// sweep keeps the parade readable, and because bursts alternate sides by
+// serial, a pair never lands on top of itself.
+const MAX_QUIET_REVEAL_BURSTS = 2;
 
 function getRevealBatchSize(width, coarsePointer = false) {
   if (coarsePointer || width <= 700) return MOBILE_REVEAL_BATCH_SIZE;
@@ -1092,11 +1096,12 @@ export default function PackworksGameClean() {
     }, 1_750 + queued.length * 55);
   }, []);
 
-  const queueGlobalBurst = useCallback((type, count = 1) => {
+  const queueGlobalBurst = useCallback((type, count = 1, card = null) => {
     const burst = {
       id: ++globalBurstSerialRef.current,
       type,
       count: Math.max(1, count),
+      card,
     };
     setGlobalBursts((current) => [...current.slice(-4), burst]);
   }, []);
@@ -1146,6 +1151,25 @@ export default function PackworksGameClean() {
     if (fractures > 0) {
       queueGlobalBurst("fracture", fractures);
       getHaptics().pulse("burst");
+    }
+    // A card revealed with no pack open — Regalynx crossing a cash threshold
+    // while you idle, or catching up on thresholds the passive income earned
+    // while you were away — otherwise lands in the binder with nothing to see.
+    // When a pack IS open the card spills onto the reveal board instead, and
+    // showing it twice would be the noisier lie.
+    const openingCanShowSpill = openingRef.current
+      && !["filing", "collecting"].includes(openingRef.current.phase);
+    if (!openingCanShowSpill) {
+      const revealed = events.filter((event) => event.t === "duplicateReveal" && event.cardId);
+      for (const event of revealed.slice(0, MAX_QUIET_REVEAL_BURSTS)) {
+        const card = getCard(event.cardId);
+        if (!card) continue;
+        queueGlobalBurst("reveal", 1, { name: card.name, rarity: card.rarity });
+      }
+      if (revealed.length > 0) {
+        getAudio().sound("reveal", RARITIES[getCard(revealed[0].cardId)?.rarity]?.order || 0);
+        getHaptics().pulse("reveal");
+      }
     }
     const encore = events.find((event) => event.t === "encore");
     if (encore) playGameplayCue("encore", `ENCORE +${encore.count}`, "BONUS CARDS JOIN THE PACK");

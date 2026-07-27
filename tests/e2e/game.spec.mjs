@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { LEGACY_CARD_MAP, SETS, getCard } from "../../lib/gameData.js";
-import { SAVE_KEY, advanceBeat, createInitialState } from "../../lib/gameLogic.js";
+import { SAVE_KEY, advanceBeat, createInitialState, displayCard } from "../../lib/gameLogic.js";
 
 async function seedState(page, state) {
   await page.addInitScript(({ key, value }) => {
@@ -539,6 +539,57 @@ test("generated Mystery cards auto-reveal through the live opening", async ({ pa
     { timeout: 5_000 },
   ).toBeGreaterThan(1);
   await expect(page.locator('.case-strip-slot[title="Locklure"]')).toHaveClass(/is-triggered/);
+});
+
+// Regalynx reveals a card every 1,000 cash earned. With no pack open that
+// card resolves straight into the binder, so it gets a burst of its own.
+function seedQuietRevealState() {
+  const state = createInitialState(Date.now());
+  state.packsOpened = 400;
+  state.collection = Object.fromEntries(SETS[0].cards.map((card) => [card.id, 1]));
+  state.bestRarities = Object.fromEntries(SETS[0].cards.map((card) => [card.id, card.rarity]));
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  // Seat it through displayCard: seating stamps the card's threshold counter
+  // at the cash earned so far, so a hand-written `displayed` array would start
+  // crediting from the seeded total and never fire. Cash arrives after, which
+  // is the real order of events anyway.
+  const regalynx = SETS[0].cards.find((card) => card.name === "Regalynx").id;
+  const seated = displayCard(advanceBeat(state), regalynx, Date.now());
+  if (!seated.displayed.length) throw new Error("Regalynx was not seated");
+  return { ...seated, coins: 40_000, lifetimeCoins: 40_000 };
+}
+
+test("a card revealed with no pack open gets its own burst", async ({ page }) => {
+  await seedState(page, seedQuietRevealState());
+  await page.goto("/");
+  await expect(page.locator(".opening-layer")).toHaveCount(0);
+
+  // The idle sweep runs on a 2s interval.
+  const burst = page.locator(".burst-reveal").first();
+  await expect(burst).toBeVisible({ timeout: 15_000 });
+  await expect(burst.locator("small")).toHaveText("REVEALED");
+  await expect(burst.locator("b")).not.toBeEmpty();
+  await expect(burst.locator(".global-burst-card.is-single")).toHaveCount(1);
+  // Never more than a pair at once, so a catch-up batch stays readable.
+  expect(await page.locator(".burst-reveal").count()).toBeLessThanOrEqual(2);
+  // The collection has to actually grow — the burst is not decoration.
+  await expect(page.locator(".clean-set-progress")).not.toContainText("0/98");
+});
+
+test("a card that spills into an open pack is shown on the board, not as a burst", async ({ page }) => {
+  await seedState(page, seedQuietRevealState());
+  await page.goto("/");
+  await page.locator(".clean-pack-clicker").click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  const dealt = await page.locator(".reveal-card").count();
+
+  // Sit in the open pack across several idle sweeps: the generated cards join
+  // the deal instead of bursting, so the player never sees the same reveal twice.
+  await page.waitForTimeout(7_000);
+  expect(await page.locator(".reveal-card").count()).toBeGreaterThan(dealt);
+  await expect(page.locator(".burst-reveal")).toHaveCount(0);
 });
 
 test("Fracture spill cards auto-reveal without flipping the original pack", async ({ page }) => {

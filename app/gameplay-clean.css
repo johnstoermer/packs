@@ -2717,6 +2717,81 @@ button.clean-case-slot.is-empty:hover {
   animation-delay: calc(80ms + var(--i) * 42ms);
 }
 
+/* One card revealed off-board — an idle threshold crossing, or catching up on
+   thresholds after time away. Same family as the Salvage burst, but a single
+   card rising and no pack tearing open, because nothing was opened. */
+.global-burst-single {
+  position: fixed;
+  z-index: 3;
+  top: var(--burst-y);
+  left: var(--burst-x);
+  display: grid;
+  justify-items: center;
+  transform: translate(-50%, -50%);
+  animation: global-reveal-rise 1.25s cubic-bezier(0.16, 0.8, 0.3, 1) both;
+}
+
+.global-burst-card.is-single {
+  position: relative;
+  width: 44px;
+  height: 62px;
+  opacity: 1;
+  animation: global-reveal-flip 620ms cubic-bezier(0.15, 0.75, 0.25, 1) both;
+  /* The fanned-cards rule staggers on --i, which a lone card does not carry. */
+  animation-delay: 0s;
+}
+
+.global-burst-single b {
+  margin-top: 9px;
+  padding: 6px 10px 5px;
+  border: 3px solid #052752;
+  border-radius: 9px;
+  background: #ffd63d;
+  box-shadow: 0 4px 0 #052752;
+  color: #052752;
+  font: 950 10px/1 "Trebuchet MS", Arial, sans-serif;
+  letter-spacing: 0.06em;
+}
+
+.global-burst-single small {
+  margin-top: 5px;
+  color: #e9f7ff;
+  font: 950 7px/1 "Trebuchet MS", Arial, sans-serif;
+  letter-spacing: 0.16em;
+  text-shadow: 0 1px 0 #052752, 0 0 10px color-mix(in srgb, var(--rarity) 70%, transparent);
+}
+
+@keyframes global-reveal-rise {
+  0% { opacity: 0; transform: translate(-50%, calc(-50% + 12px)); }
+  16% { opacity: 1; transform: translate(-50%, -50%); }
+  70% { opacity: 1; transform: translate(-50%, calc(-50% - 34px)); }
+  100% { opacity: 0; transform: translate(-50%, calc(-50% - 62px)); }
+}
+
+@keyframes global-reveal-flip {
+  0% { transform: rotateY(90deg) scale(0.7); }
+  55% { transform: rotateY(0deg) scale(1.08); }
+  100% { transform: rotateY(0deg) scale(1); }
+}
+
+/* On a phone the pack fills the middle of the stage, so these sit in the gap
+   between the case strip and the pack rather than on top of the art. */
+@media (max-width: 700px) {
+  .burst-reveal .global-burst-single {
+    top: 24%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .global-burst-card.is-single {
+    animation: none;
+  }
+
+  .global-burst-single {
+    animation: global-burst-fade 1.25s ease-out both;
+  }
+}
+
 .burst-fracture .global-burst-pack b {
   background: #ff8a68;
 }
