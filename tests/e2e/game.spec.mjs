@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { SETS } from "../../lib/gameData.js";
+import { LEGACY_CARD_MAP, SETS } from "../../lib/gameData.js";
 import { SAVE_KEY, advanceBeat, createInitialState } from "../../lib/gameLogic.js";
 
 async function seedState(page, state) {
@@ -361,6 +361,59 @@ test("Locklure shakes its display slot when it adds a Common card", async ({ pag
   await expect(slot).toHaveClass(/fx-trigger/);
   await expect(slot).toHaveCSS("animation-name", "league-strip-trigger");
   await expect(slot).toHaveAttribute("data-fx", /\d+/);
+});
+
+test("generated Mystery cards auto-reveal through the live opening", async ({ page }) => {
+  const locklureId = LEGACY_CARD_MAP["crown-11"];
+  const salvageId = LEGACY_CARD_MAP["frontier-01"];
+  const state = createInitialState(Date.now());
+  state.collection = Object.fromEntries(SETS[0].cards.map((card) => [card.id, 1]));
+  state.bestRarities = Object.fromEntries(SETS[0].cards.map((card) => [card.id, card.rarity]));
+  state.displayed = [
+    { id: locklureId, at: Date.now() },
+    { id: salvageId, at: Date.now() + 1 },
+  ];
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, advanceBeat(state));
+  await page.goto("/");
+  await page.evaluate(() => {
+    Math.random = () => 0;
+  });
+
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await page.locator(".reveal-card").first().click();
+
+  await expect(page.locator(".reveal-card")).toHaveCount(18);
+  await expect.poll(
+    () => page.locator(".reveal-card.is-revealed").count(),
+    { timeout: 5_000 },
+  ).toBeGreaterThan(1);
+  await expect(page.locator('.case-strip-slot[title="Locklure"]')).toHaveClass(/is-triggered/);
+});
+
+test("Fracture spill cards auto-reveal without flipping the original pack", async ({ page }) => {
+  const fractureId = LEGACY_CARD_MAP["ember-01"];
+  const state = createInitialState(Date.now());
+  state.collection = { [fractureId]: 1 };
+  state.bestRarities = { [fractureId]: SETS[0].cards.find((card) => card.id === fractureId).rarity };
+  state.displayed = [{ id: fractureId, at: Date.now() }];
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+  await page.evaluate(() => {
+    Math.random = () => 0;
+  });
+
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await expect(page.locator(".reveal-card")).toHaveCount(12);
+  await expect(page.locator(".reveal-card.is-revealed")).toHaveCount(6, { timeout: 5_000 });
+  await expect(page.locator(".reveal-card:not(.is-revealed)")).toHaveCount(6);
 });
 
 test("clicking an empty pack stack buys and opens without visiting a shop", async ({ page }) => {

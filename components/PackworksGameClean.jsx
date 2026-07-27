@@ -1173,14 +1173,40 @@ export default function PackworksGameClean() {
   useEffect(() => {
     if (!ready) return undefined;
     const interval = window.setInterval(() => {
-      const swept = evaluateIdleThresholds(gameRef.current, {});
+      const currentOpening = openingRef.current;
+      const canSpillIntoOpening = currentOpening && currentOpening.phase !== "summary";
+      const openingCards = canSpillIntoOpening ? currentOpening.result.cards : null;
+      const swept = evaluateIdleThresholds(gameRef.current, {
+        injectCards: openingCards,
+      });
       if (swept.state !== gameRef.current) {
         commit(swept.state);
         pushFx(swept.events);
       }
+      if (openingCards && swept.cards?.length > openingCards.length) {
+        if (currentOpening.phase === "complete") {
+          openingTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+          openingTimersRef.current = [];
+        }
+        commitOpening((current) => {
+          if (current?.id !== currentOpening.id) return current;
+          const nextStart = swept.cards.findIndex((entry) => !entry.revealed && !entry.fusedAway);
+          return {
+            ...current,
+            result: { ...current.result, cards: swept.cards },
+            phase: current.phase === "complete" ? "ready" : current.phase,
+            batchStart: current.phase === "complete" ? Math.max(0, nextStart) : current.batchStart,
+            batchPending: current.phase === "complete" ? false : current.batchPending,
+            revealed: swept.cards
+              .map((entry, index) => (entry.revealed ? index : -1))
+              .filter((index) => index >= 0),
+            impact: current.phase === "complete" ? null : current.impact,
+          };
+        });
+      }
     }, 2_000);
     return () => window.clearInterval(interval);
-  }, [commit, pushFx, ready]);
+  }, [commit, commitOpening, pushFx, ready]);
 
   const clearOpeningTimers = useCallback(() => {
     openingTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -1322,14 +1348,15 @@ export default function PackworksGameClean() {
     revealLocksRef.current.add(key);
 
     const revealedOutcome = revealPackCard(gameRef.current, currentOpening.result.cards, index, { manual: true });
-    const automaticSale = sellDuplicatesDetailed(revealedOutcome.state, {});
-    const outcome = automaticSale.state === revealedOutcome.state
-      ? revealedOutcome
-      : {
-        ...revealedOutcome,
-        state: automaticSale.state,
-        events: [...revealedOutcome.events, ...automaticSale.events],
-      };
+    const automaticSale = sellDuplicatesDetailed(revealedOutcome.state, {
+      injectCards: revealedOutcome.cards,
+    });
+    const outcome = {
+      ...revealedOutcome,
+      state: automaticSale.state,
+      cards: automaticSale.cards || revealedOutcome.cards,
+      events: [...revealedOutcome.events, ...automaticSale.events],
+    };
     commit(outcome.state);
     pushFx(outcome.events);
     const echoCount = outcome.events.filter((event) => event.t === "echo" && event.index === index).length;
@@ -1437,6 +1464,24 @@ export default function PackworksGameClean() {
     }
   }, [commit, commitOpening, getAudio, getHaptics, playGameplayCue, pushFx]);
 
+  // Mystery and Fracture cards visibly spill into the current deal, then flip
+  // through the exact same reveal function as a player-clicked card. Resolving
+  // one at a time keeps mobile DOM/animation work bounded and preserves trigger
+  // attribution (including Locklure) for every generated reveal.
+  useEffect(() => {
+    if (opening?.phase !== "ready") return undefined;
+    const generatedIndex = openingBatchIndices.find((index) => {
+      const pull = opening.result.cards[index];
+      return pull
+        && !pull.revealed
+        && !pull.fusedAway
+        && (pull.fromMystery || pull.fromFracture);
+    });
+    if (generatedIndex < 0) return undefined;
+    const timer = window.setTimeout(() => revealCard(generatedIndex), 180);
+    return () => window.clearTimeout(timer);
+  }, [opening?.phase, opening?.result?.cards, openingBatchIndices, revealCard]);
+
   const forceFinishOpening = useCallback(() => {
     const currentOpening = openingRef.current;
     if (!currentOpening?.canForceFinish || currentOpening.phase === "summary") return;
@@ -1461,9 +1506,26 @@ export default function PackworksGameClean() {
       cards = step.cards;
       events.push(...step.events);
     }
-    const automaticSale = sellDuplicatesDetailed(state, {});
+    const automaticSale = sellDuplicatesDetailed(state, { injectCards: cards });
     state = automaticSale.state;
+    cards = automaticSale.cards || cards;
     events.push(...automaticSale.events);
+    for (let index = 0; index < cards.length; index += 1) {
+      if (cards[index].revealed || cards[index].fusedAway) continue;
+      const step = revealPackCard(state, cards, index, {
+        manual: true,
+        suppressEffects: true,
+      });
+      state = step.state;
+      cards = step.cards;
+      events.push(...step.events);
+    }
+    // FINISH is the hard loop breaker: generated cards still join the table and
+    // are collected, but their resulting duplicate sale cannot start a new
+    // display-effect chain.
+    const cleanupSale = sellDuplicatesDetailed(state, { suppressEffects: true });
+    state = cleanupSale.state;
+    events.push(...cleanupSale.events);
     commit(state);
     pushFx(events);
 

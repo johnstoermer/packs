@@ -692,3 +692,70 @@ test("audit: Salvage Mystery Packs enter the pack-open and Fracture pipeline", (
   assert.ok(sale.mysteryCards.length >= 10);
   assert.ok(sale.state.packsOpened > loaded.packsOpened);
 });
+
+test("audit: Fracture spill cards reveal through Locklure like normal pack cards", () => {
+  const ids = [L("crown-11"), L("ember-01")];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  const opened = openPack(built, {
+    manual: true,
+    free: true,
+    now: 5_000,
+    rng: () => 0,
+  });
+  const fractureIndex = opened.result.cards.findIndex((pull) => pull.fromFracture);
+  assert.ok(fractureIndex >= 0, "Fracture appended a visibly tagged spill card");
+  assert.equal(opened.result.cards[fractureIndex].revealed, false);
+
+  const before = opened.result.cards.length;
+  const revealed = revealPackCard(opened.state, opened.result.cards, fractureIndex, {
+    manual: true,
+    rng: () => 0,
+  });
+  assert.ok(
+    revealed.events.some((event) => event.t === "trigger" && event.cardId === L("crown-11")),
+    "Locklure triggered from the Fracture card's normal reveal",
+  );
+  assert.ok(
+    revealed.events.some((event) => event.t === "addCards" && event.source === L("crown-11")),
+    "Locklure added its Common card to the same opening",
+  );
+  assert.equal(revealed.cards.length, before + 1);
+});
+
+test("audit: duplicate-sale Mystery cards spill into an opening and trigger Locklure", () => {
+  const ids = [L("crown-11"), L("frontier-01")];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  const opened = openPack(built, {
+    manual: true,
+    free: true,
+    now: 5_000,
+    rng: () => 0,
+  });
+  const loaded = {
+    ...opened.state,
+    collection: { ...opened.state.collection, [L("corner-01")]: 2 },
+    duplicateBank: 1,
+  };
+  const before = opened.result.cards.length;
+  const sale = sellDuplicatesDetailed(loaded, {
+    injectCards: opened.result.cards,
+    rng: () => 0,
+  });
+  assert.ok(sale.cards.length > before, "Mystery cards joined the active pack");
+  const mysteryIndex = sale.cards.findIndex((pull, index) => index >= before && pull.fromMystery);
+  assert.ok(mysteryIndex >= before);
+  assert.equal(sale.cards[mysteryIndex].revealed, false);
+
+  const revealed = revealPackCard(sale.state, sale.cards, mysteryIndex, {
+    manual: true,
+    rng: () => 0,
+  });
+  assert.ok(
+    revealed.events.some((event) => event.t === "trigger" && event.cardId === L("crown-11")),
+    "Locklure triggered from the Mystery card's normal reveal",
+  );
+  assert.ok(
+    revealed.events.some((event) => event.t === "addCards" && event.source === L("crown-11")),
+    "Locklure's added card remained in that same opening",
+  );
+});
