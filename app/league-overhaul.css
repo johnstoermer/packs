@@ -1204,16 +1204,26 @@
   aspect-ratio: 1 / 1.42;
   border: 0;
   background: transparent;
-  filter: drop-shadow(0 20px 20px rgba(3, 26, 56, 0.48));
-  perspective: 1100px;
+  filter: none;
+  perspective: none;
   translate: -50% -50%;
   transform-origin: 50% 75%;
-  animation: league-card-zoom-in 440ms var(--motion-pop) both;
+  animation: league-card-zoom-in 180ms ease-out both;
 }
 
 .theme-league .card-zoom-card .card-front,
 .theme-league .card-zoom-card .card-back {
   transform: none;
+}
+
+.theme-league .card-zoom-card .card-front.is-foil,
+.theme-league .card-zoom-card .card-front.is-foil::before,
+.theme-league .card-zoom-card .card-front.is-foil .card-art,
+.theme-league .card-zoom-card .card-front.is-foil .card-head,
+.theme-league .card-zoom-card .card-front.is-foil .card-copy,
+.theme-league .card-zoom-card .card-front.is-foil .card-foot {
+  transform: none;
+  transform-style: flat;
 }
 
 .theme-league .card-zoom-card .card-front {
@@ -1373,9 +1383,8 @@
 }
 
 @keyframes league-card-zoom-in {
-  from { opacity: 0; transform: translateY(70px) scale(0.58) rotate(-5deg); }
-  72% { opacity: 1; transform: translateY(-8px) scale(1.04) rotate(1deg); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes league-card-hud-in {

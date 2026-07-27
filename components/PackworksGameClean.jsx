@@ -58,9 +58,9 @@ const PIXEL_ART_VERSION = "20260726-2";
 const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
 const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
-const DESKTOP_REVEAL_BATCH_SIZE = 18;
+const DESKTOP_REVEAL_BATCH_SIZE = 72;
 const TABLET_REVEAL_BATCH_SIZE = 12;
-const MOBILE_REVEAL_BATCH_SIZE = 6;
+const MOBILE_REVEAL_BATCH_SIZE = 9;
 const COLLECTION_ANIMATION_MS = 950;
 
 function getRevealBatchSize(width) {
@@ -468,9 +468,9 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
   const set = getSet(setId);
   const unlockedSets = SETS.filter((candidate) => game.unlockedSets.includes(candidate.id));
   const [query, setQuery] = useState("");
-  const [ownership, setOwnership] = useState("all");
+  const [ownership, setOwnership] = useState("owned");
   const [rarityFilter, setRarityFilter] = useState("all");
-  const [sort, setSort] = useState("rarity");
+  const [sort, setSort] = useState("rarity-low");
   const found = set.cards.filter((card) => game.collection[card.id]).length;
   const visibleCards = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -627,6 +627,7 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
             <PrintedCard
               card={card}
               rarityId={rarityId}
+              foil={(game.foils?.[card.id] || 0) > 0}
               copyLabel={`${count} ${count === 1 ? "COPY" : "COPIES"}`}
             />
           ) : (

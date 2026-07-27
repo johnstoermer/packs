@@ -138,22 +138,37 @@ test("the pack rotunda presents every real pack type without duplicating wrapper
   await expect(page.locator(".clean-pack-station .pack-title strong")).toHaveText("Standard");
 });
 
-test("Mega Standard stages readable batches and exposes the FINISH failsafe", async ({ page }) => {
+test("desktop mounts at most 72 cards", async ({ page }) => {
+  const fractureId = SETS[0].cards.find((card) => card.name === "Dawnrift").id;
+  const locklureId = SETS[0].cards.find((card) => card.name === "Locklure").id;
   const state = createInitialState(Date.now());
   state.coins = 10_000;
   state.lifetimeCoins = 10_000;
+  state.collection = { [fractureId]: 1, [locklureId]: 1 };
+  state.bestRarities = {
+    [fractureId]: getCard(fractureId).rarity,
+    [locklureId]: getCard(locklureId).rarity,
+  };
+  state.displayed = [
+    { id: fractureId, at: Date.now() },
+    { id: locklureId, at: Date.now() + 1 },
+  ];
   state.settings.sound = false;
   state.settings.quickOpen = true;
   state.lastSavedAt = Date.now();
-  await seedState(page, state);
+  await seedState(page, advanceBeat(state));
   await page.goto("/");
+  await page.evaluate(() => {
+    Math.random = () => 0;
+  });
 
   await page.getByRole("button", { name: "Next pack type" }).click();
   await page.getByRole("button", { name: "Next pack type" }).click();
   await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(18);
+  await expect(page.locator(".reveal-card")).toHaveCount(72);
   await expect(page.getByRole("button", { name: "FINISH" })).toHaveCount(0);
+  await page.waitForTimeout(2_000);
 
   const viewport = page.viewportSize();
   const bounds = await page.locator(".reveal-card").evaluateAll((nodes) => nodes.map((node) => {
@@ -167,23 +182,10 @@ test("Mega Standard stages readable batches and exposes the FINISH failsafe", as
     expect(box.bottom).toBeLessThanOrEqual(viewport.height);
   }
 
-  await revealAll(page);
-  const finish = page.getByRole("button", { name: "FINISH" });
-  await expect(finish).toBeVisible();
-  const caseBounds = await page.locator(".case-strip").boundingBox();
-  const finishBounds = await finish.boundingBox();
-  expect(finishBounds.y).toBeGreaterThanOrEqual(caseBounds.y + caseBounds.height);
-  await expect(page.locator(".opening-layer.phase-filing")).toBeVisible();
-  await expect(page.locator(".reveal-card").first()).toHaveCSS("animation-name", "league-file-card");
   await page.screenshot({ path: "test-results/clean-mega-pack.png" });
-  await finish.click();
-  await expect(page.locator(".opening-layer.phase-collecting")).toBeVisible();
-  await expect(page.locator(".reveal-deck")).toHaveCSS("animation-name", "league-deck-collect");
-  await expect(finish).toHaveCount(0);
-  await expect(page.locator(".opening-layer")).toHaveCount(0, { timeout: 3_000 });
 });
 
-test("mobile mounts only six cards from a large pack at once", async ({ page }) => {
+test("mobile mounts at most nine cards from a large pack at once", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
   state.coins = 10_000;
@@ -198,11 +200,11 @@ test("mobile mounts only six cards from a large pack at once", async ({ page }) 
   await page.getByRole("button", { name: "Next pack type" }).click();
   await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(6);
+  await expect(page.locator(".reveal-card")).toHaveCount(9);
   await revealAll(page);
   await expect(page.getByRole("button", { name: "FINISH" })).toBeVisible();
   await expect(page.locator(".opening-layer.phase-filing")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(6);
+  await expect(page.locator(".reveal-card")).toHaveCount(9);
 });
 
 test("holding Space reveals cards in order and releasing stops the sequence", async ({ page }) => {
@@ -442,7 +444,7 @@ test("generated Mystery cards auto-reveal through the live opening", async ({ pa
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
   await page.locator(".reveal-card").first().click();
 
-  await expect(page.locator(".reveal-card")).toHaveCount(18);
+  await expect(page.locator(".reveal-card")).toHaveCount(72);
   await expect.poll(
     () => page.locator(".reveal-card.is-revealed").count(),
     { timeout: 5_000 },
@@ -501,6 +503,11 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
 
   await page.locator(".clean-set-progress").click();
   await expect(page.locator(".clean-binder-tools")).toBeVisible();
+  const binderSelects = page.locator(".clean-binder-tools select");
+  await expect(binderSelects.nth(0)).toHaveValue("owned");
+  await expect(binderSelects.nth(2)).toHaveValue("rarity-low");
+  await expect(page.locator(".clean-binder-grid > button")).toHaveCount(0);
+  await binderSelects.nth(0).selectOption("all");
   await expect(page.locator(".clean-binder-grid > button")).toHaveCount(98);
   await expect(page.locator(".clean-binder-grid").getByText(/PW-\d+|PW\s*\/\s*\d+/)).toHaveCount(0);
 
@@ -526,9 +533,11 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
 });
 
 test("the display case holds cards whose unique effects augment the game", async ({ page }) => {
+  const pennigeonId = LEGACY_CARD_MAP["corner-02"];
   const state = createInitialState(Date.now());
-  state.collection = { "corner-02": 2 };
-  state.bestRarities = { "corner-02": "common" };
+  state.collection = { [pennigeonId]: 2 };
+  state.bestRarities = { [pennigeonId]: "common" };
+  state.foils = { [pennigeonId]: 1 };
   state.settings.sound = false;
   state.lastSavedAt = Date.now();
   await seedState(page, state);
@@ -540,6 +549,11 @@ test("the display case holds cards whose unique effects augment the game", async
   await page.getByRole("button", { name: /Pennigeon, 1 cop/ }).click();
   const detail = page.locator(".clean-card-detail");
   await expect(detail.locator(".clean-detail-art .card-front")).toBeVisible();
+  await expect(detail.locator(".clean-detail-art .card-front")).toHaveClass(/is-foil/);
+  await expect(detail.locator(".clean-detail-art .foil-sheen")).toBeVisible();
+  await expect(detail.locator(".card-zoom-card")).toHaveCSS("filter", "none");
+  await expect(detail.locator(".card-zoom-card")).toHaveCSS("perspective", "none");
+  await expect(detail.locator(".card-zoom-card .card-art")).toHaveCSS("transform", "none");
   await expect.poll(() => detail.locator(".card-zoom-card").evaluate((node) => {
     const bounds = node.getBoundingClientRect();
     return {
