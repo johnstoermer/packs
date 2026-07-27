@@ -24,10 +24,12 @@ import {
   displayCard,
   evaluateIdleThresholds,
   getDuplicateCount,
+  getFiledIndices,
   getInscriptionsEarned,
   getPassiveIncomeRate,
   hydrateState,
   openPack,
+  planRevealBatch,
   resolveFusions,
   resolveImmediateFusion,
   revealPackCard,
@@ -191,6 +193,124 @@ test("coin thresholds fire from any income source, never from timers", () => {
     drained = next.state;
   }
   assert.equal(evaluateIdleThresholds(drained, { rng: hit }).events.length, 0);
+});
+
+// A stand-in board: `pattern` is one character per card — "." face-down,
+// "R" already revealed, "x" fused away.
+const board = (pattern) => [...pattern].map((mark) => ({
+  revealed: mark === "R",
+  fusedAway: mark === "x",
+}));
+
+test("a reveal screen seats the next face-down cards up to the cap", () => {
+  const cards = board("..........");
+  assert.deepEqual(planRevealBatch(cards, 0, 4), [0, 1, 2, 3]);
+  assert.deepEqual(planRevealBatch(cards, 4, 4), [4, 5, 6, 7]);
+  assert.deepEqual(planRevealBatch(cards, 8, 4), [8, 9]);
+  assert.deepEqual(planRevealBatch(cards, 0, 99), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+});
+
+test("a reveal screen skips fused cards and keeps cards turned on this screen", () => {
+  // Fusion consumes a slot outright; a card turned during the current screen
+  // has to hold its place until the screen is done.
+  assert.deepEqual(planRevealBatch(board("..x..."), 0, 4), [0, 1, 3, 4]);
+  assert.deepEqual(planRevealBatch(board("RR...."), 0, 4), [0, 1, 2, 3]);
+});
+
+test("a reveal screen never seats cards filed with an earlier screen", () => {
+  // Six cards, cap of three. The first screen takes 0-2; an effect also turns
+  // card 4 off-screen while it plays.
+  const afterFirstScreen = board("RRRR.R.");
+  const filed = getFiledIndices(afterFirstScreen);
+  const nextStart = afterFirstScreen.findIndex((entry) => !entry.revealed && !entry.fusedAway);
+  assert.equal(nextStart, 4);
+
+  // Without the filed set the second screen opens on one face-down card and
+  // two already-revealed ones — the exact thing this guards against.
+  assert.deepEqual(planRevealBatch(afterFirstScreen, nextStart, 3), [4, 5, 6]);
+  assert.deepEqual(planRevealBatch(afterFirstScreen, nextStart, 3, filed), [4, 6]);
+});
+
+test("getFiledIndices collects everything already resolved, and nothing else", () => {
+  assert.deepEqual([...getFiledIndices(board("R.xR."))], [0, 2, 3]);
+  assert.deepEqual([...getFiledIndices(board("....."))], []);
+  assert.deepEqual([...getFiledIndices([])], []);
+});
+
+test("a reveal screen tolerates junk bounds", () => {
+  const cards = board("....");
+  assert.deepEqual(planRevealBatch(cards, -5, 2), [0, 1]);
+  assert.deepEqual(planRevealBatch(cards, 0, 0), [0]);
+  assert.deepEqual(planRevealBatch(cards, 99, 4), []);
+  assert.deepEqual(planRevealBatch(cards, Number.NaN, 2), [0, 1]);
+  assert.deepEqual(planRevealBatch(undefined, 0, 4), []);
+});
+
+// Walks a pack the way the reveal board does: seat a screen, turn everything
+// on it, then hand off to the next screen. Returns what each screen was dealt.
+function walkRevealScreens(state, cards, rng, size, { useFiled = true } = {}) {
+  const screens = [];
+  let working = state;
+  let board = cards;
+  let batchStart = 0;
+  let filed = null;
+  let guard = 0;
+  while (guard < 60) {
+    guard += 1;
+    const seats = planRevealBatch(board, batchStart, size, filed);
+    if (!seats.length) break;
+    screens.push({
+      seats: seats.length,
+      alreadyRevealed: seats.filter((index) => board[index].revealed).length,
+    });
+    for (const index of seats) {
+      if (board[index].revealed || board[index].fusedAway) continue;
+      const step = revealPackCard(working, board, index, { manual: true, rng });
+      working = step.state;
+      board = step.cards;
+    }
+    const next = board.findIndex((entry) => !entry.revealed && !entry.fusedAway);
+    if (next < 0) break;
+    batchStart = next;
+    if (useFiled) filed = getFiledIndices(board);
+  }
+  return screens;
+}
+
+// Reveal effects can turn cards that live past the screen cap: a generated
+// duplicate arrives face-up at the end of the deal while a screenful of cards
+// is still face-down in front of it.
+const OFFSCREEN_REVEAL_IDS = ["marquee-33", "marquee-05", "tideworks-02", "tideworks-26", "marquee-02"];
+
+function openBigPack(seed) {
+  const ids = OFFSCREEN_REVEAL_IDS.map(L);
+  const seeded = displayAll(
+    withSlots(createInitialState(1), ids, { coins: 5_000_000, lifetimeCoins: 5_000_000 }),
+    ids,
+  );
+  const rng = seededRandom(seed);
+  const rolled = openPack(seeded, { manual: true, free: true, source: "mega-standard", now: 1_000, rng });
+  return { state: rolled.state, cards: rolled.result.cards, rng };
+}
+
+test("a later reveal screen is never dealt cards that were already revealed", () => {
+  for (let seed = 30; seed <= 60; seed += 1) {
+    const { state, cards, rng } = openBigPack(seed);
+    for (const screen of walkRevealScreens(state, cards, rng, 18)) {
+      assert.equal(screen.alreadyRevealed, 0, `seed ${seed} dealt a screen with revealed cards on it`);
+    }
+  }
+});
+
+test("without filing, off-screen reveals land on a later screen", () => {
+  // Guards the test above: this is the shape it exists to prevent, and it is
+  // reachable with the real engine.
+  const { state, cards, rng } = openBigPack(54);
+  const screens = walkRevealScreens(state, cards, rng, 18, { useFiled: false });
+  assert.ok(
+    screens.some((screen) => screen.alreadyRevealed > 0),
+    "expected an unfiled walk to deal a screen holding already-revealed cards",
+  );
 });
 
 test("reordering the case moves one card and leaves the rest in order", () => {

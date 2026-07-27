@@ -85,6 +85,14 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
 });
 
 test("the pack rotunda presents every real pack type without duplicating wrapper details", async ({ page }) => {
+  // Bankrolled on purpose: a pack you cannot afford greys out and swaps its
+  // description for the shortfall, which the next test covers.
+  const state = createInitialState(Date.now());
+  state.coins = 50_000_000;
+  state.lifetimeCoins = 50_000_000;
+  state.settings.sound = false;
+  state.lastSavedAt = Date.now();
+  await seedState(page, advanceBeat(state));
   await page.goto("/");
 
   const arrow = page.getByRole("button", { name: "Next pack type" });
@@ -136,6 +144,41 @@ test("the pack rotunda presents every real pack type without duplicating wrapper
 
   await arrow.click();
   await expect(page.locator(".clean-pack-station .pack-title strong")).toHaveText("Standard");
+});
+
+test("a pack you cannot afford greys out until the cash is there", async ({ page }) => {
+  await page.goto("/");
+  const station = page.locator(".clean-pack-station");
+  const arrow = page.getByRole("button", { name: "Next pack type" });
+
+  // A fresh save opens with sealed Standard packs on hand, so Standard reads
+  // as available even at zero cash.
+  await expect(station).not.toHaveClass(/is-unaffordable/);
+  await expect(page.locator(".pack-type-copy small")).toHaveText("Standard distribution.");
+
+  // Rare costs 10,000 and there is no stock of it.
+  await arrow.click();
+  await expect(station).toHaveClass(/is-unaffordable/);
+  await expect(page.locator(".pack-type-copy small")).toHaveText("NOT ENOUGH CASH");
+  await expect(page.locator(".clean-pack-clicker")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator(".clean-pack-clicker")).toHaveAttribute("aria-label", /Not enough cash/);
+  const filter = await page.locator(".clean-pack-station.is-unaffordable .clean-pack-stack")
+    .evaluate((node) => getComputedStyle(node).filter);
+  expect(filter).toContain("grayscale");
+
+  // Same pack, funded: the grey lifts and the description comes back.
+  const funded = createInitialState(Date.now());
+  funded.coins = 50_000_000;
+  funded.lifetimeCoins = 50_000_000;
+  funded.settings.sound = false;
+  funded.lastSavedAt = Date.now();
+  await seedState(page, advanceBeat(funded));
+  await page.goto("/");
+  await arrow.click();
+  await expect(station).toHaveClass(/clean-pack-station/);
+  await expect(station).not.toHaveClass(/is-unaffordable/);
+  await expect(page.locator(".pack-type-copy small")).toHaveText("Common and Uncommon removed.");
+  await expect(page.locator(".clean-pack-clicker")).not.toHaveAttribute("aria-disabled", "true");
 });
 
 test("desktop mounts at most 72 cards", async ({ page }) => {

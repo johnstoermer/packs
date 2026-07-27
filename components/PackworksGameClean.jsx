@@ -29,10 +29,12 @@ import {
   getCardSaleValue,
   getDerived,
   getInscriptionsEarned,
+  getFiledIndices,
   getPackPrice,
   getProductCount,
   hydrateState,
   openPack,
+  planRevealBatch,
   reorderDisplayed,
   resolveImmediateFusion,
   revealPackCard,
@@ -69,14 +71,6 @@ function getRevealBatchSize(width, coarsePointer = false) {
   if (coarsePointer || width <= 700) return MOBILE_REVEAL_BATCH_SIZE;
   if (width <= 1_000) return TABLET_REVEAL_BATCH_SIZE;
   return DESKTOP_REVEAL_BATCH_SIZE;
-}
-
-function getRevealBatchIndices(cards = [], start = 0, size = DESKTOP_REVEAL_BATCH_SIZE) {
-  const indices = [];
-  for (let index = Math.max(0, start); index < cards.length && indices.length < size; index += 1) {
-    if (!cards[index]?.fusedAway) indices.push(index);
-  }
-  return indices;
 }
 
 function money(value) {
@@ -1396,11 +1390,19 @@ export default function PackworksGameClean() {
   // Grid solver: pick the columns-by-rows arrangement that keeps every card
   // of the reveal inside the visible board area at the largest possible
   // size. Columns grow with the pack just like rows — never scrolling.
-  const openingBatchIndices = useMemo(() => getRevealBatchIndices(
+  const openingBatchIndices = useMemo(() => planRevealBatch(
     opening?.result?.cards,
     opening?.batchStart || 0,
     opening?.batchSize || getRevealBatchSize(viewport.w, viewport.coarse),
-  ), [opening?.batchSize, opening?.batchStart, opening?.result?.cards, viewport.coarse, viewport.w]);
+    opening?.filed,
+  ), [
+    opening?.batchSize,
+    opening?.batchStart,
+    opening?.filed,
+    opening?.result?.cards,
+    viewport.coarse,
+    viewport.w,
+  ]);
 
   const openingBatchIndexSet = useMemo(
     () => new Set(openingBatchIndices),
@@ -1540,7 +1542,12 @@ export default function PackworksGameClean() {
     const rarity = RARITIES[impactPull.rarity];
     const allRevealed = cards.every((entry) => entry.revealed || entry.fusedAway);
     const batchSize = currentOpening.batchSize || DESKTOP_REVEAL_BATCH_SIZE;
-    const batchIndices = getRevealBatchIndices(cards, currentOpening.batchStart || 0, batchSize);
+    const batchIndices = planRevealBatch(
+      cards,
+      currentOpening.batchStart || 0,
+      batchSize,
+      currentOpening.filed,
+    );
     const batchComplete = !allRevealed
       && batchIndices.length > 0
       && batchIndices.every((position) => cards[position].revealed || cards[position].fusedAway);
@@ -1604,6 +1611,10 @@ export default function PackworksGameClean() {
             ...current,
             phase: "ready",
             batchStart: nextStart,
+            // Everything face-up right now files with this screen — including
+            // cards past the cap that an effect turned — so the next screen
+            // deals only what is still face-down.
+            filed: getFiledIndices(current.result.cards),
             batchNumber: (current.batchNumber || 1) + 1,
             batchPending: false,
             impact: null,
@@ -1708,9 +1719,11 @@ export default function PackworksGameClean() {
     commit(state);
     pushFx(events);
 
+    // The last screenful FINISH resolved, so it collects on screen. Cards
+    // filed with an earlier screen are left out — they already flew.
     const batchSize = currentOpening.batchSize || DESKTOP_REVEAL_BATCH_SIZE;
     const activeIndices = cards
-      .map((entry, index) => (!entry.fusedAway ? index : -1))
+      .map((entry, index) => (!entry.fusedAway && !currentOpening.filed?.has(index) ? index : -1))
       .filter((index) => index >= 0);
     const batchStart = activeIndices[Math.max(0, activeIndices.length - batchSize)] || 0;
     commitOpening({
@@ -1807,6 +1820,7 @@ export default function PackworksGameClean() {
         window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches === true,
       ),
       batchStart: 0,
+      filed: null,
       batchNumber: 1,
       batchPending: false,
       canForceFinish: false,
@@ -1921,10 +1935,11 @@ export default function PackworksGameClean() {
     }
 
     if (opening.phase === "ready") {
-      const visibleIndices = getRevealBatchIndices(
+      const visibleIndices = planRevealBatch(
         opening.result.cards,
         opening.batchStart || 0,
         opening.batchSize || DESKTOP_REVEAL_BATCH_SIZE,
+        opening.filed,
       );
       const nextIndex = visibleIndices.find((index) => (
         !opening.result.cards[index].revealed && !opening.result.cards[index].fusedAway
@@ -2194,9 +2209,9 @@ export default function PackworksGameClean() {
               aria-disabled={packAffordable ? undefined : true}
               aria-label={selectedPackStock
                 ? `Open a pack: ${selectedPackType.name}. ${selectedPackStock} ready.`
-                : packAffordable
-                  ? `Buy and open a pack: ${selectedPackType.name} for ${exactMoney(nextPackPrice)} cash.`
-                  : `${selectedPackType.name} pack unavailable: costs ${exactMoney(nextPackPrice)} cash, you have ${exactMoney(game.coins)}.`}
+                : `Buy and open a pack: ${selectedPackType.name} for ${exactMoney(nextPackPrice)} cash.${
+                  packAffordable ? "" : ` Not enough cash — you have ${exactMoney(game.coins)}.`
+                }`}
             >
               <span className="clean-pack-shadow" />
               <span
