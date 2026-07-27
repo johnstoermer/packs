@@ -60,7 +60,8 @@ const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
 const DESKTOP_REVEAL_BATCH_SIZE = 72;
 const TABLET_REVEAL_BATCH_SIZE = 12;
-const MOBILE_REVEAL_BATCH_SIZE = 12;
+const MOBILE_REVEAL_BATCH_SIZE = 18;
+const MOBILE_REVEAL_COLUMNS = 6;
 const COLLECTION_ANIMATION_MS = 950;
 
 function getRevealBatchSize(width, coarsePointer = false) {
@@ -1298,12 +1299,28 @@ export default function PackworksGameClean() {
 
   const boardLayout = useMemo(() => {
     const mobileOpening = viewport.coarse || viewport.w <= 700;
-    const grewDuringOpening = (opening?.result?.cards?.length || 0) > (opening?.initialCount || 0);
-    const count = mobileOpening && grewDuringOpening
-      ? Math.max(openingBatchIndices.length, opening?.batchSize || MOBILE_REVEAL_BATCH_SIZE)
-      : openingBatchIndices.length;
+    const count = openingBatchIndices.length;
     if (!count) return { count: 0, perRow: 1, rows: 1, shrink: 1, gapX: 0, gapY: 0 };
     const { w, h } = viewport;
+    if (mobileOpening) {
+      const cardW = Math.min(w * 0.22, 112);
+      const cardH = cardW * 1.42;
+      const gapX = Math.min(w * 0.135, 74);
+      const availW = w * 0.92;
+      const availH = h * 0.58;
+      const maxRows = Math.ceil(MOBILE_REVEAL_BATCH_SIZE / MOBILE_REVEAL_COLUMNS);
+      const sW = availW / ((MOBILE_REVEAL_COLUMNS - 1) * gapX + cardW);
+      const sH = availH / (maxRows * (cardH + 16));
+      const shrink = +Math.max(0.55, Math.min(1, sW, sH)).toFixed(3);
+      return {
+        count,
+        perRow: MOBILE_REVEAL_COLUMNS,
+        rows: Math.ceil(count / MOBILE_REVEAL_COLUMNS),
+        shrink,
+        gapX: Math.round(gapX),
+        gapY: Math.round(cardH * shrink + Math.max(8, 16 * shrink)),
+      };
+    }
     const narrow = w <= 1050;
     const cardW = Math.min(Math.max(narrow ? 132 : 148, w * (narrow ? 0.155 : 0.145)), narrow ? 165 : 198);
     const cardH = cardW * 1.42;
@@ -1328,9 +1345,6 @@ export default function PackworksGameClean() {
       gapY: Math.round(cardH * shrink + Math.max(8, 20 * shrink)),
     };
   }, [
-    opening?.batchSize,
-    opening?.initialCount,
-    opening?.result?.cards?.length,
     openingBatchIndices.length,
     viewport,
   ]);
@@ -1667,7 +1681,6 @@ export default function PackworksGameClean() {
       phase: "sealed",
       revealed: [],
       impact: null,
-      initialCount: rolled.result.cards.length,
       batchSize: getRevealBatchSize(
         window.innerWidth,
         window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches === true,
@@ -2001,7 +2014,7 @@ export default function PackworksGameClean() {
       <section className="clean-stage">
         <div className="clean-stage-light" />
         <div className="clean-floor"><i /><i /><i /><i /><i /></div>
-        <div className="stage-case-dock">
+        <div className={`stage-case-dock${opening ? " is-opening" : ""}`}>
           <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
           {Object.keys(game.discoverStack || {}).length > 0 && (
             <div className="discover-stack" aria-label="Pending Discover stacks">
@@ -2010,6 +2023,15 @@ export default function PackworksGameClean() {
                 return <span key={id}>{option?.name || id} ×{count}</span>;
               })}
             </div>
+          )}
+          {opening?.canForceFinish && !["complete", "collecting"].includes(opening.phase) && (
+            <button
+              type="button"
+              className="opening-force-finish"
+              onClick={forceFinishOpening}
+            >
+              FINISH
+            </button>
           )}
         </div>
 
@@ -2142,15 +2164,6 @@ export default function PackworksGameClean() {
           }}
         >
           <div className="opening-haze" />
-          {opening.canForceFinish && !["complete", "collecting"].includes(opening.phase) && (
-            <button
-              type="button"
-              className="opening-force-finish"
-              onClick={forceFinishOpening}
-            >
-              FINISH
-            </button>
-          )}
           <div className="foil-pack-wrap">
             <div className="foil-half foil-top"><PackFace set={opening.result.set} packType={opening.result.packType} /></div>
             <div className="foil-half foil-bottom"><PackFace set={opening.result.set} packType={opening.result.packType} /></div>

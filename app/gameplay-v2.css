@@ -3046,24 +3046,6 @@
     text-align: center;
   }
 
-  .reveal-card.count-6 {
-    --card-width: min(27vw, 108px);
-  }
-
-  .reveal-card.count-6:nth-child(1) { --mobile-x: -112px; --mobile-y: -111px; --mobile-r: -4deg; }
-  .reveal-card.count-6:nth-child(2) { --mobile-x: 0px; --mobile-y: -111px; --mobile-r: 0deg; }
-  .reveal-card.count-6:nth-child(3) { --mobile-x: 112px; --mobile-y: -111px; --mobile-r: 4deg; }
-  .reveal-card.count-6:nth-child(4) { --mobile-x: -112px; --mobile-y: 74px; --mobile-r: 3deg; }
-  .reveal-card.count-6:nth-child(5) { --mobile-x: 0px; --mobile-y: 74px; --mobile-r: 0deg; }
-  .reveal-card.count-6:nth-child(6) { --mobile-x: 112px; --mobile-y: 74px; --mobile-r: -3deg; }
-
-  .reveal-card.count-6.is-dealt,
-  .reveal-card.count-6.is-revealed {
-    transform:
-      translate(calc(-50% + var(--mobile-x)), calc(-50% + var(--mobile-y)))
-      rotate(var(--mobile-r));
-  }
-
 }
 
 @media (max-width: 470px) {
@@ -3100,14 +3082,6 @@
     font-size: 6px;
   }
 
-  .reveal-card.count-6 {
-    --card-width: min(26vw, 99px);
-  }
-
-  .reveal-card.count-6:nth-child(1) { --mobile-x: -102px; }
-  .reveal-card.count-6:nth-child(3) { --mobile-x: 102px; }
-  .reveal-card.count-6:nth-child(4) { --mobile-x: -102px; }
-  .reveal-card.count-6:nth-child(6) { --mobile-x: 102px; }
 }
 
 @media (max-height: 620px) {
@@ -3171,8 +3145,4 @@
     min-height: 43px;
   }
 
-  .reveal-card.count-6 {
-    --card-width: min(16vw, 100px);
-    --card-gap: min(16vw, 104px);
-  }
 }

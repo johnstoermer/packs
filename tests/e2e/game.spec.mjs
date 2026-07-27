@@ -186,11 +186,12 @@ test("desktop mounts at most 72 cards", async ({ page }) => {
   await page.screenshot({ path: "test-results/clean-mega-pack.png" });
 });
 
-test("mobile mounts at most twelve stable-size cards from a large pack at once", async ({ page }) => {
+test("mobile lays out up to eighteen cards in fixed rows of six", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
   state.coins = 10_000;
   state.lifetimeCoins = 10_000;
+  state.discoverStack = { acceleration: 1, reflection: 1 };
   state.settings.sound = false;
   state.settings.quickOpen = true;
   state.lastSavedAt = Date.now();
@@ -201,18 +202,55 @@ test("mobile mounts at most twelve stable-size cards from a large pack at once",
   await page.getByRole("button", { name: "Next pack type" }).click();
   await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(12);
-  await expect(page.locator(".opening-overflow-count")).toHaveText("24 CARDS NOT ON SCREEN");
+  await expect(page.locator(".reveal-card")).toHaveCount(18);
+  await expect(page.locator(".opening-overflow-count")).toHaveText("18 CARDS NOT ON SCREEN");
+  await page.waitForTimeout(2_000);
   const mobileWidths = await page.locator(".reveal-card").evaluateAll(
     (nodes) => nodes.map((node) => node.getBoundingClientRect().width),
   );
   expect(Math.min(...mobileWidths)).toBeGreaterThan(70);
-  await page.waitForTimeout(2_000);
+  const rows = await page.locator(".reveal-card").evaluateAll((nodes) => {
+    const offsets = nodes.map((node) => node.style.getPropertyValue("--rowoff"));
+    return [...new Set(offsets)].map((offset) => offsets.filter((candidate) => candidate === offset).length);
+  });
+  expect(rows).toEqual([6, 6, 6]);
+  await expect(page.locator(".stage-case-dock")).toBeVisible();
+  await expect(page.locator(".discover-stack")).toBeVisible();
   await page.screenshot({ path: "test-results/clean-mobile-overflow.png" });
-  await revealAll(page);
+  const cards = page.locator(".reveal-card");
+  for (let index = 0; index < await cards.count(); index += 1) {
+    await cards.nth(index).evaluate((node) => node.click());
+  }
   await expect(page.getByRole("button", { name: "FINISH" })).toBeVisible();
+  const badgeBottom = await page.locator(".discover-stack").evaluate(
+    (node) => node.getBoundingClientRect().bottom,
+  );
+  const finishTop = await page.getByRole("button", { name: "FINISH" }).evaluate(
+    (node) => node.getBoundingClientRect().top,
+  );
+  expect(finishTop).toBeGreaterThanOrEqual(badgeBottom);
+  await page.screenshot({ path: "test-results/clean-mobile-finish.png" });
   await expect(page.locator(".opening-layer.phase-filing")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(12);
+  await expect(page.locator(".reveal-card")).toHaveCount(18);
+});
+
+test("mobile keeps a standard six-card pack in one row", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = createInitialState(Date.now());
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /Open a pack/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await expect(page.locator(".reveal-card")).toHaveCount(6);
+  await page.waitForTimeout(1_500);
+  const rowOffsets = await page.locator(".reveal-card").evaluateAll(
+    (nodes) => [...new Set(nodes.map((node) => node.style.getPropertyValue("--rowoff")))],
+  );
+  expect(rowOffsets).toEqual(["0"]);
 });
 
 test("holding Space reveals cards in order and releasing stops the sequence", async ({ page }) => {

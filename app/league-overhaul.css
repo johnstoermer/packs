@@ -1802,10 +1802,6 @@
 }
 
 .theme-league .opening-force-finish {
-  position: absolute;
-  z-index: 34;
-  top: 78px;
-  left: 50%;
   min-width: 104px;
   min-height: 40px;
   padding: 8px 18px;
@@ -1820,7 +1816,6 @@
   font-weight: 950;
   letter-spacing: 0.12em;
   pointer-events: auto;
-  transform: translateX(-50%);
 }
 
 .theme-league .opening-force-finish:hover,
@@ -1830,7 +1825,13 @@
 
 .theme-league .opening-force-finish:active {
   box-shadow: 0 2px 0 var(--league-navy);
-  transform: translate(-50%, 3px);
+  transform: translateY(3px);
+}
+
+.theme-league .stage-case-dock.is-opening {
+  position: fixed;
+  z-index: 34;
+  top: 74px;
 }
 
 .theme-league .phase-filing .reveal-deck {
@@ -3949,6 +3950,10 @@
 }
 
 @media (max-width: 700px), (hover: none) and (pointer: coarse) {
+  .theme-league .stage-case-dock.is-opening {
+    top: 70px;
+  }
+
   .theme-league .opening-layer.clean-opening,
   .theme-league.fx-holo .opening-layer.clean-opening,
   .theme-league.fx-tabletop .opening-layer.clean-opening {
@@ -3960,6 +3965,7 @@
   }
 
   .theme-league .reveal-card {
+    --card-width: min(25vw, 112px);
     transition:
       opacity 180ms ease,
       filter 180ms ease,

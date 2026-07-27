@@ -1423,16 +1423,6 @@
   filter: drop-shadow(0 20px 18px color-mix(in srgb, var(--rarity) 28%, rgba(0, 0, 0, 0.54)));
 }
 
-.pw-clean .reveal-card.count-6 {
-  --card-width: clamp(118px, 11.2vw, 160px);
-  --card-gap: var(--board-gap-x, min(11.8vw, 164px));
-}
-
-.pw-clean .reveal-card.count-7 {
-  --card-width: clamp(104px, 9.8vw, 142px);
-  --card-gap: var(--board-gap-x, min(10.3vw, 144px));
-}
-
 .pw-clean .card-foot b {
   max-width: 58%;
   overflow: hidden;
