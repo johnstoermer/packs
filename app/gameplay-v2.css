@@ -2494,10 +2494,6 @@
   animation: pw-duel-time 8s linear both;
 }
 
-.reduced-effects .pw-duel-timeline i {
-  animation-duration: 3.2s;
-}
-
 @keyframes pw-duel-time {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
@@ -3212,18 +3208,5 @@
   .reveal-card.count-6 {
     --card-width: min(16vw, 100px);
     --card-gap: min(16vw, 104px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pw2 *,
-  .pw2 *::before,
-  .pw2 *::after {
-    scroll-behavior: auto !important;
-  }
-
-  .pw-duel-cards i,
-  .pw-duel-pulse {
-    animation: none !important;
   }
 }

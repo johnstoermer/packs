@@ -2460,26 +2460,6 @@ kbd {
   50% { opacity: 1; transform: scaleX(1); }
 }
 
-.reduced-effects *,
-.reduced-effects *::before,
-.reduced-effects *::after {
-  scroll-behavior: auto !important;
-  animation-duration: 0.001ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.001ms !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .packworks *,
-  .packworks *::before,
-  .packworks *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
-}
-
 @media (max-width: 1120px) {
   :root {
     --panel-width: clamp(300px, 31vw, 350px);

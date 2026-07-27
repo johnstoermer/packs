@@ -2322,20 +2322,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pw-clean *,
-  .pw-clean *::before,
-  .pw-clean *::after {
-    scroll-behavior: auto !important;
-  }
-
-  .clean-pack-stack,
-  .clean-drawer {
-    animation-duration: 1ms !important;
-    transition-duration: 1ms !important;
-  }
-}
-
 /* --- Verb engine: display case strip -------------------------------------- */
 
 .stage-case-dock {
@@ -2729,12 +2715,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .discover-card {
-    animation: none;
-  }
-}
-
 .discover-stack {
   display: flex;
   gap: 6px;
@@ -2834,10 +2814,6 @@ button.clean-case-slot.is-empty:hover {
   100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .reveal-echo-flash { animation-iteration-count: 1; }
-}
-
 /* Shared lightweight bursts can fire over any menu without taking it over. */
 
 .global-burst-layer {
@@ -2845,10 +2821,6 @@ button.clean-case-slot.is-empty:hover {
   inset: 0;
   z-index: 180;
   pointer-events: none;
-}
-
-.reduced-effects .global-burst-layer {
-  display: none;
 }
 
 .global-burst {

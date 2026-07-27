@@ -185,7 +185,7 @@ export default function CardReviewGallery() {
         <label>
           <span>SET</span>
           <select value={setId} onChange={(event) => setSetId(event.target.value)}>
-            <option value="all">All Core cards</option>
+            <option value="all">All cards</option>
             {SETS.map((set) => <option value={set.id} key={set.id}>{set.short} / {set.name}</option>)}
           </select>
         </label>

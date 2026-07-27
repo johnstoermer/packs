@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ALL_CARDS,
+  PACK_TYPES,
   RARITIES,
   SETS,
   formatNumber,
@@ -57,9 +58,30 @@ const PIXEL_ART_VERSION = "20260726-2";
 const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
 const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
+const DESKTOP_REVEAL_BATCH_SIZE = 18;
+const TABLET_REVEAL_BATCH_SIZE = 12;
+const MOBILE_REVEAL_BATCH_SIZE = 6;
+
+function getRevealBatchSize(width) {
+  if (width <= 700) return MOBILE_REVEAL_BATCH_SIZE;
+  if (width <= 1_000) return TABLET_REVEAL_BATCH_SIZE;
+  return DESKTOP_REVEAL_BATCH_SIZE;
+}
+
+function getRevealBatchIndices(cards = [], start = 0, size = DESKTOP_REVEAL_BATCH_SIZE) {
+  const indices = [];
+  for (let index = Math.max(0, start); index < cards.length && indices.length < size; index += 1) {
+    if (!cards[index]?.fusedAway) indices.push(index);
+  }
+  return indices;
+}
 
 function money(value) {
   return formatNumber(Math.round(Number(value) || 0));
+}
+
+function exactMoney(value) {
+  return Math.round(Number(value) || 0).toLocaleString("en-US");
 }
 
 function rate(value) {
@@ -94,7 +116,6 @@ function CardArt({ card, compact = false, animated = false }) {
   const artAt = artKey.lastIndexOf("-");
   const artSetId = artKey.slice(0, artAt);
   const artNumber = artKey.slice(artAt + 1);
-  const legacyPath = `${ASSET_BASE}/card-art/${artSetId}/${artNumber}.webp`;
   const pixelPath = `${ASSET_BASE}/card-art-pixel/${artSetId}/${artNumber}/frame-0.png?v=${PIXEL_ART_VERSION}`;
   const holoPath = `${ASSET_BASE}/card-art-pixel/${artSetId}/${artNumber}/holo-strip.png?v=${PIXEL_ART_VERSION}`;
   useEffect(() => {
@@ -102,12 +123,11 @@ function CardArt({ card, compact = false, animated = false }) {
   }, [pixelPath]);
   return (
     <span
-      className={`card-art ${compact ? "compact" : ""} ${animated ? "is-pixel-animated" : ""} ${pixelReady ? "has-pixel-art" : ""}`.trim()}
+      className={`card-art card-art-${card.id} ${compact ? "compact" : ""} ${animated ? "is-pixel-animated" : ""} ${pixelReady ? "has-pixel-art" : ""}`.trim()}
       role="img"
       aria-label={`${card.name}, an original card illustration`}
       style={{ "--art-a": set.colors[0], "--art-b": set.colors[1] }}
     >
-      <img className="card-art-legacy" src={legacyPath} alt="" aria-hidden="true" loading={compact ? "lazy" : "eager"} decoding="async" />
       <img
         ref={pixelRef}
         className="card-art-pixel"
@@ -176,44 +196,46 @@ function PackCreatureArt({ card }) {
   const artSetId = artKey.slice(0, artAt);
   const artNumber = artKey.slice(artAt + 1);
   const pixelPath = `${ASSET_BASE}/card-art-pixel/${artSetId}/${artNumber}/frame-0.png?v=${PIXEL_ART_VERSION}`;
-  const legacyPath = `${ASSET_BASE}/card-art/${artSetId}/${artNumber}.webp`;
   return (
     <img
       src={pixelPath}
-      data-fallback={legacyPath}
       alt=""
       aria-hidden="true"
       decoding="async"
       onError={(event) => {
-        const image = event.currentTarget;
-        const fallback = image.dataset.fallback;
-        if (fallback && image.getAttribute("src") !== fallback) image.src = fallback;
-        else image.hidden = true;
+        event.currentTarget.hidden = true;
       }}
     />
   );
 }
 
-export function PackFace({ set, small = false }) {
-  const featured = [...set.cards]
+export function PackFace({ set, packType = PACK_TYPES[0], small = false }) {
+  const fallbackFeatured = [...set.cards]
     .sort((left, right) => (
       RARITIES[right.rarity].order - RARITIES[left.rarity].order
       || right.number - left.number
-    ))
-    .slice(0, 3);
+    ));
+  const requestedFeatured = (packType.featuredNames || [])
+    .map((name) => set.cards.find((card) => card.name === name))
+    .filter(Boolean);
+  const featured = [
+    ...requestedFeatured,
+    ...fallbackFeatured.filter((card) => !requestedFeatured.includes(card)),
+  ].slice(0, 3);
   const [chase, leftFeature, rightFeature] = featured;
+  const packColors = packType.colors || set.colors;
   return (
     <span
-      className={`${small ? "pack-face small" : "pack-face"}`}
+      className={`${small ? "pack-face small" : "pack-face"} pack-type-${packType.id}`}
       style={{
-        "--pack-a": set.colors[0],
-        "--pack-b": set.colors[1],
-        "--pack-c": set.colors[2],
+        "--pack-a": packColors[0],
+        "--pack-b": packColors[1],
+        "--pack-c": packColors[2],
       }}
     >
       <span className="pack-crimp top" />
       <span className="pack-title">
-        <strong>{set.name}</strong>
+        <strong>{packType.name}</strong>
       </span>
       <span
         className="pack-creature-scene"
@@ -222,7 +244,7 @@ export function PackFace({ set, small = false }) {
         <span className="pack-creature is-left"><PackCreatureArt card={leftFeature} /></span>
         <span className="pack-creature is-right"><PackCreatureArt card={rightFeature} /></span>
         <span className="pack-creature is-chase"><PackCreatureArt card={chase} /></span>
-        <span className="pack-info"><b>6 CARDS</b><small>PACKWORKS</small></span>
+        <span className="pack-info"><b>{packType.cardCount} CARDS</b><small>PACKWORKS</small></span>
       </span>
       <span className="pack-crimp bottom" />
     </span>
@@ -284,11 +306,11 @@ export function PrintedCard({
 function RevealCard({
   pull,
   index,
+  position,
   count,
   perRow,
   rows,
   shrink,
-  initialCount,
   revealed,
   echo,
   latest,
@@ -302,9 +324,9 @@ function RevealCard({
   const set = getSet(pull.card.setId);
   const dealt = ["ready", "complete", "summary"].includes(phase);
   const canReveal = phase === "ready" && !revealed;
-  const row = Math.floor(index / perRow);
+  const row = Math.floor(position / perRow);
   const colsInRow = Math.min(perRow, count - row * perRow);
-  const spread = (index - row * perRow) - (colsInRow - 1) / 2;
+  const spread = (position - row * perRow) - (colsInRow - 1) / 2;
   const rowOffset = row - (rows - 1) / 2;
   const copyLabel = pull.isNew ? "NEW" : "DUPLICATE";
 
@@ -319,18 +341,14 @@ function RevealCard({
         "--spread": spread,
         "--rowoff": rowOffset,
         "--shrink": shrink,
+        "--position": position,
         "--rarity": rarity.color,
         "--rarity-deep": rarity.deep,
         "--signal": signal.color,
         "--set-a": set.colors[0],
         "--set-b": set.colors[1],
         "--set-c": set.colors[2],
-        // Cards that join an in-progress reveal (Mystery bursts, Fusion
-        // results, encores) deal in immediately with a short stagger instead
-        // of waiting out the whole board's delay chain.
-        "--deal-delay": initialCount != null && index >= initialCount
-          ? `${((index - initialCount) % 6) * 80}ms`
-          : `${Math.min(index * 95, 4_000)}ms`,
+        "--deal-delay": `${Math.min(position * 75, 1_100)}ms`,
       }}
       onPointerEnter={() => canReveal && onSignal(signal.order)}
       onFocus={() => canReveal && onSignal(signal.order)}
@@ -910,6 +928,9 @@ export default function PackworksGameClean() {
   const [binderSetId, setBinderSetId] = useState(SETS[0].id);
   const [opening, setOpening] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
+  const [packTypeIndex, setPackTypeIndex] = useState(0);
+  const [packRotation, setPackRotation] = useState("right");
+  const selectedPackType = PACK_TYPES[packTypeIndex] || PACK_TYPES[0];
   const [gameplayCues, setGameplayCues] = useState([]);
   const [globalBursts, setGlobalBursts] = useState([]);
   const [cashStreams, setCashStreams] = useState([]);
@@ -983,7 +1004,6 @@ export default function PackworksGameClean() {
   }, []);
 
   const queueGlobalBurst = useCallback((type, count = 1) => {
-    if (gameRef.current?.settings?.reducedEffects) return;
     const burst = {
       id: ++globalBurstSerialRef.current,
       type,
@@ -1257,8 +1277,14 @@ export default function PackworksGameClean() {
   // Grid solver: pick the columns-by-rows arrangement that keeps every card
   // of the reveal inside the visible board area at the largest possible
   // size. Columns grow with the pack just like rows — never scrolling.
+  const openingBatchIndices = useMemo(() => getRevealBatchIndices(
+    opening?.result?.cards,
+    opening?.batchStart || 0,
+    opening?.batchSize || getRevealBatchSize(viewport.w),
+  ), [opening?.batchSize, opening?.batchStart, opening?.result?.cards, viewport.w]);
+
   const boardLayout = useMemo(() => {
-    const count = opening?.result?.cards?.length || 0;
+    const count = openingBatchIndices.length;
     if (!count) return { count: 0, perRow: 1, rows: 1, shrink: 1, gapX: 0, gapY: 0 };
     const { w, h } = viewport;
     const narrow = w <= 1050;
@@ -1284,7 +1310,7 @@ export default function PackworksGameClean() {
       gapX: Math.round(gapXBase),
       gapY: Math.round(cardH * shrink + Math.max(8, 20 * shrink)),
     };
-  }, [opening?.result?.cards?.length, viewport]);
+  }, [openingBatchIndices.length, viewport]);
 
   const revealCard = useCallback((index) => {
     const currentOpening = openingRef.current;
@@ -1323,6 +1349,11 @@ export default function PackworksGameClean() {
     const revealedPull = cards[index];
     const rarity = RARITIES[revealedPull.rarity];
     const allRevealed = cards.every((entry) => entry.revealed || entry.fusedAway);
+    const batchSize = currentOpening.batchSize || DESKTOP_REVEAL_BATCH_SIZE;
+    const batchIndices = getRevealBatchIndices(cards, currentOpening.batchStart || 0, batchSize);
+    const batchComplete = !allRevealed
+      && batchIndices.length > 0
+      && batchIndices.every((position) => cards[position].revealed || cards[position].fusedAway);
     const impact = {
       index,
       rarity: revealedPull.rarity,
@@ -1333,6 +1364,8 @@ export default function PackworksGameClean() {
       ...currentOpening,
       result: { ...currentOpening.result, cards },
       phase: allRevealed ? "complete" : "ready",
+      batchPending: batchComplete,
+      canForceFinish: currentOpening.canForceFinish || batchComplete,
       revealed: cards.map((entry, position) => (entry.revealed ? position : -1)).filter((position) => position >= 0),
       impact,
     });
@@ -1344,6 +1377,33 @@ export default function PackworksGameClean() {
     else if (rarity.order >= RARITIES.legendary.order) audio.sound("legendary", rarity.order);
     if (outcome.events.some((event) => event.t === "echo")) audio.sound("fusion", 2);
 
+    if (batchComplete) {
+      const settleDelay = rarity.order >= 4 ? 800 : rarity.order === 3 ? 620 : 420;
+      const filingDuration = 900;
+      openingTimersRef.current.push(window.setTimeout(() => {
+        commitOpening((current) => current?.id === currentOpening.id
+          ? { ...current, phase: "filing", batchPending: false, impact: null }
+          : current);
+        audio.sound("caseBreak");
+      }, settleDelay));
+      openingTimersRef.current.push(window.setTimeout(() => {
+        commitOpening((current) => {
+          if (current?.id !== currentOpening.id) return current;
+          const nextStart = current.result.cards.findIndex((entry) => !entry.revealed && !entry.fusedAway);
+          if (nextStart < 0) return { ...current, phase: "complete", batchPending: false, impact: null };
+          return {
+            ...current,
+            phase: "ready",
+            batchStart: nextStart,
+            batchNumber: (current.batchNumber || 1) + 1,
+            batchPending: false,
+            impact: null,
+          };
+        });
+        audio.sound("deal");
+      }, settleDelay + filingDuration));
+    }
+
     if (allRevealed) {
       const delay = rarity.order >= 4 ? 1550 : rarity.order === 3 ? 1200 : 900;
       openingTimersRef.current.push(window.setTimeout(() => {
@@ -1354,9 +1414,19 @@ export default function PackworksGameClean() {
           audio.sound("fusion", 4);
           getHaptics().pulse("fuse");
           playGameplayCue("fusion", "FUSION ↑", "REVEAL THE NEW CARD");
-          commitOpening((current) => current?.id === currentOpening.id
-            ? { ...current, result: { ...current.result, cards: fusion.cards }, phase: "ready", impact: null }
-            : current);
+          commitOpening((current) => {
+            if (current?.id !== currentOpening.id) return current;
+            const nextStart = fusion.cards.findIndex((entry) => !entry.revealed && !entry.fusedAway);
+            return {
+              ...current,
+              result: { ...current.result, cards: fusion.cards },
+              phase: "ready",
+              batchStart: Math.max(0, nextStart),
+              batchNumber: (current.batchNumber || 1) + 1,
+              batchPending: false,
+              impact: null,
+            };
+          });
           return;
         }
         audio.sound("packComplete");
@@ -1365,25 +1435,81 @@ export default function PackworksGameClean() {
           : current);
       }, delay));
     }
-  }, [commit, commitOpening, getAudio, playGameplayCue, pushFx]);
+  }, [commit, commitOpening, getAudio, getHaptics, playGameplayCue, pushFx]);
+
+  const forceFinishOpening = useCallback(() => {
+    const currentOpening = openingRef.current;
+    if (!currentOpening?.canForceFinish || currentOpening.phase === "summary") return;
+    clearOpeningTimers();
+    clearHoldRevealTimer();
+    revealLocksRef.current.clear();
+    swipePointerRef.current = null;
+    mobileAutoPointerRef.current = null;
+    setSwipeRevealing(false);
+    setMobileAutoHeld(false);
+
+    let state = gameRef.current;
+    let cards = currentOpening.result.cards;
+    const events = [];
+    for (let index = 0; index < cards.length; index += 1) {
+      if (cards[index].revealed || cards[index].fusedAway) continue;
+      const step = revealPackCard(state, cards, index, {
+        manual: true,
+        suppressEffects: true,
+      });
+      state = step.state;
+      cards = step.cards;
+      events.push(...step.events);
+    }
+    const automaticSale = sellDuplicatesDetailed(state, {});
+    state = automaticSale.state;
+    events.push(...automaticSale.events);
+    commit(state);
+    pushFx(events);
+
+    const batchSize = currentOpening.batchSize || DESKTOP_REVEAL_BATCH_SIZE;
+    const activeIndices = cards
+      .map((entry, index) => (!entry.fusedAway ? index : -1))
+      .filter((index) => index >= 0);
+    const batchStart = activeIndices[Math.max(0, activeIndices.length - batchSize)] || 0;
+    commitOpening({
+      ...currentOpening,
+      result: { ...currentOpening.result, cards },
+      phase: "summary",
+      batchStart,
+      batchPending: false,
+      revealed: cards.map((entry, index) => (entry.revealed ? index : -1)).filter((index) => index >= 0),
+      impact: null,
+    });
+    getAudio().sound("packComplete");
+    getHaptics().pulse("open");
+  }, [
+    clearHoldRevealTimer,
+    clearOpeningTimers,
+    commit,
+    commitOpening,
+    getAudio,
+    getHaptics,
+    pushFx,
+  ]);
 
   const beginManualOpen = useCallback(() => {
     if (!ready || drawer || selectedCard || gameRef.current.discoverOffer) return;
     const currentOpening = openingRef.current;
     if (currentOpening && currentOpening.phase !== "summary") return;
     let current = gameRef.current;
-    if (getProductCount(current, current.activeSet, "loose") <= 0) {
-      if (getProductCount(current, current.activeSet, "case") > 0) {
+    if (getProductCount(current, current.activeSet, selectedPackType.id) <= 0) {
+      if (selectedPackType.id === "loose" && getProductCount(current, current.activeSet, "case") > 0) {
         current = breakProduct(current, "case");
       }
-      if (getProductCount(current, current.activeSet, "loose") <= 0) {
-        current = buyProduct(current, "loose", current.activeSet);
+      if (getProductCount(current, current.activeSet, selectedPackType.id) <= 0) {
+        current = buyProduct(current, selectedPackType.id, current.activeSet);
       }
-      if (getProductCount(current, current.activeSet, "loose") <= 0) {
+      if (getProductCount(current, current.activeSet, selectedPackType.id) <= 0) {
         const now = Date.now();
         if (now - purchaseDenyAtRef.current > 3_500) {
           purchaseDenyAtRef.current = now;
-          const price = getPackPrice(current, "loose", current.activeSet);
+          const price = getPackPrice(current, selectedPackType.id, current.activeSet);
           getAudio().sound("deny");
           playGameplayCue("price", `${money(price)} CASH`, "KEEP HOLDING — PURCHASE RESUMES");
         }
@@ -1391,7 +1517,7 @@ export default function PackworksGameClean() {
       }
     }
     setRevealEchoes({});
-    const rolled = openPack(current, { manual: true, source: "loose", now: Date.now() });
+    const rolled = openPack(current, { manual: true, source: selectedPackType.id, now: Date.now() });
     if (!rolled.result) {
       if (rolled.error === "MANUAL_RATE_CAP") {
         getAudio().sound("deny");
@@ -1417,8 +1543,20 @@ export default function PackworksGameClean() {
     pushFx(rolled.result.events);
 
     const id = `${Date.now()}-${rolled.state.packsOpened}`;
-    commitOpening({ id, result: rolled.result, phase: "sealed", revealed: [], impact: null, initialCount: rolled.result.cards.length });
-    const quick = rolled.state.settings.quickOpen || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    commitOpening({
+      id,
+      result: rolled.result,
+      phase: "sealed",
+      revealed: [],
+      impact: null,
+      initialCount: rolled.result.cards.length,
+      batchSize: getRevealBatchSize(window.innerWidth),
+      batchStart: 0,
+      batchNumber: 1,
+      batchPending: false,
+      canForceFinish: false,
+    });
+    const quick = rolled.state.settings.quickOpen;
     const tearDelay = quick ? 80 : 440;
     const dealDelay = quick ? 240 : 1250;
     openingTimersRef.current.push(window.setTimeout(() => {
@@ -1429,7 +1567,18 @@ export default function PackworksGameClean() {
       commitOpening((value) => value?.id === id ? { ...value, phase: "ready" } : value);
       audio.sound("deal");
     }, dealDelay));
-  }, [clearOpeningTimers, commit, commitOpening, drawer, getAudio, playGameplayCue, pushFx, ready, selectedCard]);
+  }, [
+    clearOpeningTimers,
+    commit,
+    commitOpening,
+    drawer,
+    getAudio,
+    playGameplayCue,
+    pushFx,
+    ready,
+    selectedCard,
+    selectedPackType,
+  ]);
 
   const startMobileAuto = useCallback((event) => {
     if (event.button !== undefined && event.button !== 0) return;
@@ -1517,7 +1666,14 @@ export default function PackworksGameClean() {
     }
 
     if (opening.phase === "ready") {
-      const nextIndex = opening.result.cards.findIndex((_, index) => !opening.revealed.includes(index));
+      const visibleIndices = getRevealBatchIndices(
+        opening.result.cards,
+        opening.batchStart || 0,
+        opening.batchSize || DESKTOP_REVEAL_BATCH_SIZE,
+      );
+      const nextIndex = visibleIndices.find((index) => (
+        !opening.result.cards[index].revealed && !opening.result.cards[index].fusedAway
+      ));
       if (nextIndex >= 0) {
         const lastIndex = opening.revealed.at(-1);
         const lastPull = Number.isInteger(lastIndex) ? opening.result.cards[lastIndex] : null;
@@ -1680,24 +1836,31 @@ export default function PackworksGameClean() {
     clearHoldRevealTimer();
   }, [clearHoldRevealTimer, clearOpeningTimers]);
 
+  const rotatePackType = useCallback((step) => {
+    if (openingRef.current) return;
+    setPackRotation(step < 0 ? "left" : "right");
+    setPackTypeIndex((current) => (current + step + PACK_TYPES.length) % PACK_TYPES.length);
+    getAudio().sound("switch");
+  }, [getAudio]);
+
   const derived = useMemo(() => getDerived(game), [game]);
   const activeSet = getSet(game.activeSet);
-  const loosePacks = getProductCount(game, game.activeSet, "loose");
-  const nextPackPrice = getPackPrice(game, "loose", game.activeSet);
+  const selectedPackStock = getProductCount(game, game.activeSet, selectedPackType.id);
+  const nextPackPrice = getPackPrice(game, selectedPackType.id, game.activeSet);
   const mobileAutoTitle = mobileAutoHeld
     ? "AUTO-OPENING"
     : opening?.phase === "summary"
       ? "CONTINUE"
       : "HOLD TO AUTO-OPEN";
   const mobileAutoDetail = mobileAutoHeld
-    ? loosePacks > 0 || game.coins >= nextPackPrice ? "RELEASE TO STOP" : `WAITING FOR ${money(nextPackPrice)} CASH`
+    ? selectedPackStock > 0 || game.coins >= nextPackPrice ? "RELEASE TO STOP" : `WAITING FOR ${money(nextPackPrice)} CASH`
     : opening?.phase === "summary"
       ? "TAP ONCE / HOLD TO KEEP OPENING"
       : "SLOW REVEAL / CONTINUES INTO NEXT PACK";
 
   return (
     <main
-      className={`packworks pw2 pw-clean theme-league fx-holo ${game.settings.reducedEffects ? "reduced-effects" : ""} ${opening ? "opening-active" : ""} ${spaceHeld ? "space-held" : ""} ${mobileAutoHeld ? "mobile-auto-held" : ""} ${swipeRevealing ? "swipe-revealing" : ""}`}
+      className={`packworks pw2 pw-clean theme-league fx-holo ${opening ? "opening-active" : ""} ${spaceHeld ? "space-held" : ""} ${mobileAutoHeld ? "mobile-auto-held" : ""} ${swipeRevealing ? "swipe-revealing" : ""}`}
       data-fx-style="holo"
       style={{ "--set-a": activeSet.colors[0], "--set-b": activeSet.colors[1], "--set-c": activeSet.colors[2] }}
     >
@@ -1730,28 +1893,57 @@ export default function PackworksGameClean() {
           )}
         </div>
 
-        <div className="clean-pack-station">
-          <button
-            className="clean-pack-clicker"
-            onPointerDown={(event) => {
-              if (event.pointerType === "mouse") return;
-              startMobileAuto(event);
-              beginManualOpen();
-            }}
-            onPointerUp={stopMobileAuto}
-            onPointerCancel={stopMobileAuto}
-            onContextMenu={(event) => event.preventDefault()}
-            onClick={beginManualOpen}
-            aria-label={loosePacks
-              ? `Open a pack. ${loosePacks} ready.`
-              : `Buy and open a pack for ${money(nextPackPrice)} cash.`}
-          >
-            <span className="clean-pack-shadow" />
-            <span className="clean-pack-stack">
-              <i /><i />
-              <PackFace set={activeSet} />
-            </span>
-          </button>
+        <div className="clean-pack-station" data-pack-type={selectedPackType.id}>
+          <div className="pack-rotunda">
+            <button
+              type="button"
+              className="pack-rotunda-arrow is-previous"
+              onClick={() => rotatePackType(-1)}
+              aria-label="Previous pack type"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15.5 4.5 8 12l7.5 7.5" />
+              </svg>
+            </button>
+            <button
+              className="clean-pack-clicker"
+              onPointerDown={(event) => {
+                if (event.pointerType === "mouse") return;
+                startMobileAuto(event);
+                beginManualOpen();
+              }}
+              onPointerUp={stopMobileAuto}
+              onPointerCancel={stopMobileAuto}
+              onContextMenu={(event) => event.preventDefault()}
+              onClick={beginManualOpen}
+              aria-label={selectedPackStock
+                ? `Open a pack: ${selectedPackType.name}. ${selectedPackStock} ready.`
+                : `Buy and open a pack: ${selectedPackType.name} for ${exactMoney(nextPackPrice)} cash.`}
+            >
+              <span className="clean-pack-shadow" />
+              <span
+                className={`clean-pack-stack rotates-${packRotation}`}
+                key={selectedPackType.id}
+              >
+                <i /><i />
+                <PackFace set={activeSet} packType={selectedPackType} />
+              </span>
+            </button>
+            <button
+              type="button"
+              className="pack-rotunda-arrow is-next"
+              onClick={() => rotatePackType(1)}
+              aria-label="Next pack type"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m8.5 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          </div>
+          <div className="pack-type-copy" aria-live="polite">
+            <strong>{exactMoney(nextPackPrice)} CASH</strong>
+            <small>{selectedPackType.description}</small>
+          </div>
           <div className="clean-simple-stats">
             <div><strong>{formatNumber(game.packsOpened)}</strong><span>PACKS OPENED</span></div>
             <i />
@@ -1847,9 +2039,18 @@ export default function PackworksGameClean() {
           }}
         >
           <div className="opening-haze" />
+          {opening.canForceFinish && !["complete", "summary"].includes(opening.phase) && (
+            <button
+              type="button"
+              className="opening-force-finish"
+              onClick={forceFinishOpening}
+            >
+              FINISH
+            </button>
+          )}
           <div className="foil-pack-wrap">
-            <div className="foil-half foil-top"><PackFace set={opening.result.set} /></div>
-            <div className="foil-half foil-bottom"><PackFace set={opening.result.set} /></div>
+            <div className="foil-half foil-top"><PackFace set={opening.result.set} packType={opening.result.packType} /></div>
+            <div className="foil-half foil-bottom"><PackFace set={opening.result.set} packType={opening.result.packType} /></div>
             <span className="tear-ribbon">PACKWORKS / FACTORY WRAPPED</span>
             <span className="tear-shockwave" />
             <PackDebris />
@@ -1862,31 +2063,36 @@ export default function PackworksGameClean() {
             onPointerUp={stopSwipeReveal}
             onPointerCancel={stopSwipeReveal}
           >
-            {opening.result.cards.map((pull, index) => (
-              <RevealCard
-                key={`${pull.card.id}-${index}`}
-                pull={pull}
-                index={index}
-                count={boardLayout.count}
-                perRow={boardLayout.perRow}
-                rows={boardLayout.rows}
-                shrink={boardLayout.shrink}
-                initialCount={opening.initialCount}
-                revealed={!!pull.revealed}
-                echo={revealEchoes[index]}
-                latest={opening.impact?.index === index}
-                phase={opening.phase}
-                onReveal={revealCard}
-                onSelect={setSelectedCard}
-                onSignal={signalCard}
-              />
-            ))}
+            {openingBatchIndices.map((index, position) => {
+              const pull = opening.result.cards[index];
+              return (
+                <RevealCard
+                  key={`${opening.id}-${index}`}
+                  pull={pull}
+                  index={index}
+                  position={position}
+                  count={boardLayout.count}
+                  perRow={boardLayout.perRow}
+                  rows={boardLayout.rows}
+                  shrink={boardLayout.shrink}
+                  revealed={!!pull.revealed}
+                  echo={revealEchoes[index]}
+                  latest={opening.impact?.index === index}
+                  phase={opening.phase}
+                  onReveal={revealCard}
+                  onSelect={setSelectedCard}
+                  onSignal={signalCard}
+                />
+              );
+            })}
           </div>
-          {(opening.phase === "ready" || opening.phase === "complete") && (
+          {(opening.phase === "ready" || opening.phase === "filing" || opening.phase === "complete") && (
             <div className="opening-instruction clean-opening-instruction">
               <strong className="opening-instruction-desktop">
                 {opening.phase === "complete"
                   ? "PACK COMPLETE"
+                  : opening.phase === "filing" || opening.batchPending
+                    ? "FILING REVEALED CARDS TO COLLECTION"
                   : spaceHeld
                     ? "SPACE HELD / REVEALING ONE BY ONE"
                     : "HOVER FOR RARITY / CLICK EACH CARD OR HOLD SPACE"}
@@ -1894,6 +2100,8 @@ export default function PackworksGameClean() {
               <strong className="opening-instruction-mobile">
                 {opening.phase === "complete"
                   ? "PACK COMPLETE"
+                  : opening.phase === "filing" || opening.batchPending
+                    ? "FILING CARDS / NEXT BATCH INCOMING"
                   : mobileAutoHeld
                     ? "AUTO-OPENING / RELEASE BELOW TO STOP"
                     : swipeRevealing

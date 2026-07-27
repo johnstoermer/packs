@@ -30,11 +30,10 @@ The display case is the core progression engine. There are no duel, filing-rule,
 - Inspection lamps improve premium-card weight.
 - Supplier terms reduce the purchase price of packs.
 - Booster boxes do not exist. Cases remain a late bulk option.
-- There are five 48-card print lines (240 unique cards) sharing one rarity distribution; each card is a signature, a support, a capstone, or the prestige door, with player-facing rules text. Signatures sit at each line's top Legendary/Mythic/Celestial slots, so rarity itself routes players into builds.
+- There is one 98-card collection; each card is a signature, a support, a capstone, or the prestige door, with player-facing rules text.
 - The display case holds up to six cards; slots unlock through milestones, and the displayed signatures-plus-supports engine drives the run. Editing the case first sells that card's duplicate stack — displaying is a commitment.
-- Sets unlock along a branching print tree: finishing Neon Circuit opens Gilded Frontier, Abyssal Bloom, and Crownfall at once; most mid-game sets open from either of two parents; Sunken Signal opens only through Nocturne Harbor; Unwritten requires completing every other set.
-- Each later set introduces permanently higher-rarity chase cards, culminating in the sole Nameless card in set 20.
-- Owning What Was Never Named unlocks the Rewrite: a prestige reset that grants permanent Inscriptions (+25% income and sale value each, doubled if the Nameless is displayed when you Rewrite).
+- Card counts taper at every step from Common through Divine. Nameless is not a normal rarity roll: it replaces one card in the next pack only after all other 97 cards have been discovered.
+- Owning Nameling unlocks the Rewrite: a prestige reset that grants permanent Inscriptions (+25% income and sale value each, doubled if the Nameless is displayed when you Rewrite).
 
 The full engine design — verbs, triggers, pipeline order, animation language, and rejected directions — lives in `docs/ENGINE_SPEC.md`.
 
@@ -42,18 +41,18 @@ Cases are inventory bundles that the player can break into loose packs. Packs ha
 
 ## Rarity
 
-Every pack uses the complete 18-tier ladder, from Common at roughly 82% and Uncommon at 18% through Nameless at 0.000001%. The average pack is four or five Commons and an Uncommon; everything Rare and above is a genuine event, and the display case verbs (Fusion, Transmute, Salvage, Mystery pity) are the intended roads to the high tiers. Rarity is part of a card's identity: Pavement Pigeon is always Common, and What Was Never Named is always Nameless. A roll can fall back only to a lower fixed tier that exists in the selected set; it never upgrades a card. Each tier has its own border material or animation, with the upper tiers progressing through shimmer, starfield, halo, constellation, refraction, distortion, and the shifting Nameless treatment.
+Normal pulls use seven tiers: Common (75%), Uncommon (18%), Rare (5%), Epic (1.5%), Legendary (0.4%), Mythic (0.09%), and Divine (0.01%). The retired Exalted, Ascendant, Celestial, old Divine, and Astral labels collapse into Mythic; Eternal, Primordial, Transcendent, Empyrean, Absolute, and Singularity collapse into Divine. Nameless remains a one-card completion unlock outside that percentage ladder. Fusion, Transmute, Salvage, and Fracture provide engine-driven routes upward without allowing an early Nameless pull.
 
 ## Opening
 
 Pack opening remains deliberately elaborate even though the surrounding game is minimal:
 
 - staged foil handling and tear animation;
-- six separately dealt cards;
+- separately dealt cards, staged in bounded batches for large packs;
 - hover rarity signals with occasional false positives;
 - manual click-to-reveal or a paced hold-Space sequence;
 - rarity-specific impact, lighting, particles, and synthesized audio;
-- distinctive original artwork for all 240 cards across twenty cohesive visual worlds.
+- distinctive animated PixelLab artwork for all 98 cards.
 
 Manual opening is capped near forty packs per minute. Reduced-motion preferences shorten packaging without skipping individual reveals.
 
@@ -87,6 +86,6 @@ Both builds are written to `dist/`. The default build packages a Sites-compatibl
 
 ## Assets and UI license
 
-The 240 illustrations in `public/card-art/` were created specifically for PACKWORKS. No artwork, characters, names, or scans from commercial trading-card games are included. The generation brief and crop workflow are preserved in `docs/CARD_ART_PROMPTS.md`.
+The live illustrations in `public/card-art-pixel/` were created specifically for PACKWORKS. Every card uses its animated PixelLab frame set; the retired static-art fallback is intentionally not shipped. No artwork, characters, names, or scans from commercial trading-card games are included.
 
 The project includes [augmented-ui](https://augmented-ui.com/) under the BSD 2-Clause License. Its license is included at `public/vendor/augmented-ui.LICENSE.txt`.

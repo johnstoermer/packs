@@ -69,6 +69,125 @@ test("the clean game presents one obvious loop and a manual six-card opening", a
   expect(pageErrors).toEqual([]);
 });
 
+test("the pack rotunda presents every real pack type without duplicating wrapper details", async ({ page }) => {
+  await page.goto("/");
+
+  const arrow = page.getByRole("button", { name: "Next pack type" });
+  await expect(page.getByRole("button", { name: "Previous pack type" })).toBeVisible();
+  await expect(arrow).toBeVisible();
+  await expect(arrow.locator("svg")).toHaveCount(1);
+  await expect(arrow).toHaveCSS("border-top-width", "3px");
+
+  const expected = [
+    {
+      name: "Standard",
+      price: "100 CASH",
+      description: "Standard distribution.",
+      creatures: "Bankslime, Coinbud, and Packross",
+    },
+    {
+      name: "Rare",
+      price: "10,000 CASH",
+      description: "Common and Uncommon removed; every rarity shifts upward.",
+      creatures: "Echowl, Portalink, and Catalystag",
+    },
+    {
+      name: "Mega Standard",
+      price: "10,000 CASH",
+      description: "Standard distribution.",
+      creatures: "Rootpack, Absolumute, and Reverbogre",
+    },
+    {
+      name: "Mega Rare",
+      price: "1,000,000 CASH",
+      description: "Common and Uncommon removed; every rarity shifts upward.",
+      creatures: "Omniecho, Prismorph, and Luxquest",
+    },
+    {
+      name: "Collector",
+      price: "10,000 CASH",
+      description: "Standard distribution with a guaranteed foil.",
+      creatures: "Foilmonk, Foilvan, and Foilpress",
+    },
+  ];
+
+  for (const [index, packType] of expected.entries()) {
+    await expect(page.locator(".clean-pack-station .pack-title strong")).toHaveText(packType.name);
+    await expect(page.locator(".pack-type-copy strong")).toHaveText(packType.price);
+    await expect(page.locator(".pack-type-copy small")).toHaveText(packType.description);
+    await expect(page.locator(".clean-pack-station .pack-creature-scene")).toHaveAttribute("aria-label", packType.creatures);
+    if (index < expected.length - 1) await arrow.click();
+  }
+
+  await arrow.click();
+  await expect(page.locator(".clean-pack-station .pack-title strong")).toHaveText("Standard");
+});
+
+test("Mega Standard stages readable batches and exposes the FINISH failsafe", async ({ page }) => {
+  const state = createInitialState(Date.now());
+  state.coins = 10_000;
+  state.lifetimeCoins = 10_000;
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Next pack type" }).click();
+  await page.getByRole("button", { name: "Next pack type" }).click();
+  await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await expect(page.locator(".reveal-card")).toHaveCount(18);
+  await expect(page.getByRole("button", { name: "FINISH" })).toHaveCount(0);
+
+  const viewport = page.viewportSize();
+  const bounds = await page.locator(".reveal-card").evaluateAll((nodes) => nodes.map((node) => {
+    const box = node.getBoundingClientRect();
+    return { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
+  }));
+  for (const box of bounds) {
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.top).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(viewport.width);
+    expect(box.bottom).toBeLessThanOrEqual(viewport.height);
+  }
+
+  await revealAll(page);
+  const finish = page.getByRole("button", { name: "FINISH" });
+  await expect(finish).toBeVisible();
+  const caseBounds = await page.locator(".case-strip").boundingBox();
+  const finishBounds = await finish.boundingBox();
+  expect(finishBounds.y).toBeGreaterThanOrEqual(caseBounds.y + caseBounds.height);
+  await expect(page.locator(".opening-layer.phase-filing")).toBeVisible();
+  await expect(page.locator(".reveal-card").first()).toHaveCSS("animation-name", "league-file-card");
+  await page.screenshot({ path: "test-results/clean-mega-pack.png" });
+  await finish.click();
+  await expect(page.locator(".opening-layer.phase-summary")).toBeVisible();
+  await expect(finish).toHaveCount(0);
+});
+
+test("mobile mounts only six cards from a large pack at once", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = createInitialState(Date.now());
+  state.coins = 10_000;
+  state.lifetimeCoins = 10_000;
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Next pack type" }).click();
+  await page.getByRole("button", { name: "Next pack type" }).click();
+  await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+  await expect(page.locator(".reveal-card")).toHaveCount(6);
+  await revealAll(page);
+  await expect(page.getByRole("button", { name: "FINISH" })).toBeVisible();
+  await expect(page.locator(".opening-layer.phase-filing")).toBeVisible();
+  await expect(page.locator(".reveal-card")).toHaveCount(6);
+});
+
 test("holding Space reveals cards in order and releasing stops the sequence", async ({ page }) => {
   const state = createInitialState(Date.now());
   state.settings.sound = false;
@@ -76,6 +195,9 @@ test("holding Space reveals cards in order and releasing stops the sequence", as
   state.lastSavedAt = Date.now();
   await seedState(page, state);
   await page.goto("/");
+  await page.evaluate(() => {
+    Math.random = () => 0.99;
+  });
 
   await expect(page.getByRole("button", { name: /Open a pack/ })).toBeVisible();
   await expect(page.locator(".loading-screen")).toHaveCount(0);
@@ -277,7 +399,7 @@ test("clicking an undiscovered card shows its rarity without spoiling the card",
   await expect(detail).toBeVisible();
   await expect(detail).toContainText("Card 01");
   await expect(detail).toContainText("Common");
-  await expect(detail).toContainText("~82%");
+  await expect(detail).toContainText("75%");
   await expect(detail).not.toContainText("Coinbud");
   await expect(detail.locator(".clean-detail-art.is-missing")).toBeVisible();
   await expect(detail.locator(".card-zoom-close")).toHaveCount(0);
@@ -334,6 +456,40 @@ test("the display case holds cards whose unique effects augment the game", async
   await expect(caseDrawer).toContainText("0/1 available slots filled");
 });
 
+test("Omniecho stays centered in the display case with PixelLab art only", async ({ page }) => {
+  const state = createInitialState(Date.now());
+  state.collection = { "mirrorfield-48": 1 };
+  state.bestRarities = { "mirrorfield-48": "divine" };
+  state.displayed = [{ id: "mirrorfield-48", at: Date.now() }];
+  state.settings.sound = false;
+  state.lastSavedAt = Date.now();
+  await seedState(page, state);
+  await page.goto("/");
+
+  await page.locator(".case-strip-label").first().click();
+  const art = page.locator(".clean-case-slot.is-filled .card-art-mirrorfield-48");
+  await expect(art).toBeVisible();
+  const image = art.locator(".card-art-pixel");
+  await expect(image).toHaveAttribute("src", /\/card-art-pixel\/prism\/12\/frame-0\.png/);
+  await expect(page.locator(".card-art-legacy")).toHaveCount(0);
+  await expect.poll(() => image.evaluate((node) => node.complete && node.naturalWidth > 0)).toBe(true);
+
+  const offset = await art.evaluate((node) => {
+    const wrapper = node.getBoundingClientRect();
+    const sprite = node.querySelector(".card-art-pixel").getBoundingClientRect();
+    // Alpha centroid of the shipped 128px Omniecho frame.
+    const visibleX = sprite.left + sprite.width * (64.52 / 128);
+    const visibleY = sprite.top + sprite.height * (66.18 / 128);
+    return {
+      x: Math.abs(visibleX - (wrapper.left + wrapper.width / 2)) / wrapper.width,
+      y: Math.abs(visibleY - (wrapper.top + wrapper.height / 2)) / wrapper.height,
+    };
+  });
+  expect(offset.x).toBeLessThan(0.06);
+  expect(offset.y).toBeLessThan(0.08);
+  await page.screenshot({ path: "test-results/clean-omniecho-centered.png" });
+});
+
 test("holding Space buys the next pack automatically when stock reaches zero", async ({ page }) => {
   const state = createInitialState(Date.now());
   state.coins = 200;
@@ -356,6 +512,7 @@ test("holding Space buys the next pack automatically when stock reaches zero", a
 });
 
 test("legendary pulls retain the full impact treatment", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const state = createInitialState(Date.now());
@@ -363,7 +520,7 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
   state.manualPacks = 1;
   state.pityLegendary = 10_000;
   state.sealed[SETS[0].id].loose = 1;
-  state.settings = { sound: false, reducedEffects: false, quickOpen: true };
+  state.settings = { sound: false, quickOpen: true };
   state.lastSavedAt = Date.now();
   await seedState(page, state);
   await page.goto("/");
@@ -383,6 +540,10 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
   await page.waitForTimeout(950);
   const legendaryFace = legendary.locator(".card-front");
   const legendaryBack = legendary.locator(".card-back");
+  const borderAnimationSeconds = await legendary.locator(".rarity-border-fx").evaluate(
+    (node) => Number.parseFloat(getComputedStyle(node).animationDuration),
+  );
+  expect(borderAnimationSeconds).toBeGreaterThan(0.1);
   expect(await legendaryFace.evaluate((node) => getComputedStyle(node).transform)).not.toBe("none");
   await expect(legendaryFace).toHaveCSS("backface-visibility", "hidden");
   await expect(legendaryBack).toHaveCSS("visibility", "hidden");
@@ -391,16 +552,16 @@ test("legendary pulls retain the full impact treatment", async ({ page }) => {
 });
 
 test("the Nameless tier uses its shifting border treatment", async ({ page }) => {
-  const collection = Object.fromEntries(SETS.slice(0, -1).flatMap((set) => (
-    set.cards.map((card) => [card.id, 1])
-  )));
+  const collection = Object.fromEntries(
+    SETS[0].cards.filter((card) => card.rarity !== "nameless").map((card) => [card.id, 1]),
+  );
   const state = advanceBeat({
     ...createInitialState(Date.now()),
     collection,
     activeSet: SETS.at(-1).id,
   });
   state.sealed[SETS.at(-1).id].loose = 1;
-  state.settings = { sound: false, reducedEffects: false, quickOpen: true };
+  state.settings = { sound: false, quickOpen: true };
   state.lastSavedAt = Date.now();
   await seedState(page, state);
   await page.goto("/");

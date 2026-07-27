@@ -4,6 +4,7 @@ import {
   BASE_PASSIVE_RATE,
   BINDER_PAYOUT_SCALE,
   MANUAL_RATE_CAP_MS,
+  NAMELESS_CARD_ID,
   SAVE_VERSION,
   advanceBeat,
   applyOfflineProgress,
@@ -26,7 +27,15 @@ import {
   sellDuplicates,
   tickEconomy,
 } from "../lib/gameLogic.js";
-import { ALL_CARDS, LEGACY_CARD_MAP, PACK_PRODUCTS, RARITIES, SETS, getCard } from "../lib/gameData.js";
+import {
+  ALL_CARDS,
+  LEGACY_CARD_MAP,
+  PACK_PRODUCTS,
+  PACK_TYPES,
+  RARITIES,
+  SETS,
+  getCard,
+} from "../lib/gameData.js";
 import { CORE_ART_TRANSFERS } from "../lib/coreArtTransfers.js";
 import { CORE_CARD_IDS } from "../lib/coreSetManifest.js";
 
@@ -66,19 +75,58 @@ test("buying product changes pack stock but can never create a card", () => {
   const next = buyProduct(state, "loose");
   assert.equal(getProductCount(next, FIRST, "loose"), 4);
   assert.deepEqual(next.collection, beforeCollection);
-  assert.equal(next.coins, 490);
+  assert.equal(next.coins, 400);
 });
 
 test("pack prices stay simple as opened volume grows", () => {
   const fresh = createInitialState(1);
   const knownBuyer = { ...fresh, packsOpened: 866 };
-  assert.equal(getPackPrice(fresh, "loose"), 10);
-  assert.equal(getPackPrice(knownBuyer, "loose"), 10);
+  assert.equal(getPackPrice(fresh, "loose"), 100);
+  assert.equal(getPackPrice(knownBuyer, "loose"), 100);
+});
+
+test("the five pack types have exact prices, concise copy, and distinct wrapper creatures", () => {
+  const state = createInitialState(1);
+  assert.deepEqual(PACK_TYPES.map((packType) => packType.name), [
+    "Standard",
+    "Rare",
+    "Mega Standard",
+    "Mega Rare",
+    "Collector",
+  ]);
+  assert.deepEqual(PACK_TYPES.map((packType) => getPackPrice(state, packType.id)), [
+    100,
+    10_000,
+    10_000,
+    1_000_000,
+    10_000,
+  ]);
+  assert.deepEqual(PACK_TYPES.map((packType) => packType.cardCount), [6, 6, 36, 36, 6]);
+  assert.deepEqual(PACK_TYPES[0].featuredNames, ["Bankslime", "Coinbud", "Packross"]);
+  assert.equal(new Set(PACK_TYPES.flatMap((packType) => packType.featuredNames)).size, 15);
+  for (const packType of PACK_TYPES) {
+    assert.doesNotMatch(packType.description, /\d|\bcash\b/i);
+  }
+});
+
+test("premium pack types change the actual deal", () => {
+  const state = createInitialState(1);
+  const rare = openPack(state, { manual: true, free: true, source: "rare", rng: () => 0.99 });
+  const megaStandard = openPack(state, { manual: true, free: true, source: "mega-standard", rng: () => 0.99 });
+  const megaRare = openPack(state, { manual: true, free: true, source: "mega-rare", rng: () => 0.99 });
+  const collector = openPack(state, { manual: true, free: true, source: "collector", rng: () => 0.99 });
+
+  assert.equal(rare.result.cards.length, 6);
+  assert.ok(rare.result.cards.every((pull) => RARITIES[pull.rarity].order >= RARITIES.rare.order));
+  assert.equal(megaStandard.result.cards.length, 36);
+  assert.equal(megaRare.result.cards.length, 36);
+  assert.ok(megaRare.result.cards.every((pull) => RARITIES[pull.rarity].order >= RARITIES.rare.order));
+  assert.ok(collector.result.cards.some((pull) => pull.foil));
 });
 
 test("supplier terms reduce purchase cost", () => {
   const state = { ...createInitialState(1), upgrades: { ...createInitialState(1).upgrades, supplier: 2 } };
-  assert.equal(getPackPrice(state, "loose"), 9);
+  assert.equal(getPackPrice(state, "loose"), 95);
   assert.equal(Number.isInteger(getPackPrice(state, "loose")), true);
 });
 
@@ -116,41 +164,37 @@ test("cash income is a flat one per second and the binder pays nothing", () => {
   assert.equal(Number.isInteger(ticking.coins), true);
 });
 
-test("the complete 18-tier rarity ladder uses the four-hour-arc base rates", () => {
+test("the seven normal rarities use a coherent 100% ladder with Nameless outside it", () => {
   const expected = {
-    common: 0.8169,
+    common: 0.75,
     uncommon: 0.18,
-    rare: 0.006,
-    epic: 0.0028,
-    legendary: 0.0012,
-    mythic: 0.0006,
-    exalted: 0.0003,
-    ascendant: 0.00015,
-    celestial: 0.00008,
-    divine: 0.00003,
-    astral: 0.000015,
-    eternal: 0.000006,
-    primordial: 0.000003,
-    transcendent: 0.0000015,
-    empyrean: 0.0000006,
-    absolute: 0.0000003,
-    singularity: 0.00000015,
-    nameless: 0.00000003,
+    rare: 0.05,
+    epic: 0.015,
+    legendary: 0.004,
+    mythic: 0.0009,
+    divine: 0.0001,
+    nameless: 0,
   };
-  assert.equal(Object.keys(RARITIES).length, 18);
+  assert.equal(Object.keys(RARITIES).length, 8);
   assert.deepEqual(
     Object.fromEntries(Object.entries(RARITIES).map(([id, rarity]) => [id, rarity.odds])),
     expected,
   );
+  assert.equal(
+    Object.entries(RARITIES)
+      .filter(([id]) => id !== "nameless")
+      .reduce((total, [, rarity]) => total + rarity.odds, 0),
+    1,
+  );
   assert.deepEqual(
     Object.values(RARITIES).map((rarity) => rarity.order),
-    Array.from({ length: 18 }, (_, index) => index),
+    Array.from({ length: 8 }, (_, index) => index),
   );
   assert.ok(Object.values(RARITIES).every((rarity) => rarity.border && rarity.rateLabel));
   assert.ok(Object.values(RARITIES).every((rarity, index, all) => index === 0 || rarity.sellValue > all[index - 1].sellValue));
 });
 
-test("one 98-card Core mega-set uses the rebalanced full rarity ladder", () => {
+test("the 98-card set has fewer cards at every higher normal rarity", () => {
   assert.equal(SETS.length, 1);
   assert.equal(SETS[0].id, "core");
   assert.equal(ALL_CARDS.length, 98);
@@ -168,25 +212,19 @@ test("one 98-card Core mega-set uses the rebalanced full rarity ladder", () => {
     ALL_CARDS.filter((card) => card.rarity === rarity).length,
   ]));
   assert.deepEqual(distribution, {
-    common: 21,
-    uncommon: 18,
-    rare: 14,
-    epic: 10,
-    legendary: 8,
-    mythic: 6,
-    exalted: 4,
-    ascendant: 3,
-    celestial: 3,
-    divine: 2,
-    astral: 2,
-    eternal: 1,
-    primordial: 1,
-    transcendent: 1,
-    empyrean: 1,
-    absolute: 1,
-    singularity: 1,
+    common: 25,
+    uncommon: 21,
+    rare: 16,
+    epic: 12,
+    legendary: 9,
+    mythic: 8,
+    divine: 6,
     nameless: 1,
   });
+  const normalCounts = Object.keys(RARITIES)
+    .filter((rarity) => rarity !== "nameless")
+    .map((rarity) => distribution[rarity]);
+  assert.ok(normalCounts.every((count, index) => index === 0 || count < normalCounts[index - 1]));
   assert.equal(SETS[0].cards.at(-1).name, "Nameling");
   assert.equal(SETS[0].cards.at(-1).rarity, "nameless");
   assert.deepEqual(SETS[0].unlockRequirements, []);
@@ -223,6 +261,52 @@ test("every card keeps its authored rarity in pulls and migrated saves", () => {
   assert.ok(common);
   assert.equal(common.rarity, common.card.rarity);
   assert.equal(commonRoll.state.bestRarities[common.card.id], common.card.rarity);
+});
+
+test("retired rarity totals migrate into Mythic and Divine", () => {
+  const migrated = hydrateState({
+    ...createInitialState(1),
+    rarityPulls: {
+      exalted: 2,
+      astral: 3,
+      divine: 4,
+      eternal: 5,
+      singularity: 7,
+    },
+  }, 2);
+  assert.equal(migrated.rarityPulls.mythic, 9);
+  assert.equal(migrated.rarityPulls.divine, 12);
+  assert.equal("exalted" in migrated.rarityPulls, false);
+  assert.equal("singularity" in migrated.rarityPulls, false);
+});
+
+test("Nameless cannot roll early and appears once after the other 97 cards", () => {
+  const early = openPack(createInitialState(1), {
+    manual: true,
+    free: true,
+    source: "mega-rare",
+    rng: () => 0,
+  });
+  assert.equal(early.result.cards.some((pull) => pull.card.id === NAMELESS_CARD_ID), false);
+
+  const ready = createInitialState(1);
+  for (const card of ALL_CARDS) {
+    if (card.id === NAMELESS_CARD_ID) continue;
+    ready.collection[card.id] = 1;
+    ready.bestRarities[card.id] = card.rarity;
+  }
+  const winning = openPack(ready, { manual: true, free: true, source: "mega-standard", rng: () => 0.99 });
+  const namelessIndex = winning.result.cards.findIndex((pull) => pull.card.id === NAMELESS_CARD_ID);
+  assert.ok(namelessIndex >= 0);
+  assert.equal(winning.result.cards.filter((pull) => pull.card.id === NAMELESS_CARD_ID).length, 1);
+  assert.ok(winning.result.events.some((event) => event.t === "namelessUnlocked"));
+
+  const revealed = revealPackCard(winning.state, winning.result.cards, namelessIndex, {
+    manual: true,
+    rng: () => 0.99,
+  });
+  const later = openPack(revealed.state, { manual: true, free: true, rng: () => 0 });
+  assert.equal(later.result.cards.some((pull) => pull.card.id === NAMELESS_CARD_ID), false);
 });
 
 test("manual opening retains a measured rate cap", () => {
@@ -363,6 +447,7 @@ test("hydration migrates earlier saves without inventing cards", () => {
     collection: { "corner-01": 2, invalid: 99 },
     activeSet: "corner",
     standingOrder: { enabled: true, product: "loose" },
+    settings: { sound: false, reducedEffects: true },
     filingRules: [{ id: 1, rarity: "common", threshold: 2, action: "shred", enabled: true }],
     forged: { corner: { swarm: 2 } },
     sealed: { corner: { loose: 0, box: 1 } },
@@ -379,6 +464,8 @@ test("hydration migrates earlier saves without inventing cards", () => {
   assert.equal(state.beat, 1);
   assert.equal(Object.keys(state.collection).length, 1);
   assert.equal(state.standingOrder.enabled, false);
+  assert.equal(state.settings.sound, false);
+  assert.equal("reducedEffects" in state.settings, false);
   assert.deepEqual(state.filingRules, []);
   assert.equal(state.sealedRun, null);
   assert.equal(getProductCount(state, FIRST, "loose"), 29);

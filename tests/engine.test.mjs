@@ -375,6 +375,29 @@ test("Locklure makes packs Common-only and can grow them on Common reveals", () 
   assert.ok(step.events.some((event) => event.t === "addCards" && event.source === id));
 });
 
+test("force-finish reveals suppress display effects so a pack chain is bounded", () => {
+  const locklure = L("crown-11");
+  const built = displayCard(withSlots(createInitialState(1), [locklure]), locklure, 0);
+  const opened = openPack(built, { manual: true, free: true, now: 5_000, rng: () => 0 });
+  const originalLength = opened.result.cards.length;
+  let state = opened.state;
+  let cards = opened.result.cards;
+  const events = [];
+  for (let index = 0; index < cards.length; index += 1) {
+    const step = revealPackCard(state, cards, index, {
+      manual: true,
+      rng: () => 0,
+      suppressEffects: true,
+    });
+    state = step.state;
+    cards = step.cards;
+    events.push(...step.events);
+  }
+  assert.equal(cards.length, originalLength);
+  assert.ok(cards.every((pull) => pull.revealed));
+  assert.equal(events.some((event) => event.t === "addCards"), false);
+});
+
 test("Heraldthorn stacks repeated Marks", () => {
   const stackingIds = [L("crown-08"), L("circuit-12"), L("circuit-01")];
   const stacking = displayAll(withSlots(createInitialState(5), stackingIds), stackingIds);
@@ -652,4 +675,20 @@ test("audit: direct-applied Mystery Packs fire selected mystery-open supports", 
     "mystery-open support fired for direct-applied mystery cards",
   );
   assert.ok(swept.events.some((event) => event.t === "mystery"));
+});
+
+test("audit: Salvage Mystery Packs enter the pack-open and Fracture pipeline", () => {
+  const ids = [L("frontier-01"), L("ember-01"), L("observatory-05")];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  const loaded = {
+    ...built,
+    collection: { ...built.collection, [L("corner-01")]: 2 },
+    duplicateBank: 1,
+  };
+  const sale = sellDuplicatesDetailed(loaded, { rng: () => 0 });
+  assert.ok(sale.events.some((event) => event.t === "mystery"));
+  assert.ok(sale.events.some((event) => event.t === "fracture" && event.source === "salvage"));
+  assert.ok(sale.events.some((event) => event.t === "trigger" && event.cardId === L("observatory-05")));
+  assert.ok(sale.mysteryCards.length >= 10);
+  assert.ok(sale.state.packsOpened > loaded.packsOpened);
 });
