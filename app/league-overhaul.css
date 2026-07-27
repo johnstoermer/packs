@@ -1837,6 +1837,25 @@
   pointer-events: none;
 }
 
+.theme-league .opening-overflow-count {
+  position: absolute;
+  z-index: 31;
+  top: auto;
+  bottom: 70px;
+  left: 50%;
+  width: max-content;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(3, 26, 56, 0.72);
+  color: rgba(225, 244, 255, 0.82);
+  font-size: 6px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  pointer-events: none;
+  translate: -50% 0;
+}
+
 .theme-league .phase-filing .reveal-card.is-revealed {
   animation: league-file-card 640ms cubic-bezier(0.38, 0, 0.72, 0.35) calc(var(--position) * 14ms) both;
   pointer-events: none;
@@ -3938,6 +3957,20 @@
 
   .theme-league .opening-haze {
     inset: 9% -18% 15%;
+  }
+
+  .theme-league .reveal-card {
+    transition:
+      opacity 180ms ease,
+      filter 180ms ease,
+      translate 150ms ease;
+    transition-delay: var(--deal-delay), 0ms, 0ms;
+  }
+
+  .theme-league .opening-overflow-count {
+    top: auto;
+    bottom: calc(180px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
   }
 
 }

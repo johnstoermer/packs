@@ -169,6 +169,7 @@ test("desktop mounts at most 72 cards", async ({ page }) => {
   await expect(page.locator(".reveal-card")).toHaveCount(72);
   await expect(page.getByRole("button", { name: "FINISH" })).toHaveCount(0);
   await page.waitForTimeout(2_000);
+  await expect(page.locator(".opening-overflow-count")).toContainText(/^\d+ CARDS NOT ON SCREEN$/);
 
   const viewport = page.viewportSize();
   const bounds = await page.locator(".reveal-card").evaluateAll((nodes) => nodes.map((node) => {
@@ -185,7 +186,7 @@ test("desktop mounts at most 72 cards", async ({ page }) => {
   await page.screenshot({ path: "test-results/clean-mega-pack.png" });
 });
 
-test("mobile mounts at most nine cards from a large pack at once", async ({ page }) => {
+test("mobile mounts at most twelve stable-size cards from a large pack at once", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
   state.coins = 10_000;
@@ -200,11 +201,18 @@ test("mobile mounts at most nine cards from a large pack at once", async ({ page
   await page.getByRole("button", { name: "Next pack type" }).click();
   await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(9);
+  await expect(page.locator(".reveal-card")).toHaveCount(12);
+  await expect(page.locator(".opening-overflow-count")).toHaveText("24 CARDS NOT ON SCREEN");
+  const mobileWidths = await page.locator(".reveal-card").evaluateAll(
+    (nodes) => nodes.map((node) => node.getBoundingClientRect().width),
+  );
+  expect(Math.min(...mobileWidths)).toBeGreaterThan(70);
+  await page.waitForTimeout(2_000);
+  await page.screenshot({ path: "test-results/clean-mobile-overflow.png" });
   await revealAll(page);
   await expect(page.getByRole("button", { name: "FINISH" })).toBeVisible();
   await expect(page.locator(".opening-layer.phase-filing")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(9);
+  await expect(page.locator(".reveal-card")).toHaveCount(12);
 });
 
 test("holding Space reveals cards in order and releasing stops the sequence", async ({ page }) => {

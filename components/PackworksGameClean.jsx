@@ -60,11 +60,11 @@ const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
 const DESKTOP_REVEAL_BATCH_SIZE = 72;
 const TABLET_REVEAL_BATCH_SIZE = 12;
-const MOBILE_REVEAL_BATCH_SIZE = 9;
+const MOBILE_REVEAL_BATCH_SIZE = 12;
 const COLLECTION_ANIMATION_MS = 950;
 
-function getRevealBatchSize(width) {
-  if (width <= 700) return MOBILE_REVEAL_BATCH_SIZE;
+function getRevealBatchSize(width, coarsePointer = false) {
+  if (coarsePointer || width <= 700) return MOBILE_REVEAL_BATCH_SIZE;
   if (width <= 1_000) return TABLET_REVEAL_BATCH_SIZE;
   return DESKTOP_REVEAL_BATCH_SIZE;
 }
@@ -911,7 +911,7 @@ export default function PackworksGameClean() {
   const [rewriteArmed, setRewriteArmed] = useState(false);
   const [fx, setFx] = useState({});
   const [revealEchoes, setRevealEchoes] = useState({});
-  const [viewport, setViewport] = useState({ w: 1200, h: 800 });
+  const [viewport, setViewport] = useState({ w: 1200, h: 800, coarse: false });
   const [hapticsAvailable, setHapticsAvailable] = useState(false);
   const adminActiveRef = useRef(false);
   const fxSerialRef = useRef(0);
@@ -1250,7 +1250,11 @@ export default function PackworksGameClean() {
   }, [closeOpening, commit, playGameplayCue]);
 
   useEffect(() => {
-    const update = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    const update = () => setViewport({
+      w: window.innerWidth,
+      h: window.innerHeight,
+      coarse: window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches === true,
+    });
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
@@ -1273,11 +1277,31 @@ export default function PackworksGameClean() {
   const openingBatchIndices = useMemo(() => getRevealBatchIndices(
     opening?.result?.cards,
     opening?.batchStart || 0,
-    opening?.batchSize || getRevealBatchSize(viewport.w),
-  ), [opening?.batchSize, opening?.batchStart, opening?.result?.cards, viewport.w]);
+    opening?.batchSize || getRevealBatchSize(viewport.w, viewport.coarse),
+  ), [opening?.batchSize, opening?.batchStart, opening?.result?.cards, viewport.coarse, viewport.w]);
+
+  const openingBatchIndexSet = useMemo(
+    () => new Set(openingBatchIndices),
+    [openingBatchIndices],
+  );
+  const openingOverflowCount = useMemo(() => (
+    opening?.result?.cards?.reduce((count, pull, index) => (
+      count + (
+        !pull.revealed
+        && !pull.fusedAway
+        && !openingBatchIndexSet.has(index)
+          ? 1
+          : 0
+      )
+    ), 0) || 0
+  ), [opening?.result?.cards, openingBatchIndexSet]);
 
   const boardLayout = useMemo(() => {
-    const count = openingBatchIndices.length;
+    const mobileOpening = viewport.coarse || viewport.w <= 700;
+    const grewDuringOpening = (opening?.result?.cards?.length || 0) > (opening?.initialCount || 0);
+    const count = mobileOpening && grewDuringOpening
+      ? Math.max(openingBatchIndices.length, opening?.batchSize || MOBILE_REVEAL_BATCH_SIZE)
+      : openingBatchIndices.length;
     if (!count) return { count: 0, perRow: 1, rows: 1, shrink: 1, gapX: 0, gapY: 0 };
     const { w, h } = viewport;
     const narrow = w <= 1050;
@@ -1303,7 +1327,13 @@ export default function PackworksGameClean() {
       gapX: Math.round(gapXBase),
       gapY: Math.round(cardH * shrink + Math.max(8, 20 * shrink)),
     };
-  }, [openingBatchIndices.length, viewport]);
+  }, [
+    opening?.batchSize,
+    opening?.initialCount,
+    opening?.result?.cards?.length,
+    openingBatchIndices.length,
+    viewport,
+  ]);
 
   const revealCard = useCallback((index) => {
     const currentOpening = openingRef.current;
@@ -1638,7 +1668,10 @@ export default function PackworksGameClean() {
       revealed: [],
       impact: null,
       initialCount: rolled.result.cards.length,
-      batchSize: getRevealBatchSize(window.innerWidth),
+      batchSize: getRevealBatchSize(
+        window.innerWidth,
+        window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches === true,
+      ),
       batchStart: 0,
       batchNumber: 1,
       batchPending: false,
@@ -2127,7 +2160,10 @@ export default function PackworksGameClean() {
           </div>
           <div
             className={`reveal-deck ${swipeRevealing ? "is-swipe-revealing" : ""}`}
-            style={boardLayout.count ? { "--board-gap-x": `${boardLayout.gapX}px`, "--board-gap-y": `${boardLayout.gapY}px` } : undefined}
+            style={boardLayout.count ? {
+              "--board-gap-x": `${boardLayout.gapX}px`,
+              "--board-gap-y": `${boardLayout.gapY}px`,
+            } : undefined}
             onPointerDown={startSwipeReveal}
             onPointerMove={continueSwipeReveal}
             onPointerUp={stopSwipeReveal}
@@ -2154,6 +2190,14 @@ export default function PackworksGameClean() {
               );
             })}
           </div>
+          {openingOverflowCount > 0 && (
+            <small
+              className="opening-overflow-count"
+              aria-live="polite"
+            >
+              {openingOverflowCount} {openingOverflowCount === 1 ? "CARD" : "CARDS"} NOT ON SCREEN
+            </small>
+          )}
           <OpeningImpact impact={opening.impact} />
           {opening.fusionNotice && (
             <div

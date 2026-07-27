@@ -805,6 +805,32 @@ test("audit: Fracture spill cards reveal through Locklure like normal pack cards
   assert.equal(revealed.cards.length, before + 1);
 });
 
+test("audit: the display cap never limits logical pack growth", () => {
+  const id = L("crown-11");
+  const built = displayAll(withSlots(createInitialState(1), [id]), [id]);
+  const opened = openPack(built, {
+    manual: true,
+    free: true,
+    now: 5_000,
+    rng: () => 0,
+  });
+  const seed = opened.result.cards[0];
+  const cards = Array.from({ length: 72 }, (_, index) => ({
+    ...seed,
+    card: opened.result.cards[index % opened.result.cards.length].card,
+    revealed: false,
+  }));
+  const revealed = revealPackCard(opened.state, cards, 0, {
+    manual: true,
+    rng: () => 0,
+  });
+  assert.equal(revealed.cards.length, 73);
+  assert.ok(
+    revealed.events.some((event) => event.t === "addCards" && event.source === id),
+    "Locklure appended beyond the 72-card display cap",
+  );
+});
+
 test("audit: duplicate-sale Mystery cards spill into an opening and trigger Locklure", () => {
   const ids = [L("crown-11"), L("frontier-01")];
   const built = displayAll(withSlots(createInitialState(1), ids), ids);
