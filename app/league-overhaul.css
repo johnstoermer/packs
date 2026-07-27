@@ -3463,6 +3463,62 @@
   height: 100%;
 }
 
+/* Drag-to-reorder. touch-action keeps a drag on the card from scrolling the
+   drawer out from under it. */
+.theme-league .clean-case-slot.is-draggable {
+  transition: transform 140ms var(--motion-pop), filter 140ms ease;
+}
+
+.theme-league .clean-case-slot.is-draggable .clean-case-card {
+  cursor: grab;
+  touch-action: none;
+}
+
+.theme-league .clean-case-slot.is-dragging {
+  z-index: 30;
+  filter: drop-shadow(0 16px 22px rgba(3, 26, 56, 0.45)) opacity(0.92);
+  transform: translate(var(--drag-x, 0), var(--drag-y, 0)) scale(1.06) rotate(-1.5deg);
+  transition: none;
+}
+
+.theme-league .clean-case-slot.is-dragging .clean-case-card {
+  cursor: grabbing;
+}
+
+/* Everything under the dragged card is inert until the drop lands. */
+.theme-league .clean-case-slots.is-reordering .clean-case-ramp,
+.theme-league .clean-case-slots.is-reordering .clean-case-unseat {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Deliberately no transform on the drop target: a transform would make it a
+   stacking context and trap the ring below the dragged card's z-index. */
+/* The dragged card covers the slot it is aimed at, so the ring sits outside
+   the lifted card's footprint and above it in the stack — otherwise the only
+   feedback about where the card lands is hidden under the card itself. */
+.theme-league .clean-case-slot.is-drop-target::after {
+  position: absolute;
+  z-index: 35;
+  inset: -11px;
+  border: 3px dashed var(--league-yellow);
+  border-radius: 18px;
+  background: rgba(255, 214, 61, 0.12);
+  content: "";
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-league .clean-case-slot.is-draggable,
+  .theme-league .clean-case-slot.is-dragging {
+    transition: none;
+  }
+
+  .theme-league .clean-case-slot.is-dragging {
+    transform: translate(var(--drag-x, 0), var(--drag-y, 0));
+  }
+}
+
 .theme-league .clean-case-card > .card-front,
 .theme-league .clean-case-slot > .card-back {
   position: absolute;

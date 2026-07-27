@@ -31,6 +31,7 @@ import {
   resolveFusions,
   resolveImmediateFusion,
   revealPackCard,
+  reorderDisplayed,
   rewriteState,
   sellDuplicatesDetailed,
   undisplayCard,
@@ -174,19 +175,82 @@ test("selected Salvage sources turn duplicate sales into Mystery Packs", () => {
 });
 
 test("coin thresholds fire from any income source, never from timers", () => {
+  // corner-05 rolls a 1.5% chance per threshold, so the rng has to clear it
+  // for the threshold itself to be observable.
+  const hit = () => 0.001;
   const base = withSlots(createInitialState(1), [L("corner-05")]);
   const built = displayCard(base, L("corner-05"), 0);
   const flush = { ...built, lifetimeCoins: built.lifetimeCoins + 10_000, coins: built.coins + 10_000 };
-  const swept = evaluateIdleThresholds(flush, { rng: () => 0.5 });
+  const swept = evaluateIdleThresholds(flush, { rng: hit });
   assert.ok(swept.events.some((event) => event.t === "mystery"));
   assert.ok(swept.mysteryCards.length > 0);
   let drained = swept.state;
   for (let round = 0; round < 60; round += 1) {
-    const next = evaluateIdleThresholds(drained, { rng: () => 0.5 });
+    const next = evaluateIdleThresholds(drained, { rng: hit });
     if (next.events.length === 0) break;
     drained = next.state;
   }
-  assert.equal(evaluateIdleThresholds(drained, { rng: () => 0.5 }).events.length, 0);
+  assert.equal(evaluateIdleThresholds(drained, { rng: hit }).events.length, 0);
+});
+
+test("reordering the case moves one card and leaves the rest in order", () => {
+  const ids = [L("corner-01"), L("corner-02"), L("corner-03")];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  assert.deepEqual(getEngine(built).slots, ids);
+
+  const toFront = reorderDisplayed(built, 2, 0, 1);
+  assert.deepEqual(getEngine(toFront).slots, [ids[2], ids[0], ids[1]]);
+
+  const toBack = reorderDisplayed(built, 0, 2, 1);
+  assert.deepEqual(getEngine(toBack).slots, [ids[1], ids[2], ids[0]]);
+
+  const adjacent = reorderDisplayed(built, 0, 1, 1);
+  assert.deepEqual(getEngine(adjacent).slots, [ids[1], ids[0], ids[2]]);
+});
+
+test("reordering the case is inert for no-op and out-of-range moves", () => {
+  const ids = [L("corner-01"), L("corner-02")];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  for (const [from, to] of [[1, 1], [-1, 0], [0, -1], [0, 2], [2, 0], [0, 99]]) {
+    assert.equal(reorderDisplayed(built, from, to, 1), built, `${from}->${to}`);
+  }
+});
+
+test("reordering the case carries each card's threshold credit with it", () => {
+  const ids = [L("corner-01"), L("corner-05")];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  const moved = reorderDisplayed(built, 1, 0, 1);
+  assert.deepEqual(getEngine(moved).slots, [ids[1], ids[0]]);
+  // Watermark credit is keyed by card id, so a move can neither bank nor burn
+  // progress toward the next threshold.
+  assert.deepEqual(moved.counters, built.counters);
+});
+
+test("reordering the case repoints positional effects at their new neighbour", () => {
+  // Truescope triggers the display card to its left, so which card that is
+  // has to follow the arrangement the player drags into place.
+  const truescope = L("marquee-37");
+  const ids = [L("corner-01"), L("corner-02"), truescope];
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+
+  const leftOf = (state, cardId) => {
+    const engine = getEngine(state);
+    const record = engine.records.find((candidate) => candidate.id === cardId);
+    return engine.records.find((candidate) => candidate.slot === record.slot - 1)?.id ?? null;
+  };
+
+  assert.equal(leftOf(built, truescope), ids[1]);
+  assert.equal(leftOf(reorderDisplayed(built, 2, 1, 1), truescope), ids[0]);
+  assert.equal(leftOf(reorderDisplayed(built, 2, 0, 1), truescope), null);
+});
+
+test("coin threshold chance can whiff without crediting the threshold", () => {
+  const base = withSlots(createInitialState(1), [L("corner-05")]);
+  const built = displayCard(base, L("corner-05"), 0);
+  const flush = { ...built, lifetimeCoins: built.lifetimeCoins + 10_000, coins: built.coins + 10_000 };
+  const missed = evaluateIdleThresholds(flush, { rng: () => 0.99 });
+  assert.equal(missed.events.filter((event) => event.t === "mystery").length, 0);
+  assert.equal(missed.mysteryCards.length, 0);
 });
 
 test("Mark signature marks a visible card before reveal and marked reveals pay", () => {

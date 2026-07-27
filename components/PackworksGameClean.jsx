@@ -33,6 +33,7 @@ import {
   getProductCount,
   hydrateState,
   openPack,
+  reorderDisplayed,
   resolveImmediateFusion,
   revealPackCard,
   rewriteState,
@@ -676,8 +677,93 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
   );
 }
 
-function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBinder, onRewrite, rewriteArmed }) {
+// Pointer-driven reordering for the display case. Pointer events rather than
+// HTML5 drag-and-drop so the same code path serves mouse and touch; the drag
+// only arms past DRAG_SLOP so a tap still reads as "zoom this card".
+const DRAG_SLOP = 7;
+
+function useCaseDragReorder(filledCount, onReorder) {
+  const [drag, setDrag] = useState(null);
+  const slotRefs = useRef(new Map());
+  const dragRef = useRef(null);
+
+  // Pointer events can outpace React's commit, so the ref is written
+  // synchronously and is what the handlers read; state only drives rendering.
+  const applyDrag = useCallback((next) => {
+    dragRef.current = next;
+    setDrag(next);
+  }, []);
+
+  const registerSlot = useCallback((index, node) => {
+    if (node) slotRefs.current.set(index, node);
+    else slotRefs.current.delete(index);
+  }, []);
+
+  // Nearest slot centre wins, so a card dropped in the gutter still lands.
+  const slotAt = useCallback((x, y) => {
+    let best = null;
+    let bestDistance = Infinity;
+    for (const [index, node] of slotRefs.current) {
+      if (index >= filledCount) continue;
+      const rect = node.getBoundingClientRect();
+      const dx = x - (rect.left + rect.width / 2);
+      const dy = y - (rect.top + rect.height / 2);
+      const distance = dx * dx + dy * dy;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = index;
+      }
+    }
+    return best;
+  }, [filledCount]);
+
+  // Capture on press, not on the first move past the slop: a fast flick can
+  // leave the card's box before any move event lands on it, and an uncaptured
+  // pointer would then drop the gesture entirely.
+  const onPointerDown = useCallback((index) => (event) => {
+    if (event.button != null && event.button !== 0) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    applyDrag({
+      index,
+      over: index,
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+      dx: 0,
+      dy: 0,
+      active: false,
+    });
+  }, [applyDrag]);
+
+  const onPointerMove = useCallback((event) => {
+    const current = dragRef.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    const dx = event.clientX - current.originX;
+    const dy = event.clientY - current.originY;
+    if (!current.active && Math.hypot(dx, dy) <= DRAG_SLOP) return;
+    event.preventDefault();
+    applyDrag({ ...current, dx, dy, active: true, over: slotAt(event.clientX, event.clientY) ?? current.index });
+  }, [applyDrag, slotAt]);
+
+  // Returns true when the gesture was a real drag, so the click that follows
+  // can be swallowed instead of zooming the card that was just dropped.
+  const endDrag = useCallback((event) => {
+    const current = dragRef.current;
+    if (!current || (event && current.pointerId !== event.pointerId)) return false;
+    applyDrag(null);
+    if (!current.active) return false;
+    if (current.over != null && current.over !== current.index) onReorder(current.index, current.over);
+    return true;
+  }, [applyDrag, onReorder]);
+
+  return { drag, registerSlot, onPointerDown, onPointerMove, endDrag };
+}
+
+function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBinder, onRewrite, rewriteArmed, onReorder }) {
   const rewriteReady = canRewrite(game);
+  const filledCount = derived.displayedEntries.length;
+  const { drag, registerSlot, onPointerDown, onPointerMove, endDrag } = useCaseDragReorder(filledCount, onReorder);
+  const suppressClickRef = useRef(false);
   const inscriptionsPreview = rewriteReady ? getInscriptionsEarned(game) : 0;
   return (
     <aside className="clean-drawer clean-case" aria-label="Display case">
@@ -689,8 +775,9 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
         <p className="clean-case-note">
           Displayed cards fire their printed effects while you play.
           {" "}{derived.displayedEntries.length}/{derived.caseSlots} available slots filled.
+          {filledCount > 1 && " Drag a card to move it to another slot."}
         </p>
-        <div className="clean-case-slots">
+        <div className={`clean-case-slots ${drag?.active ? "is-reordering" : ""}`}>
           {Array.from({ length: CASE_SIZE }, (_, index) => {
             const entry = derived.displayedEntries[index];
             if (entry) {
@@ -698,9 +785,43 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
               const def = getCardDef(entry.id);
               const rarity = RARITIES[card.rarity];
               const tally = game.triggerTallies?.[entry.id] || 0;
+              const dragging = drag?.active && drag.index === index;
+              const dropTarget = drag?.active && drag.over === index && drag.index !== index;
               return (
-                <article className={`clean-case-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}`} key={`slot-${index}`} style={{ "--rarity": rarity.color }}>
-                  <button className="clean-case-card" onClick={() => onPickCard(card.id)} aria-label={`Zoom ${card.name}`}>
+                <article
+                  className={`clean-case-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}${filledCount > 1 ? " is-draggable" : ""}${dragging ? " is-dragging" : ""}${dropTarget ? " is-drop-target" : ""}`}
+                  key={`slot-${index}`}
+                  ref={(node) => registerSlot(index, node)}
+                  style={{
+                    "--rarity": rarity.color,
+                    ...(dragging ? { "--drag-x": `${drag.dx}px`, "--drag-y": `${drag.dy}px` } : null),
+                  }}
+                >
+                  <button
+                    className="clean-case-card"
+                    onPointerDown={filledCount > 1 ? onPointerDown(index) : undefined}
+                    onPointerMove={filledCount > 1 ? onPointerMove : undefined}
+                    onPointerUp={(event) => { suppressClickRef.current = endDrag(event); }}
+                    onPointerCancel={(event) => { endDrag(event); suppressClickRef.current = false; }}
+                    onClick={() => {
+                      if (suppressClickRef.current) {
+                        suppressClickRef.current = false;
+                        return;
+                      }
+                      onPickCard(card.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (filledCount < 2) return;
+                      const step = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+                      if (!step) return;
+                      event.preventDefault();
+                      const target = index + step;
+                      if (target >= 0 && target < filledCount) onReorder(index, target);
+                    }}
+                    aria-label={filledCount > 1
+                      ? `${card.name}, case slot ${index + 1} of ${filledCount}. Drag to move, or use the arrow keys. Click to zoom.`
+                      : `Zoom ${card.name}`}
+                  >
                     <PrintedCard
                       card={card}
                       compact
@@ -1872,6 +1993,14 @@ export default function PackworksGameClean() {
     getAudio().sound("switch");
   }, [commit, getAudio]);
 
+  const handleReorderDisplay = useCallback((fromIndex, toIndex) => {
+    const next = reorderDisplayed(gameRef.current, fromIndex, toIndex, Date.now());
+    if (next === gameRef.current) return;
+    commit(next);
+    getAudio().sound("switch");
+    getHaptics().pulse("open");
+  }, [commit, getAudio, getHaptics]);
+
   const handleReset = useCallback(() => {
     if (!resetArmed) {
       setResetArmed(true);
@@ -2125,6 +2254,7 @@ export default function PackworksGameClean() {
           onOpenBinder={() => setDrawer("binder")}
           onRewrite={handleRewrite}
           rewriteArmed={rewriteArmed}
+          onReorder={handleReorderDisplay}
         />
       )}
       {drawer === "binder" && (
