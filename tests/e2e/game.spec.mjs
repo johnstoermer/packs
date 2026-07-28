@@ -229,6 +229,44 @@ test("desktop mounts at most 72 cards", async ({ page }) => {
   await page.screenshot({ path: "test-results/clean-mega-pack.png" });
 });
 
+test("FINISH appears on the 100th reveal, never earlier", async ({ page }) => {
+  const locklureId = SETS[0].cards.find((card) => card.name === "Locklure").id;
+  const state = createInitialState(Date.now());
+  state.coins = 10_000;
+  state.lifetimeCoins = 10_000;
+  state.collection = { [locklureId]: 1 };
+  state.bestRarities = { [locklureId]: getCard(locklureId).rarity };
+  state.displayed = [{ id: locklureId, at: Date.now() }];
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, advanceBeat(state));
+  await page.goto("/");
+  await page.evaluate(() => {
+    Math.random = () => 0;
+  });
+
+  await page.getByRole("button", { name: "Next pack type" }).click();
+  await page.getByRole("button", { name: "Next pack type" }).click();
+  await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
+  const opening = page.locator(".opening-layer");
+  await expect(opening).toHaveClass(/phase-ready/);
+
+  for (let target = 1; target <= 99; target += 1) {
+    const next = page.locator(".reveal-card.is-revealable").first();
+    await expect(next).toBeVisible();
+    await next.evaluate((node) => node.click());
+    await expect(opening).toHaveAttribute("data-revealed-count", String(target));
+  }
+  await expect(page.getByRole("button", { name: "FINISH" })).toHaveCount(0);
+
+  const hundredth = page.locator(".reveal-card.is-revealable").first();
+  await expect(hundredth).toBeVisible();
+  await hundredth.evaluate((node) => node.click());
+  await expect(opening).toHaveAttribute("data-revealed-count", "100");
+  await expect(page.getByRole("button", { name: "FINISH" })).toBeVisible();
+});
+
 test("mobile lays out up to eighteen cards in fixed rows of six", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
@@ -264,15 +302,8 @@ test("mobile lays out up to eighteen cards in fixed rows of six", async ({ page 
   for (let index = 0; index < await cards.count(); index += 1) {
     await cards.nth(index).evaluate((node) => node.click());
   }
-  await expect(page.getByRole("button", { name: "FINISH" })).toBeVisible();
-  const badgeBottom = await page.locator(".discover-stack").evaluate(
-    (node) => node.getBoundingClientRect().bottom,
-  );
-  const finishTop = await page.getByRole("button", { name: "FINISH" }).evaluate(
-    (node) => node.getBoundingClientRect().top,
-  );
-  expect(finishTop).toBeGreaterThanOrEqual(badgeBottom);
-  await page.screenshot({ path: "test-results/clean-mobile-finish.png" });
+  await expect(page.getByRole("button", { name: "FINISH" })).toHaveCount(0);
+  await page.screenshot({ path: "test-results/clean-mobile-batch-filed.png" });
   await expect(page.locator(".opening-layer.phase-filing")).toBeVisible();
   await expect(page.locator(".reveal-card")).toHaveCount(18);
 });

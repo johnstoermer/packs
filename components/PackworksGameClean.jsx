@@ -67,10 +67,17 @@ const TABLET_REVEAL_BATCH_SIZE = 12;
 const MOBILE_REVEAL_BATCH_SIZE = 18;
 const MOBILE_REVEAL_COLUMNS = 6;
 const COLLECTION_ANIMATION_MS = 950;
+const FORCE_FINISH_REVEAL_THRESHOLD = 100;
 // Catching up on a long idle can credit several thresholds at once. Two per
 // sweep keeps the parade readable, and because bursts alternate sides by
 // serial, a pair never lands on top of itself.
 const MAX_QUIET_REVEAL_BURSTS = 2;
+
+function countOpeningReveals(events = []) {
+  return events.reduce((count, event) => (
+    count + (event.t === "reveal" || event.t === "duplicateReveal" ? 1 : 0)
+  ), 0);
+}
 
 function getRevealBatchSize(width, coarsePointer = false) {
   if (coarsePointer || width <= 700) return MOBILE_REVEAL_BATCH_SIZE;
@@ -1306,6 +1313,7 @@ export default function PackworksGameClean() {
         commitOpening((current) => {
           if (current?.id !== currentOpening.id) return current;
           const nextStart = swept.cards.findIndex((entry) => !entry.revealed && !entry.fusedAway);
+          const revealedCount = (current.revealedCount || 0) + countOpeningReveals(swept.events);
           return {
             ...current,
             result: { ...current.result, cards: swept.cards },
@@ -1313,6 +1321,9 @@ export default function PackworksGameClean() {
             batchStart: current.phase === "complete" ? Math.max(0, nextStart) : current.batchStart,
             batchPending: current.phase === "complete" ? false : current.batchPending,
             pendingCount: getPendingCardCount(swept.cards),
+            revealedCount,
+            canForceFinish: current.canForceFinish
+              || revealedCount >= FORCE_FINISH_REVEAL_THRESHOLD,
             impact: current.phase === "complete" ? null : current.impact,
           };
         });
@@ -1558,6 +1569,7 @@ export default function PackworksGameClean() {
     const impactPull = cards[impactIndex] || revealedPull;
     const rarity = RARITIES[impactPull.rarity];
     const pendingCount = getPendingCardCount(cards);
+    const revealedCount = (currentOpening.revealedCount || 0) + countOpeningReveals(events);
     const allRevealed = pendingCount === 0;
     const batchSize = currentOpening.batchSize || DESKTOP_REVEAL_BATCH_SIZE;
     const batchIndices = planRevealBatch(
@@ -1580,8 +1592,10 @@ export default function PackworksGameClean() {
       result: { ...currentOpening.result, cards },
       phase: allRevealed ? "complete" : "ready",
       batchPending: batchComplete,
-      canForceFinish: currentOpening.canForceFinish || batchComplete,
+      canForceFinish: currentOpening.canForceFinish
+        || revealedCount >= FORCE_FINISH_REVEAL_THRESHOLD,
       pendingCount,
+      revealedCount,
       lastRevealedIndex: impactIndex,
       impact,
       fusionNotice,
@@ -1833,6 +1847,7 @@ export default function PackworksGameClean() {
       result: rolled.result,
       phase: "sealed",
       pendingCount: getPendingCardCount(rolled.result.cards),
+      revealedCount: 0,
       lastRevealedIndex: null,
       impact: null,
       batchSize: getRevealBatchSize(
@@ -2329,6 +2344,7 @@ export default function PackworksGameClean() {
       {opening && (
         <div
           className={`opening-layer phase-${opening.phase} clean-opening ${opening.impact ? `screen-impact-${opening.impact.rarity}` : ""}`}
+          data-revealed-count={opening.revealedCount || 0}
           style={{
             "--set-a": opening.result.set.colors[0],
             "--set-b": opening.result.set.colors[1],
