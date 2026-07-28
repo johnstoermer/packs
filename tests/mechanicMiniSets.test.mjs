@@ -57,15 +57,15 @@ test("the alternate Salvage package previews a complete destructive Scrap econom
   );
   assert.ok(
     paidPayoffs.every((entry) => entry.preview.text.startsWith("Whenever ")),
-    "each Scrap payoff needs an event trigger before its optional cost",
+    "each Scrap payoff needs an event trigger before its automatic cost",
   );
   assert.ok(
-    paidPayoffs.every((entry) => /you may spend \d+ Scrap/i.test(entry.preview.text)),
-    "each triggered Scrap cost should be optional",
+    paidPayoffs.every((entry) => /if you have (\d+) Scrap, spend \1 Scrap/i.test(entry.preview.text)),
+    "each triggered Scrap payoff should automatically pay its listed cost when affordable",
   );
   assert.ok(
-    paidPayoffs.some((entry) => /Whenever you Salvage a card.+open a Mystery Pack/i.test(entry.preview.text)),
-    "the Scrap economy needs a triggered Salvage-to-Mystery-Pack payoff",
+    paidPayoffs.some((entry) => /Whenever you reveal a duplicate.+spend 10 Scrap.+open a Mystery Pack/i.test(entry.preview.text)),
+    "the Scrap economy needs a duplicate-reveal Mystery Pack payoff",
   );
   for (const entry of miniSet.cards) {
     assert.ok(entry.preview?.name, `${entry.id} needs a proposed name`);

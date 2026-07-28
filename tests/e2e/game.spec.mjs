@@ -1078,10 +1078,10 @@ test("the mechanic mini-set viewer presents every eight-card build and saves rev
   await expect(page.locator(".mini-scrap-pitch")).toContainText("permanently delete one copy");
   await expect(page.locator(".mini-scrap-pitch")).toContainText("Spending Scrap is never a trigger");
   await expect(page.locator(".mini-set-card-grid")).toContainText(
-    "Whenever you Salvage a card, you may spend 10 Scrap to open a Mystery Pack.",
+    "Whenever you reveal a duplicate, if you have 10 Scrap, spend 10 Scrap to open a Mystery Pack.",
   );
   await expect(page.locator(".mini-set-card-grid")).toContainText(
-    "Whenever you open a pack, you may spend 15 Scrap to add 3 random cards to that pack.",
+    "Whenever you open a pack, if you have 15 Scrap, spend 15 Scrap to add 3 random cards to that pack.",
   );
   await expect(page.locator(".scrap-card-half")).toHaveCount(2);
   await expect(page.locator(".scrap-fragments i")).toHaveCount(12);
