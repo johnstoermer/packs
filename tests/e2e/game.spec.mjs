@@ -1085,6 +1085,7 @@ test("the mechanic mini-set viewer presents every eight-card build and saves rev
   );
   await expect(page.locator(".scrap-card-half")).toHaveCount(2);
   await expect(page.locator(".scrap-fragments i")).toHaveCount(12);
+  await expect(page.getByText("COPY DELETED")).toHaveCount(0);
   await page.getByRole("button", { name: "REPLAY SALVAGE" }).click();
 
   await index.getByRole("button", { name: /Catalyst/ }).click();

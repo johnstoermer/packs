@@ -98,7 +98,6 @@ function ScrapSalvageDemo({ foil, rules }) {
             <PrintedCard card={victim} compact foil={foil} preview={sacrificePreview} copyLabel="SALVAGE TARGET" />
           </div>
           <span className="scrap-tear-flash" aria-hidden="true"><i /><i /><i /></span>
-          <span className="scrap-delete-stamp">COPY DELETED</span>
           <div className="scrap-fragments" aria-hidden="true">
             {fragments.map(([x, y, rotation], index) => (
               <i

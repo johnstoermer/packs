@@ -551,25 +551,6 @@
 .scrap-tear-flash i:nth-child(2) { top: 49%; }
 .scrap-tear-flash i:nth-child(3) { top: 77%; }
 
-.scrap-delete-stamp {
-  position: absolute;
-  z-index: 14;
-  top: 50%;
-  left: 22%;
-  padding: 8px 11px;
-  border: 3px solid #6d2927;
-  border-radius: 7px;
-  background: #ff776d;
-  box-shadow: 0 4px 0 #39191b;
-  color: #43171a;
-  font-size: 9px;
-  font-weight: 950;
-  letter-spacing: 0.1em;
-  opacity: 0;
-  transform: translate(-50%, -50%) rotate(-7deg) scale(1.5);
-  animation: scrap-delete-stamp 3.6s ease both;
-}
-
 .scrap-fragments {
   position: absolute;
   z-index: 10;
@@ -797,12 +778,6 @@
   0%, 22% { opacity: 0; filter: brightness(1); }
   28% { opacity: 1; filter: brightness(2); }
   39%, 100% { opacity: 0; filter: brightness(1); }
-}
-
-@keyframes scrap-delete-stamp {
-  0%, 36% { opacity: 0; transform: translate(-50%, -50%) rotate(-7deg) scale(1.5); }
-  42%, 53% { opacity: 1; transform: translate(-50%, -50%) rotate(-7deg) scale(1); }
-  62%, 100% { opacity: 0; transform: translate(-50%, -50%) rotate(-7deg) scale(0.82); }
 }
 
 @keyframes scrap-fragment-flight {
@@ -1398,7 +1373,6 @@
   }
 
   .scrap-tear-flash,
-  .scrap-delete-stamp,
   .scrap-fragments {
     left: 30%;
   }
