@@ -5,6 +5,7 @@ import "./gameplay-clean.css";
 import "./league-overhaul.css";
 import "./card-review.css";
 import "./subset-selector.css";
+import "./mini-sets.css";
 
 export const metadata = {
   title: "PACKWORKS",

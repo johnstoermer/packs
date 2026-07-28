@@ -170,6 +170,7 @@ export default function CardReviewGallery() {
         <div className="review-coverage">
           <strong>{generatedCardCount} / {ALL_CARDS.length}</strong>
           <span>PIXELLAB CARDS READY</span>
+          <a className="review-mini-sets-link" href={`${ASSET_BASE}/mini-sets/`}>MECHANIC MINI-SETS</a>
           <button type="button" onClick={loadManifest}>REFRESH STATUS</button>
         </div>
       </header>

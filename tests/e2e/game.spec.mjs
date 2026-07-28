@@ -1044,3 +1044,38 @@ test("the card lab exposes every standard, holo, filter, zoom, and flip state", 
   await mechanics.scrollIntoViewIfNeeded();
   expect(await mechanics.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
 });
+
+test("the mechanic mini-set viewer presents every eight-card build and saves review notes locally", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/mini-sets/");
+
+  await expect(page.getByRole("heading", { name: "Mechanic Mini-Sets" })).toBeVisible();
+  const index = page.locator(".mini-set-index");
+  await expect(index.getByRole("button")).toHaveCount(14);
+  await expect(page.locator(".mini-set-card")).toHaveCount(8);
+  await expect(page.locator(".mini-set-card.is-core")).toHaveCount(6);
+  await expect(page.locator(".mini-set-card.is-flex")).toHaveCount(2);
+  await expect(page.locator(".mini-case-order > div > span")).toHaveCount(6);
+
+  await index.getByRole("button", { name: /Fracture/ }).click();
+  await expect(page.getByRole("heading", { name: "Fracture: Rift Cascade" })).toBeVisible();
+  await expect(page.locator(".mini-set-card")).toHaveCount(8);
+
+  const notes = page.getByPlaceholder("Balance concerns, card swaps, missing links, wording…");
+  await notes.fill("Keep the spill package; revisit the cash flex slot.");
+  await page.getByRole("button", { name: "APPROVE", exact: true }).click();
+  await expect(page.getByRole("button", { name: "APPROVE", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Fracture: Rift Cascade" })).toBeVisible();
+  await expect(notes).toHaveValue("Keep the spill package; revisit the cash flex slot.");
+  await expect(page.getByRole("button", { name: "APPROVE", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+  await index.getByRole("button", { name: /Catalyst/ }).click();
+  await expect(page.locator(".mini-set-flag")).toContainText("MISSING LIVE SIGNATURE");
+  await index.getByRole("button", { name: /Blueprint/ }).click();
+  await expect(page.locator(".mini-set-flag")).toContainText("SIGNATURE TEXT MISMATCH");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.locator(".mini-set-viewer").evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+});
