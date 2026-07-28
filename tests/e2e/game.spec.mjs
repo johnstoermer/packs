@@ -1076,7 +1076,13 @@ test("the mechanic mini-set viewer presents every eight-card build and saves rev
   await expect(page.locator(".mini-set-card")).toHaveCount(8);
   await expect(page.locator(".mini-proposal-badge")).toContainText("ALTERNATE RULESET");
   await expect(page.locator(".mini-scrap-pitch")).toContainText("permanently delete one copy");
-  await expect(page.locator(".mini-set-card-grid")).toContainText("Spend 10 Scrap: reveal a random card.");
+  await expect(page.locator(".mini-scrap-pitch")).toContainText("Spending Scrap is never a trigger");
+  await expect(page.locator(".mini-set-card-grid")).toContainText(
+    "Whenever you finish Salvaging a card, you may spend 10 Scrap to reveal a random card.",
+  );
+  await expect(page.locator(".mini-set-card-grid")).toContainText(
+    "Whenever you open a pack, you may spend 15 Scrap to add 3 random cards to that pack.",
+  );
   await expect(page.locator(".scrap-card-half")).toHaveCount(2);
   await expect(page.locator(".scrap-fragments i")).toHaveCount(12);
   await page.getByRole("button", { name: "REPLAY SALVAGE" }).click();

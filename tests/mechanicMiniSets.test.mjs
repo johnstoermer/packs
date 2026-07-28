@@ -49,9 +49,19 @@ test("the alternate Salvage package previews a complete destructive Scrap econom
   assert.equal(miniSet.variantOf, "salvage");
   assert.equal(miniSet.resourceRules.length, 3);
   assert.match(miniSet.resourceRules[0].text, /permanently delete/i);
+  assert.match(miniSet.resourceRules[2].text, /Spending Scrap is never a trigger/i);
+  const paidPayoffs = miniSet.cards.filter((entry) => /spend \d+ Scrap/i.test(entry.preview?.text || ""));
   assert.deepEqual(
-    miniSet.cards.map((entry) => entry.preview?.text.match(/Spend (\d+) Scrap/)?.[1]).filter(Boolean),
+    paidPayoffs.map((entry) => entry.preview.text.match(/spend (\d+) Scrap/i)?.[1]),
     ["10", "15", "30", "5", "20"],
+  );
+  assert.ok(
+    paidPayoffs.every((entry) => entry.preview.text.startsWith("Whenever ")),
+    "each Scrap payoff needs an event trigger before its optional cost",
+  );
+  assert.ok(
+    paidPayoffs.every((entry) => /you may spend \d+ Scrap/i.test(entry.preview.text)),
+    "each triggered Scrap cost should be optional",
   );
   for (const entry of miniSet.cards) {
     assert.ok(entry.preview?.name, `${entry.id} needs a proposed name`);
