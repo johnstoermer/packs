@@ -155,6 +155,7 @@
 .theme-league .rules-token.tone-gold { background: #fff1bd; color: #8b5a00; }
 .theme-league .rules-token.tone-blue { background: #def1ff; color: #075596; }
 .theme-league .rules-token.tone-cash { background: #ddf7e7; color: #187346; }
+.theme-league .rules-token.tone-scrap { background: #f3dfca; color: #7c451f; }
 .theme-league .rules-token.tone-foil {
   background: linear-gradient(90deg, #dffbff, #f3e5ff, #fff1bd);
   color: #514489;

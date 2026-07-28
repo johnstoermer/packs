@@ -1051,7 +1051,7 @@ test("the mechanic mini-set viewer presents every eight-card build and saves rev
 
   await expect(page.getByRole("heading", { name: "Mechanic Mini-Sets" })).toBeVisible();
   const index = page.locator(".mini-set-index");
-  await expect(index.getByRole("button")).toHaveCount(14);
+  await expect(index.getByRole("button")).toHaveCount(15);
   await expect(page.locator(".mini-set-card")).toHaveCount(8);
   await expect(page.locator(".mini-set-card.is-core")).toHaveCount(6);
   await expect(page.locator(".mini-set-card.is-flex")).toHaveCount(2);
@@ -1070,6 +1070,16 @@ test("the mechanic mini-set viewer presents every eight-card build and saves rev
   await expect(page.getByRole("heading", { name: "Fracture: Rift Cascade" })).toBeVisible();
   await expect(notes).toHaveValue("Keep the spill package; revisit the cash flex slot.");
   await expect(page.getByRole("button", { name: "APPROVE", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+  await index.getByRole("button", { name: /Salvage \/ Scrap/ }).click();
+  await expect(page.getByRole("heading", { name: "Salvage / Scrap: Scrapyard Economy" })).toBeVisible();
+  await expect(page.locator(".mini-set-card")).toHaveCount(8);
+  await expect(page.locator(".mini-proposal-badge")).toContainText("ALTERNATE RULESET");
+  await expect(page.locator(".mini-scrap-pitch")).toContainText("permanently delete one copy");
+  await expect(page.locator(".mini-set-card-grid")).toContainText("Spend 10 Scrap: reveal a random card.");
+  await expect(page.locator(".scrap-card-half")).toHaveCount(2);
+  await expect(page.locator(".scrap-fragments i")).toHaveCount(12);
+  await page.getByRole("button", { name: "REPLAY SALVAGE" }).click();
 
   await index.getByRole("button", { name: /Catalyst/ }).click();
   await expect(page.locator(".mini-set-flag")).toContainText("MISSING LIVE SIGNATURE");

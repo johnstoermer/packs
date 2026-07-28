@@ -7,10 +7,10 @@ import { MECHANICS } from "../lib/mechanicsCatalog.js";
 
 test("every live mechanic has one complete eight-card review package", () => {
   assert.deepEqual(
-    MECHANIC_MINI_SETS.map((miniSet) => miniSet.id),
+    MECHANICS.map((mechanic) => MECHANIC_MINI_SETS.find((miniSet) => miniSet.id === mechanic.id)?.id),
     MECHANICS.map((mechanic) => mechanic.id),
   );
-  assert.equal(MECHANIC_MINI_SETS.length, 14);
+  assert.equal(MECHANIC_MINI_SETS.length, 15);
 
   const liveIds = new Set(ALL_CARDS.map((card) => card.id));
   for (const miniSet of MECHANIC_MINI_SETS) {
@@ -39,5 +39,23 @@ test("every live mechanic has one complete eight-card review package", () => {
 
 test("mechanic mini-set lookup falls back safely", () => {
   assert.equal(getMechanicMiniSet("fusion").id, "fusion");
+  assert.equal(getMechanicMiniSet("salvage-scrap").id, "salvage-scrap");
   assert.equal(getMechanicMiniSet("not-a-mechanic").id, MECHANIC_MINI_SETS[0].id);
+});
+
+test("the alternate Salvage package previews a complete destructive Scrap economy", () => {
+  const miniSet = getMechanicMiniSet("salvage-scrap");
+  assert.equal(miniSet.proposal, true);
+  assert.equal(miniSet.variantOf, "salvage");
+  assert.equal(miniSet.resourceRules.length, 3);
+  assert.match(miniSet.resourceRules[0].text, /permanently delete/i);
+  assert.deepEqual(
+    miniSet.cards.map((entry) => entry.preview?.text.match(/Spend (\d+) Scrap/)?.[1]).filter(Boolean),
+    ["10", "15", "30", "5", "20"],
+  );
+  for (const entry of miniSet.cards) {
+    assert.ok(entry.preview?.name, `${entry.id} needs a proposed name`);
+    assert.ok(entry.preview?.text, `${entry.id} needs proposed rules`);
+    assert.ok(entry.preview?.flavor, `${entry.id} needs proposed flavor`);
+  }
 });

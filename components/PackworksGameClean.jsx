@@ -52,6 +52,7 @@ import {
   getCardDef,
   getCardRules,
   getCaseSlots,
+  tokenizeCardText,
 } from "../lib/engineCards";
 import { createAudioEngine } from "../lib/audio";
 import { createHapticsEngine } from "../lib/haptics";
@@ -151,8 +152,22 @@ function CardArt({ card, compact = false, animated = false }) {
   );
 }
 
-function CardRules({ cardId, heading = false, reminders = false, className = "" }) {
-  const rules = getCardRules(cardId);
+function CardRules({
+  cardId,
+  heading = false,
+  reminders = false,
+  className = "",
+  rulesOverride = null,
+}) {
+  const rules = rulesOverride?.text
+    ? {
+      eyebrow: rulesOverride.eyebrow || "Proposal",
+      title: rulesOverride.title || "Proposed Effect",
+      text: rulesOverride.text,
+      tokens: tokenizeCardText(rulesOverride.text),
+      reminders: [],
+    }
+    : getCardRules(cardId);
   if (!rules) return null;
   return (
     <span className={`card-rules ${heading ? "has-heading" : ""} ${className}`.trim()}>
@@ -257,11 +272,14 @@ export const PrintedCard = memo(function PrintedCard({
   foil = false,
   compact = false,
   className = "",
+  preview = null,
 }) {
   const rarity = RARITIES[rarityId];
   const set = getSet(card.setId);
-  const kind = getCardKind(card);
-  const rulesLength = getCardRules(card.id)?.text?.length || 0;
+  const kind = preview?.kind || getCardKind(card);
+  const displayName = preview?.name || card.name;
+  const flavor = preview?.flavor || card.flavor;
+  const rulesLength = preview?.text?.length || getCardRules(card.id)?.text?.length || 0;
   const copyFitClass = rulesLength > 155 ? "copy-very-long" : rulesLength > 105 ? "copy-long" : "";
   return (
     <span
@@ -276,15 +294,15 @@ export const PrintedCard = memo(function PrintedCard({
     >
       <span className="card-head">
         <span className="card-identity">
-          <strong>{card.name}</strong>
+          <strong>{displayName}</strong>
         </span>
         <b>{rarity.short}</b>
       </span>
       <CardArt card={card} compact={compact} animated={foil} />
       <span className="card-copy">
         <span className="card-type-line">{rarity.label} / {kind}</span>
-        <CardRules cardId={card.id} />
-        <small className="card-flavor">“{card.flavor}”</small>
+        <CardRules cardId={card.id} rulesOverride={preview} />
+        <small className="card-flavor">“{flavor}”</small>
       </span>
       <span className="card-foot">
         <span>{copyLabel}</span>

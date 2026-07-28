@@ -271,6 +271,25 @@
   line-height: 1.45;
 }
 
+.mini-proposal-badge {
+  display: inline-block;
+  margin-top: 15px;
+  padding: 7px 10px;
+  border: 2px solid var(--mini-navy);
+  border-radius: 7px;
+  background: #f2d1ad;
+  box-shadow: 0 3px 0 var(--mini-navy);
+  color: #643719;
+  font-size: 8px;
+  letter-spacing: 0.11em;
+}
+
+.mini-set-viewer.is-proposal .mini-set-hero {
+  background:
+    radial-gradient(circle at 83% 42%, rgba(239, 178, 112, 0.74) 0 12%, transparent 29%),
+    linear-gradient(125deg, #174e71, #7d4b2d);
+}
+
 .mini-set-stats {
   display: flex;
   flex: 0 0 auto;
@@ -330,6 +349,511 @@
   font-size: 12px;
   font-weight: 850;
   line-height: 1.35;
+}
+
+.mini-scrap-pitch {
+  display: grid;
+  grid-template-columns: minmax(290px, 0.68fr) minmax(520px, 1.32fr);
+  gap: 18px;
+  padding: clamp(22px, 3vw, 38px);
+  border-bottom: 4px solid var(--mini-navy);
+  background:
+    radial-gradient(circle at 72% 45%, rgba(238, 178, 109, 0.19), transparent 28%),
+    linear-gradient(145deg, #c3e6f5, #f2dfca);
+}
+
+.mini-scrap-contract,
+.scrap-animation-display {
+  border: 3px solid var(--mini-navy);
+  border-radius: 16px;
+  box-shadow: 0 6px 0 var(--mini-navy);
+  overflow: hidden;
+}
+
+.mini-scrap-contract {
+  padding: 22px;
+  background: #fffaf0;
+}
+
+.mini-scrap-contract > span,
+.scrap-animation-head > span {
+  color: #97613a;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 0.13em;
+}
+
+.mini-scrap-contract h3 {
+  margin: 5px 0 9px;
+  color: var(--mini-navy);
+  font-size: clamp(24px, 2.5vw, 38px);
+  line-height: 0.98;
+}
+
+.mini-scrap-contract > p {
+  margin: 0;
+  color: #4b6572;
+  font-size: 11px;
+  font-weight: 780;
+  line-height: 1.45;
+}
+
+.mini-scrap-contract ol {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mini-scrap-contract li {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 9px;
+  padding-top: 8px;
+  border-top: 2px solid #d8c3aa;
+}
+
+.mini-scrap-contract li b {
+  color: #85512b;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.mini-scrap-contract li span {
+  color: #385467;
+  font-size: 9px;
+  font-weight: 770;
+  line-height: 1.35;
+}
+
+.mini-scrap-contract > button {
+  width: 100%;
+  padding: 11px;
+  border: 2px solid var(--mini-navy);
+  border-radius: 8px;
+  background: #d89a62;
+  box-shadow: 0 3px 0 var(--mini-navy);
+  color: var(--mini-navy);
+  cursor: pointer;
+  font: 950 9px/1 "Trebuchet MS", Arial, sans-serif;
+}
+
+.scrap-animation-display {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto minmax(330px, 1fr) auto;
+  background: #06294b;
+}
+
+.scrap-animation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  border-bottom: 3px solid var(--mini-navy);
+  background: #fff5df;
+}
+
+.scrap-animation-head b {
+  color: #4d6b7d;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+}
+
+.scrap-demo-stage {
+  --scrap-vacuum-distance: clamp(215px, 26vw, 345px);
+  --scrap-vacuum-end: clamp(226px, 27vw, 354px);
+  position: relative;
+  min-height: 330px;
+  background:
+    radial-gradient(circle at 22% 50%, rgba(255, 226, 175, 0.22), transparent 19%),
+    radial-gradient(circle at 86% 50%, rgba(222, 150, 82, 0.22), transparent 20%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+    #082f54;
+  overflow: hidden;
+}
+
+.scrap-source-tag {
+  position: absolute;
+  z-index: 12;
+  top: 18px;
+  left: 18px;
+  padding: 6px 8px;
+  border: 2px solid #a86337;
+  border-radius: 6px;
+  background: #ffdfb7;
+  color: #67381b;
+  font-size: 7px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  animation: scrap-source-tag 3.6s ease both;
+}
+
+.scrap-card-half {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  left: 22%;
+  width: 168px;
+  aspect-ratio: 0.7042;
+  filter: drop-shadow(0 14px 12px rgba(0, 0, 0, 0.45));
+  transform: translate(-50%, -50%);
+}
+
+.scrap-card-half .card-front {
+  transform: none;
+}
+
+.scrap-card-half.is-left {
+  clip-path: polygon(0 0, 55% 0, 47% 9%, 57% 17%, 45% 25%, 56% 34%, 46% 44%, 55% 53%, 44% 63%, 54% 73%, 45% 82%, 55% 91%, 50% 100%, 0 100%);
+  animation: scrap-card-left 3.6s cubic-bezier(0.16, 0.8, 0.2, 1) both;
+}
+
+.scrap-card-half.is-right {
+  clip-path: polygon(55% 0, 100% 0, 100% 100%, 50% 100%, 55% 91%, 45% 82%, 54% 73%, 44% 63%, 55% 53%, 46% 44%, 56% 34%, 45% 25%, 57% 17%, 47% 9%);
+  animation: scrap-card-right 3.6s cubic-bezier(0.16, 0.8, 0.2, 1) both;
+}
+
+.scrap-tear-flash {
+  position: absolute;
+  z-index: 11;
+  top: 50%;
+  left: 22%;
+  width: 20px;
+  height: 252px;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: scrap-tear-flash 3.6s ease both;
+}
+
+.scrap-tear-flash::before {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #fff6c7, transparent);
+  content: "";
+  filter: blur(2px);
+}
+
+.scrap-tear-flash i {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff7ca;
+  box-shadow: 0 0 12px #ffba68;
+}
+
+.scrap-tear-flash i:nth-child(1) { top: 18%; }
+.scrap-tear-flash i:nth-child(2) { top: 49%; }
+.scrap-tear-flash i:nth-child(3) { top: 77%; }
+
+.scrap-delete-stamp {
+  position: absolute;
+  z-index: 14;
+  top: 50%;
+  left: 22%;
+  padding: 8px 11px;
+  border: 3px solid #6d2927;
+  border-radius: 7px;
+  background: #ff776d;
+  box-shadow: 0 4px 0 #39191b;
+  color: #43171a;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(-7deg) scale(1.5);
+  animation: scrap-delete-stamp 3.6s ease both;
+}
+
+.scrap-fragments {
+  position: absolute;
+  z-index: 10;
+  top: 50%;
+  left: 22%;
+}
+
+.scrap-fragments i {
+  position: absolute;
+  width: 18px;
+  height: 22px;
+  border: 2px solid #6a4528;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), transparent 38%),
+    #d9995c;
+  box-shadow: 0 2px 0 #2e1b14;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+  animation: scrap-fragment-flight 3.6s cubic-bezier(0.25, 0.7, 0.2, 1) calc(var(--fragment-index) * 16ms) both;
+}
+
+.scrap-fragments i:nth-child(3n) {
+  width: 12px;
+  height: 16px;
+  background-color: #8dc9d9;
+}
+
+.scrap-fragments i:nth-child(4n) {
+  width: 20px;
+  height: 12px;
+  background-color: #f4d26b;
+}
+
+.scrap-vacuum-line {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  right: 17%;
+  left: 25%;
+  height: 76px;
+  opacity: 0;
+  transform: translateY(-50%);
+  animation: scrap-vacuum-line 3.6s ease both;
+}
+
+.scrap-vacuum-line::before,
+.scrap-vacuum-line i {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #e8b574 38%, #fff2b8 82%, transparent);
+  content: "";
+  transform: translateY(-50%) skewX(-18deg);
+}
+
+.scrap-vacuum-line i:nth-child(1) {
+  top: 26%;
+  opacity: 0.55;
+}
+
+.scrap-vacuum-line i:nth-child(2) {
+  top: 74%;
+  opacity: 0.35;
+}
+
+.scrap-counter {
+  position: absolute;
+  z-index: 9;
+  top: 50%;
+  right: 4%;
+  display: grid;
+  min-width: 154px;
+  grid-template-columns: 48px 1fr 38px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 3px solid var(--mini-navy);
+  border-radius: 13px;
+  background: #fff4dd;
+  box-shadow: 0 5px 0 var(--mini-navy), 0 0 26px rgba(233, 169, 96, 0.23);
+  color: var(--mini-navy);
+  transform: translateY(-50%);
+  animation: scrap-counter-pulse 3.6s ease both;
+}
+
+.scrap-bin {
+  position: relative;
+  display: block;
+  width: 46px;
+  height: 48px;
+  border: 3px solid #573720;
+  border-top: 8px solid #573720;
+  border-radius: 5px 5px 10px 10px;
+  background: #c88349;
+  box-shadow: inset 0 0 0 3px #ecc18d;
+  overflow: hidden;
+}
+
+.scrap-bin::before {
+  position: absolute;
+  top: -13px;
+  left: 5px;
+  width: 30px;
+  height: 7px;
+  border: 3px solid #573720;
+  border-radius: 4px;
+  background: #d79b61;
+  content: "";
+}
+
+.scrap-bin i {
+  position: absolute;
+  bottom: 6px;
+  width: 10px;
+  height: 13px;
+  border: 1px solid #573720;
+  background: #f3d06d;
+  transform: rotate(12deg);
+}
+
+.scrap-bin i:nth-child(1) { left: 6px; }
+.scrap-bin i:nth-child(2) { left: 17px; bottom: 9px; background: #86c7d6; transform: rotate(-8deg); }
+.scrap-bin i:nth-child(3) { right: 5px; }
+
+.scrap-counter > span:nth-child(2) {
+  display: grid;
+}
+
+.scrap-counter small {
+  color: #99623b;
+  font-size: 6px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+}
+
+.scrap-counter strong {
+  font-size: 13px;
+}
+
+.scrap-counter > b {
+  position: relative;
+  display: block;
+  height: 29px;
+  overflow: hidden;
+  font-size: 23px;
+  line-height: 29px;
+  text-align: center;
+}
+
+.scrap-counter > b i,
+.scrap-counter > b em {
+  position: absolute;
+  inset: 0;
+  font-style: normal;
+}
+
+.scrap-counter > b i {
+  animation: scrap-count-old 3.6s ease both;
+}
+
+.scrap-counter > b em {
+  color: #a65d2f;
+  opacity: 0;
+  transform: translateY(100%);
+  animation: scrap-count-new 3.6s ease both;
+}
+
+.scrap-animation-beats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0;
+  padding: 10px;
+  border-top: 3px solid var(--mini-navy);
+  background: #fff5df;
+  list-style: none;
+}
+
+.scrap-animation-beats li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 5px;
+  align-items: center;
+  padding: 4px 7px;
+  border-right: 1px solid #cda77f;
+}
+
+.scrap-animation-beats li:last-child {
+  border-right: 0;
+}
+
+.scrap-animation-beats b {
+  color: #a96435;
+  font-size: 8px;
+}
+
+.scrap-animation-beats span {
+  color: #4f6673;
+  font-size: 7px;
+  font-weight: 900;
+}
+
+@keyframes scrap-source-tag {
+  0%, 10% { opacity: 0; transform: translateY(-8px); }
+  16%, 72% { opacity: 1; transform: none; }
+  82%, 100% { opacity: 0; }
+}
+
+@keyframes scrap-card-left {
+  0%, 25% { opacity: 1; transform: translate(-50%, -50%); }
+  36% { transform: translate(calc(-50% - 14px), -50%) rotate(-4deg); }
+  49% { opacity: 1; transform: translate(calc(-50% - 42px), calc(-50% + 5px)) rotate(-14deg); }
+  58%, 100% { opacity: 0; transform: translate(calc(-50% - 76px), calc(-50% + 18px)) rotate(-28deg) scale(0.82); }
+}
+
+@keyframes scrap-card-right {
+  0%, 25% { opacity: 1; transform: translate(-50%, -50%); }
+  36% { transform: translate(calc(-50% + 14px), -50%) rotate(4deg); }
+  49% { opacity: 1; transform: translate(calc(-50% + 42px), calc(-50% - 5px)) rotate(14deg); }
+  58%, 100% { opacity: 0; transform: translate(calc(-50% + 76px), calc(-50% - 18px)) rotate(28deg) scale(0.82); }
+}
+
+@keyframes scrap-tear-flash {
+  0%, 22% { opacity: 0; filter: brightness(1); }
+  28% { opacity: 1; filter: brightness(2); }
+  39%, 100% { opacity: 0; filter: brightness(1); }
+}
+
+@keyframes scrap-delete-stamp {
+  0%, 36% { opacity: 0; transform: translate(-50%, -50%) rotate(-7deg) scale(1.5); }
+  42%, 53% { opacity: 1; transform: translate(-50%, -50%) rotate(-7deg) scale(1); }
+  62%, 100% { opacity: 0; transform: translate(-50%, -50%) rotate(-7deg) scale(0.82); }
+}
+
+@keyframes scrap-fragment-flight {
+  0%, 39% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  47% {
+    opacity: 1;
+    transform:
+      translate(calc(-50% + var(--scatter-x)), calc(-50% + var(--scatter-y)))
+      rotate(var(--fragment-rotation))
+      scale(1);
+  }
+  68% {
+    opacity: 1;
+    transform:
+      translate(calc(-50% + var(--scatter-x)), calc(-50% + var(--scatter-y)))
+      rotate(var(--fragment-rotation))
+      scale(0.9);
+  }
+  88% {
+    opacity: 1;
+    transform: translate(var(--scrap-vacuum-distance), -50%) rotate(180deg) scale(0.35);
+  }
+  92%, 100% {
+    opacity: 0;
+    transform: translate(var(--scrap-vacuum-end), -50%) rotate(220deg) scale(0.1);
+  }
+}
+
+@keyframes scrap-vacuum-line {
+  0%, 62% { opacity: 0; transform: translateY(-50%) scaleX(0.15); transform-origin: right; }
+  72%, 87% { opacity: 0.85; transform: translateY(-50%) scaleX(1); transform-origin: right; }
+  94%, 100% { opacity: 0; transform: translateY(-50%) scaleX(0.2); transform-origin: right; }
+}
+
+@keyframes scrap-counter-pulse {
+  0%, 82% { filter: brightness(1); transform: translateY(-50%) scale(1); }
+  88% { filter: brightness(1.5); transform: translateY(-50%) scale(1.07); }
+  96%, 100% { filter: brightness(1); transform: translateY(-50%) scale(1); }
+}
+
+@keyframes scrap-count-old {
+  0%, 82% { opacity: 1; transform: translateY(0); }
+  89%, 100% { opacity: 0; transform: translateY(-100%); }
+}
+
+@keyframes scrap-count-new {
+  0%, 82% { opacity: 0; transform: translateY(100%); }
+  89%, 100% { opacity: 1; transform: translateY(0); }
 }
 
 .mini-set-meta {
@@ -782,6 +1306,10 @@
     grid-template-columns: 1fr;
   }
 
+  .mini-scrap-pitch {
+    grid-template-columns: 1fr;
+  }
+
   .mini-set-index {
     position: static;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -843,6 +1371,69 @@
   .mini-set-flag {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .mini-scrap-pitch {
+    padding: 14px;
+  }
+
+  .mini-scrap-contract {
+    padding: 17px;
+  }
+
+  .scrap-animation-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .scrap-demo-stage {
+    --scrap-vacuum-distance: 130px;
+    --scrap-vacuum-end: 140px;
+    min-height: 310px;
+  }
+
+  .scrap-card-half {
+    left: 30%;
+    width: 132px;
+  }
+
+  .scrap-tear-flash,
+  .scrap-delete-stamp,
+  .scrap-fragments {
+    left: 30%;
+  }
+
+  .scrap-tear-flash {
+    height: 205px;
+  }
+
+  .scrap-counter {
+    right: 2%;
+    min-width: 118px;
+    grid-template-columns: 36px 1fr 30px;
+    gap: 5px;
+    padding: 7px;
+  }
+
+  .scrap-bin {
+    width: 34px;
+    height: 39px;
+  }
+
+  .scrap-bin::before {
+    width: 22px;
+  }
+
+  .scrap-counter strong {
+    font-size: 10px;
+  }
+
+  .scrap-animation-beats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .scrap-animation-beats li:nth-child(2) {
+    border-right: 0;
   }
 
   .mini-set-meta {

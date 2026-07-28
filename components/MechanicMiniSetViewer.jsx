@@ -39,8 +39,95 @@ function readStoredReviews() {
   }
 }
 
-function cardName(id) {
-  return getCard(id)?.name || id;
+function cardName(miniSet, id) {
+  return miniSet.cards.find((entry) => entry.id === id)?.preview?.name || getCard(id)?.name || id;
+}
+
+function ScrapSalvageDemo({ foil, rules }) {
+  const [runId, setRunId] = useState(1);
+  const victim = getCard("marquee-03");
+  const fragments = [
+    ["-62px", "-62px", "-18deg"],
+    ["-30px", "-86px", "24deg"],
+    ["12px", "-74px", "48deg"],
+    ["54px", "-52px", "-32deg"],
+    ["-74px", "-18px", "35deg"],
+    ["-38px", "17px", "-45deg"],
+    ["8px", "24px", "62deg"],
+    ["61px", "12px", "18deg"],
+    ["-54px", "58px", "52deg"],
+    ["-8px", "72px", "-26deg"],
+    ["38px", "64px", "38deg"],
+    ["76px", "44px", "-58deg"],
+  ];
+  const sacrificePreview = {
+    name: "Duplop",
+    kind: "Selected duplicate",
+    text: "This owned copy is being Salvaged. It will be permanently deleted.",
+    flavor: "One last look before it becomes parts.",
+  };
+
+  return (
+    <section className="mini-scrap-pitch" aria-labelledby="scrap-animation-title">
+      <div className="mini-scrap-contract">
+        <span>ALTERNATE RULES CONTRACT</span>
+        <h3 id="scrap-animation-title">The card is really gone</h3>
+        <p>
+          Salvage is a destructive choice, not another way to open a pack. The animation must sell
+          the loss first, then make the new resource feel physical and satisfying.
+        </p>
+        <ol>
+          {rules.map((rule) => (
+            <li key={rule.label}><b>{rule.label}</b><span>{rule.text}</span></li>
+          ))}
+        </ol>
+        <button type="button" onClick={() => setRunId((current) => current + 1)}>REPLAY SALVAGE</button>
+      </div>
+
+      <div className="scrap-animation-display">
+        <div className="scrap-animation-head">
+          <span>ANIMATION PITCH / LIVE CSS MOCKUP</span>
+          <b>SELECT → SPLIT → SHRED → VACUUM</b>
+        </div>
+        <div className="scrap-demo-stage" key={runId}>
+          <span className="scrap-source-tag">DUPLICATE SELECTED</span>
+          <div className="scrap-card-half is-left">
+            <PrintedCard card={victim} compact foil={foil} preview={sacrificePreview} copyLabel="SALVAGE TARGET" />
+          </div>
+          <div className="scrap-card-half is-right">
+            <PrintedCard card={victim} compact foil={foil} preview={sacrificePreview} copyLabel="SALVAGE TARGET" />
+          </div>
+          <span className="scrap-tear-flash" aria-hidden="true"><i /><i /><i /></span>
+          <span className="scrap-delete-stamp">COPY DELETED</span>
+          <div className="scrap-fragments" aria-hidden="true">
+            {fragments.map(([x, y, rotation], index) => (
+              <i
+                key={`${x}-${y}`}
+                style={{
+                  "--fragment-index": index,
+                  "--scatter-x": x,
+                  "--scatter-y": y,
+                  "--fragment-rotation": rotation,
+                }}
+              />
+            ))}
+          </div>
+          <span className="scrap-vacuum-line" aria-hidden="true"><i /><i /></span>
+          <div className="scrap-counter">
+            <span className="scrap-bin" aria-hidden="true"><i /><i /><i /></span>
+            <span><small>RESOURCE</small><strong>SCRAP</strong></span>
+            <b><i>09</i><em>10</em></b>
+          </div>
+        </div>
+        <ol className="scrap-animation-beats">
+          <li><b>01</b><span>Card locks</span></li>
+          <li><b>02</b><span>Print tears</span></li>
+          <li><b>03</b><span>Pieces scatter</span></li>
+          <li><b>04</b><span>Scrap banks</span></li>
+        </ol>
+      </div>
+    </section>
+  );
 }
 
 export default function MechanicMiniSetViewer() {
@@ -88,6 +175,9 @@ export default function MechanicMiniSetViewer() {
 
   const miniSet = getMechanicMiniSet(mechanicId);
   const selectedCard = selectedCardId ? getCard(selectedCardId) : null;
+  const selectedEntry = selectedCardId
+    ? miniSet.cards.find((entry) => entry.id === selectedCardId)
+    : null;
   const review = reviews[mechanicId] || { status: "unreviewed", notes: "" };
   const reviewedCount = useMemo(
     () => MECHANIC_MINI_SETS.filter((entry) => {
@@ -120,8 +210,8 @@ export default function MechanicMiniSetViewer() {
 
   return (
     <main
-      className="mini-set-viewer theme-league"
-      style={{ "--mini-accent": ACCENTS[activeIndex % ACCENTS.length] }}
+      className={`mini-set-viewer theme-league ${miniSet.proposal ? "is-proposal" : ""}`}
+      style={{ "--mini-accent": miniSet.proposal ? "#c8874f" : ACCENTS[activeIndex % ACCENTS.length] }}
     >
       <header className="mini-set-masthead">
         <a className="mini-set-brand" href={`${ASSET_BASE}/`}>
@@ -131,7 +221,7 @@ export default function MechanicMiniSetViewer() {
         <div className="mini-set-title">
           <span>MECHANIC PACKAGE LAB</span>
           <h1>Mechanic Mini-Sets</h1>
-          <p>Fourteen focused packages. Eight cards each. Pick six for the live display case.</p>
+          <p>Fifteen packages across fourteen mechanics. Eight cards each. Pick six for the display case.</p>
         </div>
         <div className="mini-set-progress">
           <strong>{reviewedCount} / {MECHANIC_MINI_SETS.length}</strong>
@@ -144,7 +234,7 @@ export default function MechanicMiniSetViewer() {
         <nav className="mini-set-index" aria-label="Mechanic mini-sets">
           <header>
             <span>REVIEW QUEUE</span>
-            <b>{MECHANIC_MINI_SETS.length} MECHANICS</b>
+            <b>{MECHANIC_MINI_SETS.length} PACKAGES / 14 MECHANICS</b>
           </header>
           {MECHANIC_MINI_SETS.map((entry) => {
             const status = reviews[entry.id]?.status || "unreviewed";
@@ -170,6 +260,7 @@ export default function MechanicMiniSetViewer() {
               <span>{miniSet.index} / {miniSet.kicker}</span>
               <h2 id="mini-set-name">{miniSet.name}: {miniSet.title}</h2>
               <p>{miniSet.thesis}</p>
+              {miniSet.proposal && <b className="mini-proposal-badge">ALTERNATE RULESET / NOT LIVE</b>}
             </div>
             <div className="mini-set-stats">
               <span><b>8</b><small>CARDS</small></span>
@@ -183,6 +274,10 @@ export default function MechanicMiniSetViewer() {
               <b>{miniSet.flag}</b>
               <p>{miniSet.watchout}</p>
             </aside>
+          )}
+
+          {miniSet.resourceRules && (
+            <ScrapSalvageDemo foil={foil} rules={miniSet.resourceRules} />
           )}
 
           <section className="mini-set-meta" aria-labelledby="mini-set-meta-title">
@@ -201,7 +296,7 @@ export default function MechanicMiniSetViewer() {
                 {miniSet.caseOrder.map((id, index) => (
                   <span key={id}>
                     <i>{index + 1}</i>
-                    <b>{cardName(id)}</b>
+                    <b>{cardName(miniSet, id)}</b>
                   </span>
                 ))}
               </div>
@@ -224,17 +319,24 @@ export default function MechanicMiniSetViewer() {
           <div className="mini-set-card-grid" aria-label={`${miniSet.name} eight-card mini-set`}>
             {miniSet.cards.map((entry, index) => {
               const card = getCard(entry.id);
+              const displayName = entry.preview?.name || card.name;
               return (
                 <article className={`mini-set-card ${coreIds.has(entry.id) ? "is-core" : "is-flex"}`} key={entry.id}>
                   <div className="mini-set-card-label">
                     <span>{coreIds.has(entry.id) ? `CORE ${miniSet.caseOrder.indexOf(entry.id) + 1}` : `FLEX ${index - 5}`}</span>
                     <b>{entry.role}</b>
                   </div>
-                  <button type="button" onClick={() => setSelectedCardId(entry.id)} aria-label={`Inspect ${card.name}`}>
-                    <PrintedCard card={card} compact foil={foil} copyLabel={entry.role} />
+                  <button type="button" onClick={() => setSelectedCardId(entry.id)} aria-label={`Inspect ${displayName}`}>
+                    <PrintedCard
+                      card={card}
+                      compact
+                      foil={foil}
+                      preview={entry.preview}
+                      copyLabel={miniSet.proposal ? "SCRAP PROPOSAL" : entry.role}
+                    />
                   </button>
                   <footer>
-                    <strong>{card.name}</strong>
+                    <strong>{displayName}</strong>
                     <p>{entry.note}</p>
                   </footer>
                 </article>
@@ -293,7 +395,12 @@ export default function MechanicMiniSetViewer() {
         <div className="mini-set-zoom" onMouseDown={() => setSelectedCardId(null)}>
           <button type="button" onClick={() => setSelectedCardId(null)}>CLOSE</button>
           <div onMouseDown={(event) => event.stopPropagation()}>
-            <PrintedCard card={selectedCard} foil={foil} copyLabel={`${miniSet.name} REVIEW`} />
+            <PrintedCard
+              card={selectedCard}
+              foil={foil}
+              preview={selectedEntry?.preview}
+              copyLabel={`${miniSet.name} REVIEW`}
+            />
           </div>
         </div>
       )}
