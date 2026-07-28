@@ -26,6 +26,7 @@ import {
   getDuplicateCount,
   getFiledIndices,
   getInscriptionsEarned,
+  getPendingCardCount,
   getPassiveIncomeRate,
   hydrateState,
   openPack,
@@ -235,6 +236,12 @@ test("getFiledIndices collects everything already resolved, and nothing else", (
   assert.deepEqual([...getFiledIndices(board("R.xR."))], [0, 2, 3]);
   assert.deepEqual([...getFiledIndices(board("....."))], []);
   assert.deepEqual([...getFiledIndices([])], []);
+});
+
+test("pending-card counts ignore revealed and fused pulls", () => {
+  assert.equal(getPendingCardCount(board("R.xR.")), 2);
+  assert.equal(getPendingCardCount(board(".....")), 5);
+  assert.equal(getPendingCardCount([]), 0);
 });
 
 test("a reveal screen tolerates junk bounds", () => {
@@ -449,9 +456,10 @@ test("immediate Fusion replaces the earlier card and normally reveals the result
 
   assert.equal(fused.fused, true);
   assert.equal(fused.index, 1);
-  assert.equal(fused.cards.length, beforeLength - 1);
+  assert.equal(fused.cards.length, beforeLength);
   assert.equal(fused.cards[1].revealed, true);
   assert.equal(fused.cards[1].fusedFrom, "common");
+  assert.equal(fused.cards[4].fusedAway, true);
   assert.ok(RARITIES[fused.cards[1].rarity].order > RARITIES.common.order);
   assert.ok(
     fused.events.some((event) => (
@@ -1013,6 +1021,71 @@ test("audit: the display cap never limits logical pack growth", () => {
     revealed.events.some((event) => event.t === "addCards" && event.source === id),
     "Locklure appended beyond the 72-card display cap",
   );
+});
+
+test("a visible reveal does not clone a 3,000-card off-screen backlog", () => {
+  const built = withSlots(createInitialState(1));
+  const opened = openPack(built, {
+    manual: true,
+    free: true,
+    now: 5_000,
+    rng: () => 0.99,
+  });
+  const cards = Array.from({ length: 3_000 }, (_, index) => ({
+    ...opened.result.cards[index % opened.result.cards.length],
+    revealed: false,
+  }));
+  const untouched = cards[2_999];
+  const revealed = revealPackCard(opened.state, cards, 0, {
+    manual: true,
+    suppressEffects: true,
+    rng: () => 0.99,
+  });
+
+  assert.notEqual(revealed.cards, cards);
+  assert.notEqual(revealed.cards[0], cards[0]);
+  assert.equal(revealed.cards[2_999], untouched);
+  assert.equal(cards[0].revealed, false);
+  assert.equal(revealed.cards[0].revealed, true);
+});
+
+test("the Heartmerge Fracture-Salvage build leaves a 3,000-card backlog structurally shared", () => {
+  const names = [
+    "Heartmerge",
+    "Riftforge",
+    "Catalystag",
+    "Dawnrift",
+    "Cinderscrap",
+    "Scrapanvil",
+  ];
+  const ids = names.map((name) => ALL_CARDS.find((card) => card.name === name)?.id);
+  assert.equal(ids.every(Boolean), true);
+  const built = displayAll(withSlots(createInitialState(1), ids), ids);
+  assert.deepEqual(getEngine(built).slots, ids);
+  const opened = openPack(built, {
+    manual: true,
+    free: true,
+    now: 5_000,
+    rng: () => 0.99,
+  });
+  const common = SETS[0].cards.find((card) => card.rarity === "common");
+  let cards = Array.from({ length: 3_000 }, (_, index) => ({
+    ...opened.result.cards[index % opened.result.cards.length],
+    card: common,
+    rarity: "common",
+    revealed: false,
+  }));
+  const untouched = cards[2_999];
+  let state = opened.state;
+  ({ state, cards } = revealPackCard(state, cards, 0, { manual: true, rng: () => 0.99 }));
+  ({ state, cards } = revealPackCard(state, cards, 1, { manual: true, rng: () => 0.99 }));
+  const fused = resolveImmediateFusion(state, cards, { manual: true, rng: () => 0.99 });
+
+  assert.equal(fused.fused, true);
+  assert.equal(fused.cards[2_999], untouched);
+  assert.equal(fused.cards[1].fusedAway, true);
+  assert.ok(fused.cards.length > 3_000, "Scrapanvil Salvage still grows the live opening");
+  assert.ok(fused.events.some((event) => event.t === "mystery"));
 });
 
 test("audit: duplicate-sale Mystery cards spill into an opening and trigger Locklure", () => {

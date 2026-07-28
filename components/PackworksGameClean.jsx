@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ALL_CARDS,
   PACK_TYPES,
@@ -30,6 +30,7 @@ import {
   getDerived,
   getInscriptionsEarned,
   getFiledIndices,
+  getPendingCardCount,
   getPackPrice,
   getProductCount,
   hydrateState,
@@ -242,7 +243,7 @@ export function PackFace({ set, packType = PACK_TYPES[0], small = false }) {
   );
 }
 
-export function PrintedCard({
+export const PrintedCard = memo(function PrintedCard({
   card,
   rarityId = card.rarity,
   copyLabel = "COLLECTED",
@@ -288,9 +289,9 @@ export function PrintedCard({
       <span className="foil-sheen" />
     </span>
   );
-}
+});
 
-function RevealCard({
+const RevealCard = memo(function RevealCard({
   pull,
   index,
   position,
@@ -364,7 +365,7 @@ function RevealCard({
       </span>
     </button>
   );
-}
+});
 
 export function OpeningImpact({ impact }) {
   if (!impact) return null;
@@ -1311,9 +1312,7 @@ export default function PackworksGameClean() {
             phase: current.phase === "complete" ? "ready" : current.phase,
             batchStart: current.phase === "complete" ? Math.max(0, nextStart) : current.batchStart,
             batchPending: current.phase === "complete" ? false : current.batchPending,
-            revealed: swept.cards
-              .map((entry, index) => (entry.revealed ? index : -1))
-              .filter((index) => index >= 0),
+            pendingCount: getPendingCardCount(swept.cards),
             impact: current.phase === "complete" ? null : current.impact,
           };
         });
@@ -1428,21 +1427,15 @@ export default function PackworksGameClean() {
     viewport.w,
   ]);
 
-  const openingBatchIndexSet = useMemo(
-    () => new Set(openingBatchIndices),
-    [openingBatchIndices],
-  );
-  const openingOverflowCount = useMemo(() => (
-    opening?.result?.cards?.reduce((count, pull, index) => (
-      count + (
-        !pull.revealed
-        && !pull.fusedAway
-        && !openingBatchIndexSet.has(index)
-          ? 1
-          : 0
-      )
-    ), 0) || 0
-  ), [opening?.result?.cards, openingBatchIndexSet]);
+  const openingOverflowCount = useMemo(() => {
+    if (!opening?.result?.cards) return 0;
+    let visiblePending = 0;
+    for (const index of openingBatchIndices) {
+      const pull = opening.result.cards[index];
+      if (pull && !pull.revealed && !pull.fusedAway) visiblePending += 1;
+    }
+    return Math.max(0, (opening.pendingCount || 0) - visiblePending);
+  }, [opening?.pendingCount, opening?.result?.cards, openingBatchIndices]);
 
   const boardLayout = useMemo(() => {
     const mobileOpening = viewport.coarse || viewport.w <= 700;
@@ -1564,7 +1557,8 @@ export default function PackworksGameClean() {
     const impactIndex = fusionNotice?.index ?? index;
     const impactPull = cards[impactIndex] || revealedPull;
     const rarity = RARITIES[impactPull.rarity];
-    const allRevealed = cards.every((entry) => entry.revealed || entry.fusedAway);
+    const pendingCount = getPendingCardCount(cards);
+    const allRevealed = pendingCount === 0;
     const batchSize = currentOpening.batchSize || DESKTOP_REVEAL_BATCH_SIZE;
     const batchIndices = planRevealBatch(
       cards,
@@ -1587,7 +1581,8 @@ export default function PackworksGameClean() {
       phase: allRevealed ? "complete" : "ready",
       batchPending: batchComplete,
       canForceFinish: currentOpening.canForceFinish || batchComplete,
-      revealed: cards.map((entry, position) => (entry.revealed ? position : -1)).filter((position) => position >= 0),
+      pendingCount,
+      lastRevealedIndex: impactIndex,
       impact,
       fusionNotice,
     });
@@ -1756,7 +1751,7 @@ export default function PackworksGameClean() {
       phase: "collecting",
       batchStart,
       batchPending: false,
-      revealed: cards.map((entry, index) => (entry.revealed ? index : -1)).filter((index) => index >= 0),
+      pendingCount: 0,
       impact: null,
       fusionNotice: null,
     });
@@ -1837,7 +1832,8 @@ export default function PackworksGameClean() {
       id,
       result: rolled.result,
       phase: "sealed",
-      revealed: [],
+      pendingCount: getPendingCardCount(rolled.result.cards),
+      lastRevealedIndex: null,
       impact: null,
       batchSize: getRevealBatchSize(
         window.innerWidth,
@@ -1906,7 +1902,7 @@ export default function PackworksGameClean() {
       !card
       || !Number.isInteger(index)
       || currentOpening?.phase !== "ready"
-      || currentOpening.revealed.includes(index)
+      || currentOpening.result.cards[index]?.revealed
     ) return;
     event.preventDefault();
     swipePointerRef.current = event.pointerId;
@@ -1969,7 +1965,7 @@ export default function PackworksGameClean() {
         !opening.result.cards[index].revealed && !opening.result.cards[index].fusedAway
       ));
       if (nextIndex >= 0) {
-        const lastIndex = opening.revealed.at(-1);
+        const lastIndex = opening.lastRevealedIndex;
         const lastPull = Number.isInteger(lastIndex) ? opening.result.cards[lastIndex] : null;
         const lastOrder = lastPull ? RARITIES[lastPull.rarity].order : 0;
         const delay = mobileAutoHeld
