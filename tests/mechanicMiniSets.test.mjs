@@ -63,6 +63,10 @@ test("the alternate Salvage package previews a complete destructive Scrap econom
     paidPayoffs.every((entry) => /you may spend \d+ Scrap/i.test(entry.preview.text)),
     "each triggered Scrap cost should be optional",
   );
+  assert.ok(
+    paidPayoffs.some((entry) => /Whenever you Salvage a card.+open a Mystery Pack/i.test(entry.preview.text)),
+    "the Scrap economy needs a triggered Salvage-to-Mystery-Pack payoff",
+  );
   for (const entry of miniSet.cards) {
     assert.ok(entry.preview?.name, `${entry.id} needs a proposed name`);
     assert.ok(entry.preview?.text, `${entry.id} needs proposed rules`);
