@@ -1086,6 +1086,9 @@ test("the mechanic mini-set viewer presents every eight-card build and saves rev
   await expect(page.locator(".mini-set-card-grid")).toContainText(
     "Whenever you reveal a duplicate, 25% chance to Salvage it.",
   );
+  await expect(page.locator(".mini-set-card-grid")).toContainText(
+    "Whenever you reveal the final card in a pack, spend 5 Scrap to reveal a random card.",
+  );
   await expect(page.locator(".scrap-card-half")).toHaveCount(2);
   await expect(page.locator(".scrap-fragments i")).toHaveCount(12);
   await expect(page.getByText("COPY DELETED")).toHaveCount(0);

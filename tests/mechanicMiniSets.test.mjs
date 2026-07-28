@@ -53,7 +53,7 @@ test("the alternate Salvage package previews a complete destructive Scrap econom
   const paidPayoffs = miniSet.cards.filter((entry) => /spend \d+ Scrap/i.test(entry.preview?.text || ""));
   assert.deepEqual(
     paidPayoffs.map((entry) => entry.preview.text.match(/spend (\d+) Scrap/i)?.[1]),
-    ["10", "15", "30", "5", "20"],
+    ["10", "15", "5", "5", "20"],
   );
   assert.ok(
     paidPayoffs.every((entry) => entry.preview.text.startsWith("Whenever ")),
@@ -69,6 +69,8 @@ test("the alternate Salvage package previews a complete destructive Scrap econom
   );
   const scrapactus = miniSet.cards.find((entry) => entry.preview?.name === "Scrapactus");
   assert.doesNotMatch(scrapactus.preview.text, /automatically/i);
+  const archiveEater = miniSet.cards.find((entry) => entry.preview?.name === "Archive Eater");
+  assert.match(archiveEater.preview.text, /spend 5 Scrap to reveal a random card\.$/i);
   for (const entry of miniSet.cards) {
     assert.ok(entry.preview?.name, `${entry.id} needs a proposed name`);
     assert.ok(entry.preview?.text, `${entry.id} needs proposed rules`);
