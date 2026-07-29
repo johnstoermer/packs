@@ -7,6 +7,16 @@
    stack into its pile.
    ========================================================================== */
 
+/* Transformed children (the banner slam, flight ghosts) can create
+   scrollable overflow that browsers auto-scroll toward on interaction,
+   silently shifting the whole board. clip forbids scrolling outright. */
+.opening-layer.clean-opening,
+.theme-league .opening-layer.clean-opening,
+.theme-league.fx-holo .opening-layer.clean-opening,
+.theme-league.fx-tabletop .opening-layer.clean-opening {
+  overflow: clip;
+}
+
 .overflow-board {
   position: absolute;
   z-index: 7;
@@ -336,6 +346,24 @@
 
 .overflow-pile.is-incoming .overflow-pile-count {
   opacity: 0;
+}
+
+/* Every copy consumed (Fusion and friends): the pile stays put, greyed out
+   at zero, so the board never reshuffles under the player. */
+.overflow-pile.is-depleted .overflow-pile-card {
+  opacity: 0.5;
+  filter: grayscale(0.9) brightness(0.62);
+  transition: opacity 300ms ease, filter 300ms ease;
+}
+
+.overflow-pile.is-depleted .overflow-pile-under {
+  opacity: 0;
+}
+
+.overflow-pile.is-depleted .overflow-pile-count {
+  background: #cfd8dd;
+  box-shadow: 0 2px 0 var(--league-navy, #052752);
+  color: #47555e;
 }
 
 .overflow-pile-card.is-landing > .card-front {

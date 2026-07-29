@@ -7,7 +7,7 @@ import {
   NAMELESS_CARD_ID,
   SAVE_VERSION,
   advanceBeat,
-  applyOfflineProgress,
+  revealAllPackCards,
   breakProduct,
   buyProduct,
   buyUpgrade,
@@ -423,20 +423,25 @@ test("economy ticks add exactly one cash per second and never buy or open produc
   assert.deepEqual(next.collection, state.collection);
 });
 
-test("offline progress pays cash but cannot source or open packs", () => {
-  const now = 10_000_000;
-  const state = {
-    ...createInitialState(1),
-    collection: { [L("corner-01")]: 2, [L("corner-02")]: 1 },
-    lastSavedAt: now - 60 * 60 * 1000,
-  };
-  const stockBefore = clone(state.sealed);
-  const result = applyOfflineProgress(state, now);
-  assert.equal(result.report.coins, 3_600);
-  assert.equal(result.report.ordered, 0);
-  assert.equal(result.state.packsOpened, 0);
-  assert.deepEqual(result.state.sealed, stockBefore);
-  assert.deepEqual(result.state.collection, state.collection);
+test("FINISH collects a flooded table of thousands of cards without stalling", () => {
+  const state = createInitialState(1);
+  const commons = SETS[0].cards.filter((card) => card.rarity === "common");
+  const cards = Array.from({ length: 5_000 }, (_, index) => ({
+    card: commons[index % commons.length],
+    rarity: "common",
+    foil: false,
+    grade: 0,
+    revealed: false,
+  }));
+  const startedAt = performance.now();
+  const result = revealAllPackCards(state, cards);
+  const elapsed = performance.now() - startedAt;
+  assert.ok(elapsed < 1_000, `bulk reveal took ${Math.round(elapsed)}ms`);
+  assert.equal(result.cards.length, 5_000);
+  assert.ok(result.cards.every((pull) => pull.revealed));
+  assert.equal(result.events.filter((event) => event.t === "reveal").length, 5_000);
+  const collected = Object.values(result.state.collection).reduce((sum, count) => sum + count, 0);
+  assert.equal(collected, 5_000);
 });
 
 test("hydration migrates earlier saves without inventing cards", () => {

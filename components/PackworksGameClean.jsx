@@ -14,9 +14,9 @@ import {
 import {
   ADMIN_FLAG_KEY,
   ADMIN_SAVE_KEY,
+  PACK_SIZE,
   SAVE_KEY,
   applyAdminGuarantees,
-  applyOfflineProgress,
   createAdminState,
   breakProduct,
   buyProduct,
@@ -34,6 +34,7 @@ import {
   hydrateState,
   openPack,
   resolveImmediateFusion,
+  revealAllPackCards,
   revealPackCard,
   rewriteState,
   sellDuplicatesDetailed,
@@ -61,8 +62,6 @@ const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
 const MOBILE_REVEAL_COLUMNS = 6;
 const COLLECTION_ANIMATION_MS = 950;
-// FINISH appears on any reveal larger than two standard packs.
-const FORCE_FINISH_MIN_CARDS = 12;
 // Overflow flight ghosts beyond this land instantly instead of animating.
 const MAX_CONCURRENT_FLIGHTS = 10;
 const FLIGHT_DURATION_MS = 460;
@@ -94,18 +93,15 @@ function findNextRevealIndex(cards = []) {
   return -1;
 }
 
-// The board holds at most one loose card per card in the set. Past that the
+// The board holds at most one standard pack of loose cards. Past that the
 // opening tips into Overflow mode — one face-down stack up top, one counted
 // pile per distinct card below — and stays there for the rest of the reveal.
 function getOverflowFlags(openingValue, cards) {
-  const setSize = openingValue.result.set.cards.length;
   const active = countActiveCards(cards);
-  const overflow = Boolean(openingValue.overflow) || active > setSize;
+  const overflow = Boolean(openingValue.overflow) || active > PACK_SIZE;
   return {
     overflow,
-    canForceFinish: Boolean(openingValue.canForceFinish)
-      || overflow
-      || active > FORCE_FINISH_MIN_CARDS,
+    canForceFinish: Boolean(openingValue.canForceFinish) || overflow,
   };
 }
 
@@ -417,6 +413,7 @@ const OverflowPile = memo(function OverflowPile({
   count,
   foil,
   incoming,
+  depleted,
   pulse,
   enterDelay,
   onRef,
@@ -427,7 +424,7 @@ const OverflowPile = memo(function OverflowPile({
     <div
       ref={onRef}
       data-card-id={card.id}
-      className={`overflow-pile rarity-${card.rarity} ${incoming ? "is-incoming" : ""} ${count > 1 ? "is-stacked" : ""}`.trim()}
+      className={`overflow-pile rarity-${card.rarity} ${incoming ? "is-incoming" : ""} ${depleted ? "is-depleted" : ""} ${count > 1 ? "is-stacked" : ""}`.trim()}
       style={{
         "--rarity": rarity.color,
         "--rarity-deep": rarity.deep,
@@ -578,25 +575,6 @@ function CashStreamLayer({ streams }) {
           }}
         >
           +{money(stream.amount)}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function GameplayCueLayer({ cues }) {
-  if (!cues.length) return null;
-  return (
-    <div className="gameplay-cue-layer" aria-live="polite">
-      {cues.map((cue) => (
-        <span
-          className={`gameplay-cue cue-${cue.type}`}
-          key={cue.id}
-          style={{ "--cue-slot": cue.id % 3 }}
-        >
-          <span className="gameplay-cue-symbol" aria-hidden="true"><i /><i /><i /></span>
-          <b>{cue.label}</b>
-          {cue.detail && <small>{cue.detail}</small>}
         </span>
       ))}
     </div>
@@ -1028,7 +1006,6 @@ export default function PackworksGameClean() {
   const swipePointerRef = useRef(null);
   const revealLocksRef = useRef(new Set());
   const impactSerialRef = useRef(0);
-  const gameplayCueSerialRef = useRef(0);
   const globalBurstSerialRef = useRef(0);
   const cashStreamSerialRef = useRef(0);
   const purchaseDenyAtRef = useRef(0);
@@ -1043,7 +1020,6 @@ export default function PackworksGameClean() {
   const [packTypeIndex, setPackTypeIndex] = useState(0);
   const [packRotation, setPackRotation] = useState("right");
   const selectedPackType = PACK_TYPES[packTypeIndex] || PACK_TYPES[0];
-  const [gameplayCues, setGameplayCues] = useState([]);
   const [globalBursts, setGlobalBursts] = useState([]);
   const [cashStreams, setCashStreams] = useState([]);
   const [resetArmed, setResetArmed] = useState(false);
@@ -1161,14 +1137,6 @@ export default function PackworksGameClean() {
     setHapticsAvailable(getHaptics().supported());
   }, [getHaptics]);
 
-  const playGameplayCue = useCallback((type, label, detail = "", duration = 1_650) => {
-    const id = ++gameplayCueSerialRef.current;
-    setGameplayCues((current) => [...current.slice(-4), { id, type, label, detail }]);
-    window.setTimeout(() => {
-      setGameplayCues((current) => current.filter((cue) => cue.id !== id));
-    }, duration);
-  }, []);
-
   const playCashGains = useCallback((items) => {
     const queued = items
       .filter((item) => item.amount > 0)
@@ -1243,20 +1211,10 @@ export default function PackworksGameClean() {
       queueGlobalBurst("fracture", fractures);
       getHaptics().pulse("burst");
     }
-    const encore = events.find((event) => event.t === "encore");
-    if (encore) playGameplayCue("encore", `ENCORE +${encore.count}`, "BONUS CARDS JOIN THE PACK");
-    const freePacks = events.filter((event) => event.t === "packs").reduce((sum, event) => sum + event.count, 0);
-    if (freePacks > 0) playGameplayCue("packs", `+${freePacks} PACK${freePacks === 1 ? "" : "S"}`, "ADDED TO THE PACK STACK");
-    if (events.some((event) => event.t === "fuseLift")) {
-      playGameplayCue("fusion", "FUSION ↑", "NEXT FUSION CLIMBS");
-    }
-    for (const boon of events.filter((event) => event.t === "boon").slice(0, 2)) {
-      const option = DISCOVER_POOL.find((candidate) => candidate.id === boon.option);
-      if (option) playGameplayCue("boon", option.name.toUpperCase(), "BOON LOADED");
-    }
-    const sets = events.filter((event) => event.t === "setComplete");
-    for (const done of sets) playGameplayCue("set", "SET COMPLETE", getSet(done.setId).name.toUpperCase(), 2_600);
-  }, [getAudio, getHaptics, playCashGains, playGameplayCue, queueGlobalBurst]);
+    // Former gameplay-cue banners (Encore, free packs, Fusion lift, boons,
+    // set completion) are gone; each of those moments still needs its own
+    // bespoke notification treatment.
+  }, [getAudio, getHaptics, playCashGains, queueGlobalBurst]);
 
   useEffect(() => {
     let adminFlag = false;
@@ -1278,7 +1236,6 @@ export default function PackworksGameClean() {
       adminActiveRef.current = true;
       commit(adminState);
       setBinderSetId(adminState.activeSet);
-      window.setTimeout(() => playGameplayCue("mode", "SANDBOX", "ALL CARDS UNLOCKED", 2_600), 300);
       setReady(true);
       return;
     }
@@ -1288,25 +1245,13 @@ export default function PackworksGameClean() {
     } catch {
       loaded = null;
     }
+    // The game only runs while it is open: no offline earnings, no away
+    // report.
     const hydrated = hydrateState(loaded, Date.now());
-    const offline = applyOfflineProgress(hydrated, Date.now());
-    commit(offline.state);
-    setBinderSetId(offline.state.activeSet);
-    if (offline.report) {
-      const parts = [];
-      if (offline.report.coins > 0) {
-        parts.push(`+${money(offline.report.coins)} CASH`);
-        window.setTimeout(() => playCashGains([{ amount: offline.report.coins }]), 300);
-      }
-      if (offline.report.packsOpened > 0) {
-        parts.push(`${offline.report.packsOpened} PACK${offline.report.packsOpened === 1 ? "" : "S"} OPENED${offline.report.newCards ? ` / ${offline.report.newCards} NEW` : ""}`);
-      }
-      if (parts.length) {
-        window.setTimeout(() => playGameplayCue("offline", "TIME AWAY", parts.join(" • "), 3_200), 300);
-      }
-    }
+    commit(hydrated);
+    setBinderSetId(hydrated.activeSet);
     setReady(true);
-  }, [commit, playCashGains, playGameplayCue]);
+  }, [commit]);
 
   useEffect(() => {
     if (!ready) return undefined;
@@ -1438,7 +1383,6 @@ export default function PackworksGameClean() {
         setDrawer(null);
         commit(adminState);
         setBinderSetId(adminState.activeSet);
-        playGameplayCue("mode", "SANDBOX", "ALL CARDS UNLOCKED", 2_600);
       } else {
         window.localStorage.setItem(ADMIN_SAVE_KEY, serializeState(gameRef.current));
         let real = null;
@@ -1453,12 +1397,11 @@ export default function PackworksGameClean() {
         setDrawer(null);
         commit(restored);
         setBinderSetId(restored.activeSet);
-        playGameplayCue("mode", "LIVE SAVE", "SANDBOX CLOSED", 2_200);
       }
     } catch {
       // Local storage can be unavailable in strict privacy modes.
     }
-  }, [closeOpening, commit, playGameplayCue]);
+  }, [closeOpening, commit]);
 
   useEffect(() => {
     const update = () => setViewport({
@@ -1486,26 +1429,51 @@ export default function PackworksGameClean() {
   const openingActiveIndices = useMemo(() => getActiveIndices(openingCards), [openingCards]);
   const overflowActive = Boolean(opening?.overflow);
 
-  // Overflow piles: one entry per distinct revealed card, in default binder
-  // order — rarity low first, then card number.
+  // Overflow piles: one entry per distinct revealed card. New cards append at
+  // the end in first-revealed order, so the board never reshuffles under a
+  // fresh arrival. The sequence tracker survives re-renders (idempotent per
+  // card) and resets with each opening.
+  const pileSeqRef = useRef({ openingId: null, seq: new Map(), next: 0, waveSize: -1 });
   const overflowPiles = useMemo(() => {
     if (!overflowActive || !openingCards) return [];
-    const map = new Map();
+    const tracker = pileSeqRef.current;
+    if (tracker.openingId !== opening?.id) {
+      tracker.openingId = opening?.id;
+      tracker.seq = new Map();
+      tracker.next = 0;
+      tracker.waveSize = -1;
+    }
+    const live = new Map();
     for (const pull of openingCards) {
       if (!pull.revealed || pull.fusedAway) continue;
-      const entry = map.get(pull.card.id);
+      const entry = live.get(pull.card.id);
       if (entry) {
         entry.count += 1;
         entry.foil = entry.foil || Boolean(pull.foil);
       } else {
-        map.set(pull.card.id, { card: pull.card, count: 1, foil: Boolean(pull.foil) });
+        live.set(pull.card.id, { card: pull.card, count: 1, foil: Boolean(pull.foil) });
       }
     }
-    return [...map.values()].sort((left, right) => (
-      RARITIES[left.card.rarity].order - RARITIES[right.card.rarity].order
-      || left.card.number - right.card.number
-    ));
-  }, [overflowActive, openingCards]);
+    for (const [id, entry] of live) {
+      if (!tracker.seq.has(id)) tracker.seq.set(id, { seq: tracker.next++, card: entry.card });
+    }
+    if (tracker.waveSize < 0 && tracker.next > 0) tracker.waveSize = tracker.next;
+    // Once a card has shown on the board it stays for the rest of the
+    // opening; when effects like Fusion consume every copy, its pile greys
+    // out at zero instead of disappearing.
+    const entries = [];
+    for (const [id, meta] of tracker.seq) {
+      const current = live.get(id);
+      entries.push({
+        card: current?.card || meta.card,
+        count: current ? current.count : 0,
+        foil: Boolean(current?.foil),
+        seq: meta.seq,
+      });
+    }
+    entries.sort((left, right) => left.seq - right.seq);
+    return entries;
+  }, [overflowActive, openingCards, opening?.id]);
 
   const overflowUnrevealed = useMemo(() => {
     if (!overflowActive || !openingCards) return { count: 0, marked: 0, mystery: 0 };
@@ -1723,14 +1691,8 @@ export default function PackworksGameClean() {
     }
     if (events.some((event) => event.t === "echo")) audio.sound("fusion", 2);
     if (fusionNotice) {
-      const fusedCard = getCard(fusionNotice.cardId);
       audio.sound("fusion", 4);
       getHaptics().pulse("fuse");
-      playGameplayCue(
-        "fusion",
-        fusionCount > 1 ? `FUSION ×${fusionCount}` : "FUSION",
-        `${fusedCard?.name?.toUpperCase() || "UPGRADED CARD"} REVEALED`,
-      );
       openingTimersRef.current.push(window.setTimeout(() => {
         commitOpening((current) => current?.id === currentOpening.id
           && current.fusionNotice?.serial === fusionNotice.serial
@@ -1764,7 +1726,7 @@ export default function PackworksGameClean() {
         commitOpening(null);
       }, delay + COLLECTION_ANIMATION_MS));
     }
-  }, [commit, commitOpening, getAudio, getHaptics, playGameplayCue, pushFx]);
+  }, [commit, commitOpening, getAudio, getHaptics, pushFx]);
 
   // Mystery and Fracture cards visibly spill into the current deal, then flip
   // through the exact same reveal function as a player-clicked card. Resolving
@@ -1796,39 +1758,29 @@ export default function PackworksGameClean() {
     setMobileAutoHeld(false);
     setSpaceHeld(false);
 
+    // Flooded reveals can hold thousands of cards, so the remaining table is
+    // revealed in single passes and events are concatenated, never spread.
     let state = gameRef.current;
     let cards = currentOpening.result.cards;
-    const events = [];
-    for (let index = 0; index < cards.length; index += 1) {
-      if (cards[index].revealed || cards[index].fusedAway) continue;
-      const step = revealPackCard(state, cards, index, {
-        manual: true,
-        suppressEffects: true,
-      });
-      state = step.state;
-      cards = step.cards;
-      events.push(...step.events);
-    }
+    let events = [];
+    const firstPass = revealAllPackCards(state, cards);
+    state = firstPass.state;
+    cards = firstPass.cards;
+    events = events.concat(firstPass.events);
     const automaticSale = sellDuplicatesDetailed(state, { injectCards: cards });
     state = automaticSale.state;
     cards = automaticSale.cards || cards;
-    events.push(...automaticSale.events);
-    for (let index = 0; index < cards.length; index += 1) {
-      if (cards[index].revealed || cards[index].fusedAway) continue;
-      const step = revealPackCard(state, cards, index, {
-        manual: true,
-        suppressEffects: true,
-      });
-      state = step.state;
-      cards = step.cards;
-      events.push(...step.events);
-    }
+    events = events.concat(automaticSale.events);
+    const secondPass = revealAllPackCards(state, cards);
+    state = secondPass.state;
+    cards = secondPass.cards;
+    events = events.concat(secondPass.events);
     // FINISH is the hard loop breaker: generated cards still join the table and
     // are collected, but their resulting duplicate sale cannot start a new
     // display-effect chain.
     const cleanupSale = sellDuplicatesDetailed(state, { suppressEffects: true });
     state = cleanupSale.state;
-    events.push(...cleanupSale.events);
+    events = events.concat(cleanupSale.events);
     commit(state);
     pushFx(events);
 
@@ -1888,9 +1840,7 @@ export default function PackworksGameClean() {
         const now = Date.now();
         if (now - purchaseDenyAtRef.current > 3_500) {
           purchaseDenyAtRef.current = now;
-          const price = getPackPrice(current, selectedPackType.id, current.activeSet);
           getAudio().sound("deny");
-          playGameplayCue("price", `${money(price)} CASH`, "KEEP HOLDING — PURCHASE RESUMES");
         }
         return;
       }
@@ -1898,10 +1848,7 @@ export default function PackworksGameClean() {
     setRevealEchoes({});
     const rolled = openPack(current, { manual: true, source: selectedPackType.id, now: Date.now() });
     if (!rolled.result) {
-      if (rolled.error === "MANUAL_RATE_CAP") {
-        getAudio().sound("deny");
-        playGameplayCue("pack-deny", "FOIL SETTLING", "");
-      }
+      if (rolled.error === "MANUAL_RATE_CAP") getAudio().sound("deny");
       return;
     }
 
@@ -1952,7 +1899,6 @@ export default function PackworksGameClean() {
     drawer,
     getAudio,
     getHaptics,
-    playGameplayCue,
     pushFx,
     ready,
     selectedCard,
@@ -2170,24 +2116,27 @@ export default function PackworksGameClean() {
     }
   }, [opening, landFlight, overflowLayout]);
 
-  // FLIP: when a fresh pile squeezes into binder order, neighbours glide to
-  // their new spots instead of teleporting.
+  // FLIP: when the pile row rewraps (size steps, fusions), existing piles
+  // glide to their new spots instead of teleporting. Positions come from
+  // offsetLeft/offsetTop, which ignore transforms — so in-flight entrance,
+  // pulse, or earlier FLIP animations can never poison the measurements,
+  // even when passes overlap at high reveal speed.
   useLayoutEffect(() => {
     if (!overflowActive) {
       prevPileRectsRef.current = new Map();
       return;
     }
-    const nextRects = new Map();
+    const nextSpots = new Map();
     for (const [id, el] of pileRefs.current) {
-      if (el?.isConnected) nextRects.set(id, el.getBoundingClientRect());
+      if (el?.isConnected) nextSpots.set(id, { left: el.offsetLeft, top: el.offsetTop });
     }
     const previous = prevPileRectsRef.current;
     const moved = [];
-    for (const [id, rect] of nextRects) {
+    for (const [id, spot] of nextSpots) {
       const before = previous.get(id);
       if (!before) continue;
-      const dx = before.left - rect.left;
-      const dy = before.top - rect.top;
+      const dx = before.left - spot.left;
+      const dy = before.top - spot.top;
       if (Math.abs(dx) + Math.abs(dy) < 3) continue;
       const el = pileRefs.current.get(id);
       el.style.transition = "none";
@@ -2209,7 +2158,7 @@ export default function PackworksGameClean() {
         }, 430);
       });
     }
-    prevPileRectsRef.current = nextRects;
+    prevPileRectsRef.current = nextSpots;
   }, [overflowActive, overflowPiles]);
 
   // Stack feedback: swell when spill cards join the face-down pile, squash
@@ -2252,8 +2201,7 @@ export default function PackworksGameClean() {
     }
     commit(next);
     getAudio().sound("switch");
-    playGameplayCue("case", getCard(cardId)?.name?.toUpperCase() || "CARD SEATED", "ACTIVE IN THE CASE");
-  }, [commit, getAudio, playGameplayCue]);
+  }, [commit, getAudio]);
 
   const handleUndisplay = useCallback((cardId) => {
     const next = undisplayCard(gameRef.current, cardId);
@@ -2295,8 +2243,7 @@ export default function PackworksGameClean() {
     setSelectedCard(null);
     closeOpening();
     getAudio().sound("legendary", 17);
-    playGameplayCue("rewrite", "THE STORY REWRITES", `+${formatNumber(earned)} INSCRIPTIONS`, 3_600);
-  }, [closeOpening, commit, getAudio, playGameplayCue, rewriteArmed]);
+  }, [closeOpening, commit, getAudio, rewriteArmed]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -2653,17 +2600,21 @@ export default function PackworksGameClean() {
                 className={`overflow-piles ${overflowLayout.scrollable ? "is-scrollable" : ""}`.trim()}
                 aria-label={`${overflowPiles.length} distinct cards revealed`}
               >
-                {overflowPiles.map((pile, position) => {
+                {overflowPiles.map((pile) => {
                   const shown = Math.max(0, pile.count - (pendingLand[pile.card.id] || 0));
+                  // Only the initial collapse wave staggers in; later arrivals
+                  // pop immediately at the end of the list.
+                  const inWave = pile.seq < pileSeqRef.current.waveSize;
                   return (
                     <OverflowPile
                       key={pile.card.id}
                       card={pile.card}
                       count={shown}
                       foil={pile.foil}
-                      incoming={shown === 0}
+                      incoming={pile.count > 0 && shown === 0}
+                      depleted={pile.count === 0}
                       pulse={landPulse?.cardId === pile.card.id ? landPulse : null}
-                      enterDelay={Math.min(position * 14, 420)}
+                      enterDelay={inWave ? Math.min(pile.seq * 14, 420) : 0}
                       onRef={getPileRefCallback(pile.card.id)}
                     />
                   );
@@ -2770,7 +2721,6 @@ export default function PackworksGameClean() {
       )}
 
       <CashStreamLayer streams={cashStreams} />
-      <GameplayCueLayer cues={gameplayCues} />
 
       {globalBursts.length > 0 && (
         <GlobalBurstLayer

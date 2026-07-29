@@ -23,7 +23,7 @@ The display case is the core progression engine. There are no duel, filing-rule,
 
 ## Progression
 
-- The player begins with three packs and earns exactly 1 whole cash per second online or away.
+- The player begins with three packs and earns exactly 1 whole cash per second while the game is open. Nothing accrues offline.
 - The binder is a collection view and never generates cash.
 - Selling duplicates keeps one copy of every card and converts every extra copy into cash.
 - Dealer trays improve duplicate sale value.
@@ -48,9 +48,9 @@ Normal pulls use seven tiers: Common (75%), Uncommon (18%), Rare (5%), Epic (1.5
 Pack opening remains deliberately elaborate even though the surrounding game is minimal:
 
 - staged foil handling and tear animation;
-- separately dealt cards, up to one loose card per card in the set;
+- separately dealt cards, up to one standard pack (six) loose on the table;
 - **Overflow mode** past that limit: revealed copies collapse into one counted
-  pile per card (binder order, rarity low first), face-down cards wait in a
+  pile per card (appended in first-revealed order), face-down cards wait in a
   single stack at the top of the screen, and every reveal flies from the stack
   into its pile;
 - hover rarity signals with occasional false positives;
@@ -68,7 +68,7 @@ Manual opening is capped near forty packs per minute. Reduced-motion preferences
 - In the Shop, tap a pack price to buy one or hold it to buy that set rapidly
 - `Escape`: close the current panel, card, or completed opening
 
-Progress and flat offline cash earnings are stored locally. Offline progress never buys or opens product.
+Progress is stored locally. The game only advances while it is open — there is no offline income and nothing opens or generates in the background.
 
 ## Development
 
