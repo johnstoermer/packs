@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ALL_CARDS,
   PACK_TYPES,
@@ -14,9 +14,9 @@ import {
 import {
   ADMIN_FLAG_KEY,
   ADMIN_SAVE_KEY,
+  PACK_SIZE,
   SAVE_KEY,
   applyAdminGuarantees,
-  applyOfflineProgress,
   createAdminState,
   breakProduct,
   buyProduct,
@@ -29,15 +29,13 @@ import {
   getCardSaleValue,
   getDerived,
   getInscriptionsEarned,
-  getFiledIndices,
-  getPendingCardCount,
   getPackPrice,
   getProductCount,
   hydrateState,
   openPack,
-  planRevealBatch,
   reorderDisplayed,
   resolveImmediateFusion,
+  revealAllPackCards,
   revealPackCard,
   rewriteState,
   sellDuplicatesDetailed,
@@ -56,6 +54,7 @@ import {
 } from "../lib/engineCards";
 import { createAudioEngine } from "../lib/audio";
 import { createHapticsEngine } from "../lib/haptics";
+import { solveOverflowLayout } from "../lib/overflowLayout";
 import GlobalBurstLayer from "./GlobalBurstLayer";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
@@ -63,16 +62,18 @@ const PIXEL_ART_VERSION = "20260726-2";
 const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
 const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
 const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
-const DESKTOP_REVEAL_BATCH_SIZE = 72;
-const TABLET_REVEAL_BATCH_SIZE = 12;
-const MOBILE_REVEAL_BATCH_SIZE = 18;
 const MOBILE_REVEAL_COLUMNS = 6;
 const COLLECTION_ANIMATION_MS = 950;
-const FORCE_FINISH_REVEAL_THRESHOLD = 100;
 // Catching up on a long idle can credit several thresholds at once. Two per
 // sweep keeps the parade readable, and because bursts alternate sides by
 // serial, a pair never lands on top of itself.
 const MAX_QUIET_REVEAL_BURSTS = 2;
+// Overflow flight ghosts beyond this land instantly instead of animating.
+const MAX_CONCURRENT_FLIGHTS = 10;
+const FLIGHT_DURATION_MS = 460;
+// Pile cards render at this width and scale down to the solved pile size so
+// their typography shrinks proportionally, like shrunken reveal cards.
+const PILE_BASE_WIDTH = 148;
 
 function countOpeningReveals(events = []) {
   return events.reduce((count, event) => (
@@ -80,10 +81,40 @@ function countOpeningReveals(events = []) {
   ), 0);
 }
 
-function getRevealBatchSize(width, coarsePointer = false) {
-  if (coarsePointer || width <= 700) return MOBILE_REVEAL_BATCH_SIZE;
-  if (width <= 1_000) return TABLET_REVEAL_BATCH_SIZE;
-  return DESKTOP_REVEAL_BATCH_SIZE;
+function countActiveCards(cards = []) {
+  let active = 0;
+  for (const pull of cards) {
+    if (!pull?.fusedAway) active += 1;
+  }
+  return active;
+}
+
+function getActiveIndices(cards = []) {
+  const indices = [];
+  for (let index = 0; index < cards.length; index += 1) {
+    if (!cards[index]?.fusedAway) indices.push(index);
+  }
+  return indices;
+}
+
+function findNextRevealIndex(cards = []) {
+  for (let index = 0; index < cards.length; index += 1) {
+    const pull = cards[index];
+    if (pull && !pull.revealed && !pull.fusedAway) return index;
+  }
+  return -1;
+}
+
+// The board holds at most one standard pack of loose cards. Past that the
+// opening tips into Overflow mode — one face-down stack up top, one counted
+// pile per distinct card below — and stays there for the rest of the reveal.
+function getOverflowFlags(openingValue, cards) {
+  const active = countActiveCards(cards);
+  const overflow = Boolean(openingValue.overflow) || active > PACK_SIZE;
+  return {
+    overflow,
+    canForceFinish: Boolean(openingValue.canForceFinish) || overflow,
+  };
 }
 
 function money(value) {
@@ -392,6 +423,114 @@ const RevealCard = memo(function RevealCard({
   );
 });
 
+function CrestBack({ label }) {
+  return (
+    <span className="card-back back-style-crest">
+      {label && <span className="back-set">{label}</span>}
+      <span className="back-orbit"><i /><i /><i /></span>
+      <span className="back-mark"><span><b>PW</b><small>PACKWORKS</small></span></span>
+      <span className="back-rule" />
+    </span>
+  );
+}
+
+// One counted pile per distinct revealed card while the opening is in
+// Overflow mode. The wrapper is the FLIP target; the inner card carries the
+// landing kick so the two transforms never fight.
+const OverflowPile = memo(function OverflowPile({
+  card,
+  count,
+  foil,
+  incoming,
+  depleted,
+  pulse,
+  enterDelay,
+  onRef,
+}) {
+  const rarity = RARITIES[card.rarity];
+  const set = getSet(card.setId);
+  return (
+    <div
+      ref={onRef}
+      data-card-id={card.id}
+      className={`overflow-pile rarity-${card.rarity} ${incoming ? "is-incoming" : ""} ${depleted ? "is-depleted" : ""} ${count > 1 ? "is-stacked" : ""}`.trim()}
+      style={{
+        "--rarity": rarity.color,
+        "--rarity-deep": rarity.deep,
+        "--set-a": set.colors[0],
+        "--set-b": set.colors[1],
+        "--set-c": set.colors[2],
+        "--enter-delay": `${enterDelay}ms`,
+      }}
+      aria-label={`${card.name}, ${count} ${count === 1 ? "copy" : "copies"} on the table`}
+    >
+      <span className="overflow-pile-under" aria-hidden="true"><i /><i /></span>
+      <span className={`overflow-pile-card ${pulse ? "is-landing" : ""}`.trim()}>
+        <PrintedCard
+          card={card}
+          rarityId={card.rarity}
+          copyLabel="REVEALED"
+          foil={foil}
+          compact
+        />
+        {pulse && (
+          <span key={pulse.serial} className="overflow-land-burst" aria-hidden="true">
+            <i /><i /><i /><i /><i /><i /><i /><i />
+          </span>
+        )}
+      </span>
+      <b className="overflow-pile-count" key={`count-${count}`}>
+        <span aria-hidden="true">×</span>{count}
+      </b>
+    </div>
+  );
+});
+
+function OverflowFlightLayer({ flights, onLand }) {
+  if (!flights.length) return null;
+  return (
+    <div className="overflow-flight-layer" aria-hidden="true">
+      {flights.map((flight) => {
+        const rarity = RARITIES[flight.rarity];
+        const set = getSet(flight.card.setId);
+        return (
+          <div
+            key={flight.serial}
+            className={`overflow-flight rarity-${flight.rarity} ${flight.foil ? "is-foil" : ""}`.trim()}
+            style={{
+              left: `${flight.x}px`,
+              top: `${flight.y}px`,
+              "--fdx": `${flight.dx}px`,
+              "--fdy": `${flight.dy}px`,
+              "--flight-scale": flight.scale,
+              "--rarity": rarity.color,
+              "--rarity-deep": rarity.deep,
+              "--set-a": set.colors[0],
+              "--set-b": set.colors[1],
+              "--set-c": set.colors[2],
+            }}
+            onAnimationEnd={(event) => {
+              if (event.animationName === "overflow-flight-move") onLand(flight.serial);
+            }}
+          >
+            <span className="overflow-flight-inner">
+              <CrestBack />
+              <PrintedCard
+                card={flight.card}
+                rarityId={flight.rarity}
+                copyLabel="REVEALED"
+                foil={flight.foil}
+                compact
+              />
+            </span>
+            <span className="overflow-flight-trail" />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function OpeningImpact({ impact }) {
   if (!impact) return null;
   const rarity = RARITIES[impact.rarity];
@@ -465,25 +604,6 @@ function CashStreamLayer({ streams }) {
           }}
         >
           +{money(stream.amount)}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function GameplayCueLayer({ cues }) {
-  if (!cues.length) return null;
-  return (
-    <div className="gameplay-cue-layer" aria-live="polite">
-      {cues.map((cue) => (
-        <span
-          className={`gameplay-cue cue-${cue.type}`}
-          key={cue.id}
-          style={{ "--cue-slot": cue.id % 3 }}
-        >
-          <span className="gameplay-cue-symbol" aria-hidden="true"><i /><i /><i /></span>
-          <b>{cue.label}</b>
-          {cue.detail && <small>{cue.detail}</small>}
         </span>
       ))}
     </div>
@@ -1035,7 +1155,6 @@ export default function PackworksGameClean() {
   const swipePointerRef = useRef(null);
   const revealLocksRef = useRef(new Set());
   const impactSerialRef = useRef(0);
-  const gameplayCueSerialRef = useRef(0);
   const globalBurstSerialRef = useRef(0);
   const cashStreamSerialRef = useRef(0);
   const purchaseDenyAtRef = useRef(0);
@@ -1050,7 +1169,6 @@ export default function PackworksGameClean() {
   const [packTypeIndex, setPackTypeIndex] = useState(0);
   const [packRotation, setPackRotation] = useState("right");
   const selectedPackType = PACK_TYPES[packTypeIndex] || PACK_TYPES[0];
-  const [gameplayCues, setGameplayCues] = useState([]);
   const [globalBursts, setGlobalBursts] = useState([]);
   const [cashStreams, setCashStreams] = useState([]);
   const [resetArmed, setResetArmed] = useState(false);
@@ -1064,6 +1182,40 @@ export default function PackworksGameClean() {
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [mobileAutoHeld, setMobileAutoHeld] = useState(false);
   const [swipeRevealing, setSwipeRevealing] = useState(false);
+
+  // Overflow mode: flight ghosts travelling from the face-down stack to their
+  // pile, plus the per-pile landing bookkeeping that keeps counters in sync
+  // with the moment a ghost actually arrives.
+  const [flights, setFlights] = useState([]);
+  const [pendingLand, setPendingLand] = useState({});
+  const [landPulse, setLandPulse] = useState(null);
+  const [stackPulse, setStackPulse] = useState(null);
+  const [overflowBanner, setOverflowBanner] = useState(null);
+  const flightsRef = useRef([]);
+  const pendingLandRef = useRef({});
+  const flightQueueRef = useRef([]);
+  const flightTimersRef = useRef(new Map());
+  const flightSerialRef = useRef(0);
+  const overflowStackRef = useRef(null);
+  const overflowBoardRef = useRef(null);
+  const pileRefs = useRef(new Map());
+  const pileRefCallbacksRef = useRef(new Map());
+  const prevPileRectsRef = useRef(new Map());
+  const prevUnrevealedRef = useRef(0);
+
+  // Stable per-card ref callbacks so memoized piles skip re-renders.
+  const getPileRefCallback = useCallback((cardId) => {
+    let callback = pileRefCallbacksRef.current.get(cardId);
+    if (!callback) {
+      callback = (el) => {
+        if (el) pileRefs.current.set(cardId, el);
+        else pileRefs.current.delete(cardId);
+      };
+      pileRefCallbacksRef.current.set(cardId, callback);
+    }
+    return callback;
+  }, []);
+
   const commit = useCallback((nextOrUpdater) => {
     const next = typeof nextOrUpdater === "function" ? nextOrUpdater(gameRef.current) : nextOrUpdater;
     gameRef.current = next;
@@ -1086,6 +1238,45 @@ export default function PackworksGameClean() {
     return audioRef.current;
   }, []);
 
+  const clearFlights = useCallback(() => {
+    flightQueueRef.current = [];
+    for (const timer of flightTimersRef.current.values()) window.clearTimeout(timer);
+    flightTimersRef.current.clear();
+    flightsRef.current = [];
+    pendingLandRef.current = {};
+    prevPileRectsRef.current = new Map();
+    prevUnrevealedRef.current = 0;
+    setFlights([]);
+    setPendingLand({});
+    setLandPulse(null);
+    setStackPulse(null);
+    setOverflowBanner(null);
+  }, []);
+
+  const settlePendingLand = useCallback((cardId) => {
+    const pending = { ...pendingLandRef.current };
+    const left = (pending[cardId] || 0) - 1;
+    if (left > 0) pending[cardId] = left;
+    else delete pending[cardId];
+    pendingLandRef.current = pending;
+    setPendingLand(pending);
+  }, []);
+
+  const landFlight = useCallback((serial, options = {}) => {
+    const flight = flightsRef.current.find((entry) => entry.serial === serial);
+    if (!flight) return;
+    const timer = flightTimersRef.current.get(serial);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      flightTimersRef.current.delete(serial);
+    }
+    flightsRef.current = flightsRef.current.filter((entry) => entry.serial !== serial);
+    setFlights(flightsRef.current);
+    settlePendingLand(flight.cardId);
+    setLandPulse({ cardId: flight.cardId, serial, rarity: flight.rarity });
+    if (!options.silent) getAudio().sound("deal");
+  }, [getAudio, settlePendingLand]);
+
   const getHaptics = useCallback(() => {
     if (!hapticsRef.current) hapticsRef.current = createHapticsEngine();
     hapticsRef.current.setEnabled(gameRef.current.settings.haptics !== false);
@@ -1094,14 +1285,6 @@ export default function PackworksGameClean() {
   useEffect(() => {
     setHapticsAvailable(getHaptics().supported());
   }, [getHaptics]);
-
-  const playGameplayCue = useCallback((type, label, detail = "", duration = 1_650) => {
-    const id = ++gameplayCueSerialRef.current;
-    setGameplayCues((current) => [...current.slice(-4), { id, type, label, detail }]);
-    window.setTimeout(() => {
-      setGameplayCues((current) => current.filter((cue) => cue.id !== id));
-    }, duration);
-  }, []);
 
   const playCashGains = useCallback((items) => {
     const queued = items
@@ -1179,12 +1362,11 @@ export default function PackworksGameClean() {
       getHaptics().pulse("burst");
     }
     // A card revealed with no pack open — Regalynx crossing a cash threshold
-    // while you idle, or catching up on thresholds the passive income earned
-    // while you were away — otherwise lands in the binder with nothing to see.
+    // while you idle — otherwise lands in the binder with nothing to see.
     // When a pack IS open the card spills onto the reveal board instead, and
     // showing it twice would be the noisier lie.
     const openingCanShowSpill = openingRef.current
-      && !["filing", "collecting"].includes(openingRef.current.phase);
+      && openingRef.current.phase !== "collecting";
     if (!openingCanShowSpill) {
       const revealed = events.filter((event) => event.t === "duplicateReveal" && event.cardId);
       for (const event of revealed.slice(0, MAX_QUIET_REVEAL_BURSTS)) {
@@ -1197,20 +1379,10 @@ export default function PackworksGameClean() {
         getHaptics().pulse("reveal");
       }
     }
-    const encore = events.find((event) => event.t === "encore");
-    if (encore) playGameplayCue("encore", `ENCORE +${encore.count}`, "BONUS CARDS JOIN THE PACK");
-    const freePacks = events.filter((event) => event.t === "packs").reduce((sum, event) => sum + event.count, 0);
-    if (freePacks > 0) playGameplayCue("packs", `+${freePacks} PACK${freePacks === 1 ? "" : "S"}`, "ADDED TO THE PACK STACK");
-    if (events.some((event) => event.t === "fuseLift")) {
-      playGameplayCue("fusion", "FUSION ↑", "NEXT FUSION CLIMBS");
-    }
-    for (const boon of events.filter((event) => event.t === "boon").slice(0, 2)) {
-      const option = DISCOVER_POOL.find((candidate) => candidate.id === boon.option);
-      if (option) playGameplayCue("boon", option.name.toUpperCase(), "BOON LOADED");
-    }
-    const sets = events.filter((event) => event.t === "setComplete");
-    for (const done of sets) playGameplayCue("set", "SET COMPLETE", getSet(done.setId).name.toUpperCase(), 2_600);
-  }, [getAudio, getHaptics, playCashGains, playGameplayCue, queueGlobalBurst]);
+    // Former gameplay-cue banners (Encore, free packs, Fusion lift, boons,
+    // set completion) are gone; each of those moments still needs its own
+    // bespoke notification treatment.
+  }, [getAudio, getHaptics, playCashGains, queueGlobalBurst]);
 
   useEffect(() => {
     let adminFlag = false;
@@ -1232,7 +1404,6 @@ export default function PackworksGameClean() {
       adminActiveRef.current = true;
       commit(adminState);
       setBinderSetId(adminState.activeSet);
-      window.setTimeout(() => playGameplayCue("mode", "SANDBOX", "ALL CARDS UNLOCKED", 2_600), 300);
       setReady(true);
       return;
     }
@@ -1242,25 +1413,13 @@ export default function PackworksGameClean() {
     } catch {
       loaded = null;
     }
+    // The game only runs while it is open: no offline earnings, no away
+    // report.
     const hydrated = hydrateState(loaded, Date.now());
-    const offline = applyOfflineProgress(hydrated, Date.now());
-    commit(offline.state);
-    setBinderSetId(offline.state.activeSet);
-    if (offline.report) {
-      const parts = [];
-      if (offline.report.coins > 0) {
-        parts.push(`+${money(offline.report.coins)} CASH`);
-        window.setTimeout(() => playCashGains([{ amount: offline.report.coins }]), 300);
-      }
-      if (offline.report.packsOpened > 0) {
-        parts.push(`${offline.report.packsOpened} PACK${offline.report.packsOpened === 1 ? "" : "S"} OPENED${offline.report.newCards ? ` / ${offline.report.newCards} NEW` : ""}`);
-      }
-      if (parts.length) {
-        window.setTimeout(() => playGameplayCue("offline", "TIME AWAY", parts.join(" • "), 3_200), 300);
-      }
-    }
+    commit(hydrated);
+    setBinderSetId(hydrated.activeSet);
     setReady(true);
-  }, [commit, playCashGains, playGameplayCue]);
+  }, [commit]);
 
   useEffect(() => {
     if (!ready) return undefined;
@@ -1330,18 +1489,14 @@ export default function PackworksGameClean() {
         }
         commitOpening((current) => {
           if (current?.id !== currentOpening.id) return current;
-          const nextStart = swept.cards.findIndex((entry) => !entry.revealed && !entry.fusedAway);
-          const revealedCount = (current.revealedCount || 0) + countOpeningReveals(swept.events);
           return {
             ...current,
             result: { ...current.result, cards: swept.cards },
             phase: current.phase === "complete" ? "ready" : current.phase,
-            batchStart: current.phase === "complete" ? Math.max(0, nextStart) : current.batchStart,
-            batchPending: current.phase === "complete" ? false : current.batchPending,
-            pendingCount: getPendingCardCount(swept.cards),
-            revealedCount,
-            canForceFinish: current.canForceFinish
-              || revealedCount >= FORCE_FINISH_REVEAL_THRESHOLD,
+            ...getOverflowFlags(current, swept.cards),
+            revealed: swept.cards
+              .map((entry, index) => (entry.revealed ? index : -1))
+              .filter((index) => index >= 0),
             impact: current.phase === "complete" ? null : current.impact,
           };
         });
@@ -1365,13 +1520,14 @@ export default function PackworksGameClean() {
   const closeOpening = useCallback(() => {
     clearOpeningTimers();
     clearHoldRevealTimer();
+    clearFlights();
     mobileAutoPointerRef.current = null;
     swipePointerRef.current = null;
     revealLocksRef.current.clear();
     setMobileAutoHeld(false);
     setSwipeRevealing(false);
     commitOpening(null);
-  }, [clearHoldRevealTimer, clearOpeningTimers, commitOpening]);
+  }, [clearFlights, clearHoldRevealTimer, clearOpeningTimers, commitOpening]);
 
   const applyAdminSwitch = useCallback((enabled) => {
     if (enabled === adminActiveRef.current) return;
@@ -1395,7 +1551,6 @@ export default function PackworksGameClean() {
         setDrawer(null);
         commit(adminState);
         setBinderSetId(adminState.activeSet);
-        playGameplayCue("mode", "SANDBOX", "ALL CARDS UNLOCKED", 2_600);
       } else {
         window.localStorage.setItem(ADMIN_SAVE_KEY, serializeState(gameRef.current));
         let real = null;
@@ -1410,12 +1565,11 @@ export default function PackworksGameClean() {
         setDrawer(null);
         commit(restored);
         setBinderSetId(restored.activeSet);
-        playGameplayCue("mode", "LIVE SAVE", "SANDBOX CLOSED", 2_200);
       }
     } catch {
       // Local storage can be unavailable in strict privacy modes.
     }
-  }, [closeOpening, commit, playGameplayCue]);
+  }, [closeOpening, commit]);
 
   useEffect(() => {
     const update = () => setViewport({
@@ -1439,36 +1593,76 @@ export default function PackworksGameClean() {
   }, [ready, applyAdminSwitch]);
 
 
+  const openingCards = opening?.result?.cards;
+  const openingActiveIndices = useMemo(() => getActiveIndices(openingCards), [openingCards]);
+  const overflowActive = Boolean(opening?.overflow);
+
+  // Overflow piles: one entry per distinct revealed card. New cards append at
+  // the end in first-revealed order, so the board never reshuffles under a
+  // fresh arrival. The sequence tracker survives re-renders (idempotent per
+  // card) and resets with each opening.
+  const pileSeqRef = useRef({ openingId: null, seq: new Map(), next: 0, waveSize: -1 });
+  const overflowPiles = useMemo(() => {
+    if (!overflowActive || !openingCards) return [];
+    const tracker = pileSeqRef.current;
+    if (tracker.openingId !== opening?.id) {
+      tracker.openingId = opening?.id;
+      tracker.seq = new Map();
+      tracker.next = 0;
+      tracker.waveSize = -1;
+    }
+    const live = new Map();
+    for (const pull of openingCards) {
+      if (!pull.revealed || pull.fusedAway) continue;
+      const entry = live.get(pull.card.id);
+      if (entry) {
+        entry.count += 1;
+        entry.foil = entry.foil || Boolean(pull.foil);
+      } else {
+        live.set(pull.card.id, { card: pull.card, count: 1, foil: Boolean(pull.foil) });
+      }
+    }
+    for (const [id, entry] of live) {
+      if (!tracker.seq.has(id)) tracker.seq.set(id, { seq: tracker.next++, card: entry.card });
+    }
+    if (tracker.waveSize < 0 && tracker.next > 0) tracker.waveSize = tracker.next;
+    // Once a card has shown on the board it stays for the rest of the
+    // opening; when effects like Fusion consume every copy, its pile greys
+    // out at zero instead of disappearing.
+    const entries = [];
+    for (const [id, meta] of tracker.seq) {
+      const current = live.get(id);
+      entries.push({
+        card: current?.card || meta.card,
+        count: current ? current.count : 0,
+        foil: Boolean(current?.foil),
+        seq: meta.seq,
+      });
+    }
+    entries.sort((left, right) => left.seq - right.seq);
+    return entries;
+  }, [overflowActive, openingCards, opening?.id]);
+
+  const overflowUnrevealed = useMemo(() => {
+    if (!overflowActive || !openingCards) return { count: 0, marked: 0, mystery: 0 };
+    let count = 0;
+    let marked = 0;
+    let mystery = 0;
+    for (const pull of openingCards) {
+      if (pull.revealed || pull.fusedAway) continue;
+      count += 1;
+      if (pull.marked) marked += 1;
+      if (pull.fromMystery) mystery += 1;
+    }
+    return { count, marked, mystery };
+  }, [overflowActive, openingCards]);
+
   // Grid solver: pick the columns-by-rows arrangement that keeps every card
   // of the reveal inside the visible board area at the largest possible
   // size. Columns grow with the pack just like rows — never scrolling.
-  const openingBatchIndices = useMemo(() => planRevealBatch(
-    opening?.result?.cards,
-    opening?.batchStart || 0,
-    opening?.batchSize || getRevealBatchSize(viewport.w, viewport.coarse),
-    opening?.filed,
-  ), [
-    opening?.batchSize,
-    opening?.batchStart,
-    opening?.filed,
-    opening?.result?.cards,
-    viewport.coarse,
-    viewport.w,
-  ]);
-
-  const openingOverflowCount = useMemo(() => {
-    if (!opening?.result?.cards) return 0;
-    let visiblePending = 0;
-    for (const index of openingBatchIndices) {
-      const pull = opening.result.cards[index];
-      if (pull && !pull.revealed && !pull.fusedAway) visiblePending += 1;
-    }
-    return Math.max(0, (opening.pendingCount || 0) - visiblePending);
-  }, [opening?.pendingCount, opening?.result?.cards, openingBatchIndices]);
-
   const boardLayout = useMemo(() => {
     const mobileOpening = viewport.coarse || viewport.w <= 700;
-    const count = openingBatchIndices.length;
+    const count = overflowActive ? 0 : openingActiveIndices.length;
     if (!count) return { count: 0, perRow: 1, rows: 1, shrink: 1, gapX: 0, gapY: 0 };
     const { w, h } = viewport;
     if (mobileOpening) {
@@ -1477,14 +1671,35 @@ export default function PackworksGameClean() {
       const gapX = Math.min(w * 0.135, 74);
       const availW = w * 0.92;
       const availH = h * 0.58;
-      const maxRows = Math.ceil(MOBILE_REVEAL_BATCH_SIZE / MOBILE_REVEAL_COLUMNS);
-      const sW = availW / ((MOBILE_REVEAL_COLUMNS - 1) * gapX + cardW);
-      const sH = availH / (maxRows * (cardH + 16));
-      const shrink = +Math.max(0.55, Math.min(1, sW, sH)).toFixed(3);
+      // Fixed six-wide rows read best on a phone until the board gets deep;
+      // past that the packed solver keeps every card inside the viewport.
+      if (count <= MOBILE_REVEAL_COLUMNS * 7) {
+        const rows = Math.ceil(count / MOBILE_REVEAL_COLUMNS);
+        const sW = availW / ((MOBILE_REVEAL_COLUMNS - 1) * gapX + cardW);
+        const sH = availH / (Math.max(3, rows) * (cardH + 16));
+        const shrink = +Math.max(0.3, Math.min(1, sW, sH)).toFixed(3);
+        return {
+          count,
+          perRow: MOBILE_REVEAL_COLUMNS,
+          rows,
+          shrink,
+          gapX: Math.round(gapX),
+          gapY: Math.round(cardH * shrink + Math.max(8, 16 * shrink)),
+        };
+      }
+      let best = { cols: MOBILE_REVEAL_COLUMNS, rows: Math.ceil(count / MOBILE_REVEAL_COLUMNS), s: 0 };
+      for (let cols = MOBILE_REVEAL_COLUMNS; cols <= 12; cols += 1) {
+        const rows = Math.ceil(count / cols);
+        const sW = availW / ((cols - 1) * gapX + cardW);
+        const sH = availH / (rows * (cardH + 16));
+        const s = Math.min(1, sW, sH);
+        if (s > best.s + 1e-9) best = { cols, rows, s };
+      }
+      const shrink = +Math.max(0.2, Math.min(1, best.s)).toFixed(3);
       return {
         count,
-        perRow: MOBILE_REVEAL_COLUMNS,
-        rows: Math.ceil(count / MOBILE_REVEAL_COLUMNS),
+        perRow: best.cols,
+        rows: best.rows,
         shrink,
         gapX: Math.round(gapX),
         gapY: Math.round(cardH * shrink + Math.max(8, 16 * shrink)),
@@ -1514,9 +1729,24 @@ export default function PackworksGameClean() {
       gapY: Math.round(cardH * shrink + Math.max(8, 20 * shrink)),
     };
   }, [
-    openingBatchIndices.length,
+    openingActiveIndices.length,
+    overflowActive,
     viewport,
   ]);
+
+  // Overflow board solver: size the piles so every distinct card in the set
+  // could sit on screen at once; on surfaces too small for that, the pile
+  // area scrolls instead of shrinking cards into specks.
+  const overflowLayout = useMemo(() => {
+    if (!overflowActive) return null;
+    return solveOverflowLayout({
+      width: viewport.w,
+      height: viewport.h,
+      coarse: viewport.coarse,
+      uniqueCount: overflowPiles.length,
+      setSize: opening?.result?.set?.cards?.length || 98,
+    });
+  }, [overflowActive, overflowPiles.length, opening?.result?.set, viewport]);
 
   const revealCard = useCallback((index) => {
     const currentOpening = openingRef.current;
@@ -1586,19 +1816,8 @@ export default function PackworksGameClean() {
     const impactIndex = fusionNotice?.index ?? index;
     const impactPull = cards[impactIndex] || revealedPull;
     const rarity = RARITIES[impactPull.rarity];
-    const pendingCount = getPendingCardCount(cards);
-    const revealedCount = (currentOpening.revealedCount || 0) + countOpeningReveals(events);
-    const allRevealed = pendingCount === 0;
-    const batchSize = currentOpening.batchSize || DESKTOP_REVEAL_BATCH_SIZE;
-    const batchIndices = planRevealBatch(
-      cards,
-      currentOpening.batchStart || 0,
-      batchSize,
-      currentOpening.filed,
-    );
-    const batchComplete = !allRevealed
-      && batchIndices.length > 0
-      && batchIndices.every((position) => cards[position].revealed || cards[position].fusedAway);
+    const allRevealed = cards.every((entry) => entry.revealed || entry.fusedAway);
+    const overflowFlags = getOverflowFlags(currentOpening, cards);
     const impact = {
       index: impactIndex,
       rarity: impactPull.rarity,
@@ -1609,15 +1828,27 @@ export default function PackworksGameClean() {
       ...currentOpening,
       result: { ...currentOpening.result, cards },
       phase: allRevealed ? "complete" : "ready",
-      batchPending: batchComplete,
-      canForceFinish: currentOpening.canForceFinish
-        || revealedCount >= FORCE_FINISH_REVEAL_THRESHOLD,
-      pendingCount,
-      revealedCount,
-      lastRevealedIndex: impactIndex,
+      ...overflowFlags,
+      revealed: cards.map((entry, position) => (entry.revealed ? position : -1)).filter((position) => position >= 0),
       impact,
       fusionNotice,
     });
+
+    // In Overflow mode every reveal launches a ghost card that flies from the
+    // face-down stack into its pile; the pile counter ticks when it lands.
+    if (overflowFlags.overflow) {
+      flightQueueRef.current.push({
+        serial: ++flightSerialRef.current,
+        cardId: impactPull.card.id,
+        card: impactPull.card,
+        rarity: impactPull.rarity,
+        foil: Boolean(impactPull.foil),
+      });
+      const pending = { ...pendingLandRef.current };
+      pending[impactPull.card.id] = (pending[impactPull.card.id] || 0) + 1;
+      pendingLandRef.current = pending;
+      setPendingLand(pending);
+    }
 
     const audio = getAudio();
     const revealedRarity = RARITIES[revealedPull.rarity];
@@ -1628,52 +1859,14 @@ export default function PackworksGameClean() {
     }
     if (events.some((event) => event.t === "echo")) audio.sound("fusion", 2);
     if (fusionNotice) {
-      const fusedCard = getCard(fusionNotice.cardId);
       audio.sound("fusion", 4);
       getHaptics().pulse("fuse");
-      playGameplayCue(
-        "fusion",
-        fusionCount > 1 ? `FUSION ×${fusionCount}` : "FUSION",
-        `${fusedCard?.name?.toUpperCase() || "UPGRADED CARD"} REVEALED`,
-      );
       openingTimersRef.current.push(window.setTimeout(() => {
         commitOpening((current) => current?.id === currentOpening.id
           && current.fusionNotice?.serial === fusionNotice.serial
           ? { ...current, fusionNotice: null }
           : current);
       }, 1_000));
-    }
-
-    if (batchComplete) {
-      const settleDelay = rarity.order >= 4 ? 800 : rarity.order === 3 ? 620 : 420;
-      const filingDuration = 900;
-      openingTimersRef.current.push(window.setTimeout(() => {
-        commitOpening((current) => current?.id === currentOpening.id
-          ? { ...current, phase: "filing", batchPending: false, impact: null }
-          : current);
-        audio.sound("caseBreak");
-      }, settleDelay));
-      openingTimersRef.current.push(window.setTimeout(() => {
-        commitOpening((current) => {
-          if (current?.id !== currentOpening.id) return current;
-          const nextStart = current.result.cards.findIndex((entry) => !entry.revealed && !entry.fusedAway);
-          if (nextStart < 0) return { ...current, phase: "complete", batchPending: false, impact: null };
-          return {
-            ...current,
-            phase: "ready",
-            batchStart: nextStart,
-            // Everything face-up right now files with this screen — including
-            // cards past the cap that an effect turned — so the next screen
-            // deals only what is still face-down.
-            filed: getFiledIndices(current.result.cards),
-            batchNumber: (current.batchNumber || 1) + 1,
-            batchPending: false,
-            impact: null,
-            fusionNotice: null,
-          };
-        });
-        audio.sound("deal");
-      }, settleDelay + filingDuration));
     }
 
     if (allRevealed) {
@@ -1701,7 +1894,7 @@ export default function PackworksGameClean() {
         commitOpening(null);
       }, delay + COLLECTION_ANIMATION_MS));
     }
-  }, [commit, commitOpening, getAudio, getHaptics, playGameplayCue, pushFx]);
+  }, [commit, commitOpening, getAudio, getHaptics, pushFx]);
 
   // Mystery and Fracture cards visibly spill into the current deal, then flip
   // through the exact same reveal function as a player-clicked card. Resolving
@@ -1709,17 +1902,16 @@ export default function PackworksGameClean() {
   // attribution (including Locklure) for every generated reveal.
   useEffect(() => {
     if (opening?.phase !== "ready") return undefined;
-    const generatedIndex = openingBatchIndices.find((index) => {
-      const pull = opening.result.cards[index];
-      return pull
-        && !pull.revealed
-        && !pull.fusedAway
-        && (pull.fromMystery || pull.fromFracture);
-    });
+    const generatedIndex = opening.result.cards.findIndex((pull) => (
+      pull
+      && !pull.revealed
+      && !pull.fusedAway
+      && (pull.fromMystery || pull.fromFracture)
+    ));
     if (generatedIndex < 0) return undefined;
     const timer = window.setTimeout(() => revealCard(generatedIndex), 180);
     return () => window.clearTimeout(timer);
-  }, [opening?.phase, opening?.result?.cards, openingBatchIndices, revealCard]);
+  }, [opening?.phase, opening?.result?.cards, revealCard]);
 
   const forceFinishOpening = useCallback(() => {
     const currentOpening = openingRef.current;
@@ -1734,56 +1926,46 @@ export default function PackworksGameClean() {
     setMobileAutoHeld(false);
     setSpaceHeld(false);
 
+    // Flooded reveals can hold thousands of cards, so the remaining table is
+    // revealed in single passes and events are concatenated, never spread.
     let state = gameRef.current;
     let cards = currentOpening.result.cards;
-    const events = [];
-    for (let index = 0; index < cards.length; index += 1) {
-      if (cards[index].revealed || cards[index].fusedAway) continue;
-      const step = revealPackCard(state, cards, index, {
-        manual: true,
-        suppressEffects: true,
-      });
-      state = step.state;
-      cards = step.cards;
-      events.push(...step.events);
-    }
+    let events = [];
+    const firstPass = revealAllPackCards(state, cards);
+    state = firstPass.state;
+    cards = firstPass.cards;
+    events = events.concat(firstPass.events);
     const automaticSale = sellDuplicatesDetailed(state, { injectCards: cards });
     state = automaticSale.state;
     cards = automaticSale.cards || cards;
-    events.push(...automaticSale.events);
-    for (let index = 0; index < cards.length; index += 1) {
-      if (cards[index].revealed || cards[index].fusedAway) continue;
-      const step = revealPackCard(state, cards, index, {
-        manual: true,
-        suppressEffects: true,
-      });
-      state = step.state;
-      cards = step.cards;
-      events.push(...step.events);
-    }
+    events = events.concat(automaticSale.events);
+    const secondPass = revealAllPackCards(state, cards);
+    state = secondPass.state;
+    cards = secondPass.cards;
+    events = events.concat(secondPass.events);
     // FINISH is the hard loop breaker: generated cards still join the table and
     // are collected, but their resulting duplicate sale cannot start a new
     // display-effect chain.
     const cleanupSale = sellDuplicatesDetailed(state, { suppressEffects: true });
     state = cleanupSale.state;
-    events.push(...cleanupSale.events);
+    events = events.concat(cleanupSale.events);
     commit(state);
     pushFx(events);
 
-    // The last screenful FINISH resolved, so it collects on screen. Cards
-    // filed with an earlier screen are left out — they already flew.
-    const batchSize = currentOpening.batchSize || DESKTOP_REVEAL_BATCH_SIZE;
-    const activeIndices = cards
-      .map((entry, index) => (!entry.fusedAway && !currentOpening.filed?.has(index) ? index : -1))
-      .filter((index) => index >= 0);
-    const batchStart = activeIndices[Math.max(0, activeIndices.length - batchSize)] || 0;
+    flightQueueRef.current = [];
+    for (const timer of flightTimersRef.current.values()) window.clearTimeout(timer);
+    flightTimersRef.current.clear();
+    flightsRef.current = [];
+    pendingLandRef.current = {};
+    setFlights([]);
+    setPendingLand({});
+    setLandPulse(null);
     commitOpening({
       ...currentOpening,
       result: { ...currentOpening.result, cards },
       phase: "collecting",
-      batchStart,
-      batchPending: false,
-      pendingCount: 0,
+      ...getOverflowFlags(currentOpening, cards),
+      revealed: cards.map((entry, index) => (entry.revealed ? index : -1)).filter((index) => index >= 0),
       impact: null,
       fusionNotice: null,
     });
@@ -1826,9 +2008,7 @@ export default function PackworksGameClean() {
         const now = Date.now();
         if (now - purchaseDenyAtRef.current > 3_500) {
           purchaseDenyAtRef.current = now;
-          const price = getPackPrice(current, selectedPackType.id, current.activeSet);
           getAudio().sound("deny");
-          playGameplayCue("price", `${money(price)} CASH`, "KEEP HOLDING — PURCHASE RESUMES");
         }
         return;
       }
@@ -1836,14 +2016,12 @@ export default function PackworksGameClean() {
     setRevealEchoes({});
     const rolled = openPack(current, { manual: true, source: selectedPackType.id, now: Date.now() });
     if (!rolled.result) {
-      if (rolled.error === "MANUAL_RATE_CAP") {
-        getAudio().sound("deny");
-        playGameplayCue("pack-deny", "FOIL SETTLING", "");
-      }
+      if (rolled.error === "MANUAL_RATE_CAP") getAudio().sound("deny");
       return;
     }
 
     clearOpeningTimers();
+    clearFlights();
     revealLocksRef.current.clear();
     swipePointerRef.current = null;
     setSwipeRevealing(false);
@@ -1860,24 +2038,16 @@ export default function PackworksGameClean() {
     pushFx(rolled.result.events);
 
     const id = `${Date.now()}-${rolled.state.packsOpened}`;
-    commitOpening({
+    const freshOpening = {
       id,
       result: rolled.result,
       phase: "sealed",
-      pendingCount: getPendingCardCount(rolled.result.cards),
-      revealedCount: 0,
-      lastRevealedIndex: null,
+      revealed: [],
       impact: null,
-      batchSize: getRevealBatchSize(
-        window.innerWidth,
-        window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches === true,
-      ),
-      batchStart: 0,
-      filed: null,
-      batchNumber: 1,
-      batchPending: false,
+      overflow: false,
       canForceFinish: false,
-    });
+    };
+    commitOpening({ ...freshOpening, ...getOverflowFlags(freshOpening, rolled.result.cards) });
     const quick = rolled.state.settings.quickOpen;
     const tearDelay = quick ? 80 : 440;
     const dealDelay = quick ? 240 : 1250;
@@ -1890,12 +2060,13 @@ export default function PackworksGameClean() {
       audio.sound("deal");
     }, dealDelay));
   }, [
+    clearFlights,
     clearOpeningTimers,
     commit,
     commitOpening,
     drawer,
     getAudio,
-    playGameplayCue,
+    getHaptics,
     pushFx,
     ready,
     selectedCard,
@@ -1988,22 +2159,20 @@ export default function PackworksGameClean() {
     }
 
     if (opening.phase === "ready") {
-      const visibleIndices = planRevealBatch(
-        opening.result.cards,
-        opening.batchStart || 0,
-        opening.batchSize || DESKTOP_REVEAL_BATCH_SIZE,
-        opening.filed,
-      );
-      const nextIndex = visibleIndices.find((index) => (
-        !opening.result.cards[index].revealed && !opening.result.cards[index].fusedAway
-      ));
+      const nextIndex = findNextRevealIndex(opening.result.cards);
       if (nextIndex >= 0) {
-        const lastIndex = opening.lastRevealedIndex;
+        const lastIndex = opening.revealed.at(-1);
         const lastPull = Number.isInteger(lastIndex) ? opening.result.cards[lastIndex] : null;
         const lastOrder = lastPull ? RARITIES[lastPull.rarity].order : 0;
-        const delay = mobileAutoHeld
-          ? lastOrder >= 4 ? 1500 : lastOrder === 3 ? 1180 : lastOrder === 2 ? 920 : 720
-          : lastOrder >= 4 ? 1250 : lastOrder === 3 ? 900 : lastOrder === 2 ? 650 : 480;
+        // Overflow stacks drain faster: commons whip into their piles while
+        // rare-or-better landings still get room to breathe.
+        const delay = opening.overflow
+          ? (mobileAutoHeld
+            ? lastOrder >= 4 ? 1350 : lastOrder === 3 ? 950 : lastOrder === 2 ? 640 : 460
+            : lastOrder >= 4 ? 1250 : lastOrder === 3 ? 820 : lastOrder === 2 ? 520 : 340)
+          : (mobileAutoHeld
+            ? lastOrder >= 4 ? 1500 : lastOrder === 3 ? 1180 : lastOrder === 2 ? 920 : 720
+            : lastOrder >= 4 ? 1250 : lastOrder === 3 ? 900 : lastOrder === 2 ? 650 : 480);
         holdRevealTimerRef.current = window.setTimeout(() => {
           holdRevealTimerRef.current = null;
           revealCard(nextIndex);
@@ -2043,6 +2212,155 @@ export default function PackworksGameClean() {
     };
   }, [stopMobileAuto, stopSwipeReveal]);
 
+  const revealNextFromStack = useCallback(() => {
+    const currentOpening = openingRef.current;
+    if (!currentOpening || currentOpening.phase !== "ready") return;
+    const nextIndex = findNextRevealIndex(currentOpening.result.cards);
+    if (nextIndex >= 0) revealCard(nextIndex);
+  }, [revealCard]);
+
+  // Turn queued overflow reveals into positioned flight ghosts once the new
+  // piles exist in the DOM. Runs before paint so counters (held back through
+  // pendingLand) never show a value ahead of the animation.
+  useLayoutEffect(() => {
+    if (!flightQueueRef.current.length) return;
+    const queue = flightQueueRef.current;
+    flightQueueRef.current = [];
+    const layerRect = overflowBoardRef.current?.getBoundingClientRect();
+    const stackRect = overflowStackRef.current?.getBoundingClientRect();
+    const pending = { ...pendingLandRef.current };
+    const pulses = [];
+    const settle = (cardId) => {
+      const left = (pending[cardId] || 0) - 1;
+      if (left > 0) pending[cardId] = left;
+      else delete pending[cardId];
+    };
+    const pileW = overflowLayout?.pileW || 60;
+    const additions = [];
+    for (const item of queue) {
+      const pileRect = pileRefs.current.get(item.cardId)?.getBoundingClientRect();
+      if (!layerRect || !stackRect || !pileRect) {
+        settle(item.cardId);
+        pulses.push(item);
+        continue;
+      }
+      const fromX = stackRect.left + stackRect.width / 2 - layerRect.left;
+      const fromY = stackRect.top + stackRect.width * 0.71 - layerRect.top;
+      const toX = pileRect.left + pileRect.width / 2 - layerRect.left;
+      const toY = pileRect.top + pileRect.width * 0.71 - layerRect.top;
+      additions.push({
+        ...item,
+        x: fromX,
+        y: fromY,
+        dx: toX - fromX,
+        dy: toY - fromY,
+        scale: pileW / PILE_BASE_WIDTH,
+      });
+    }
+    let working = [...flightsRef.current, ...additions];
+    while (working.length > MAX_CONCURRENT_FLIGHTS) {
+      const oldest = working.shift();
+      const timer = flightTimersRef.current.get(oldest.serial);
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        flightTimersRef.current.delete(oldest.serial);
+      }
+      settle(oldest.cardId);
+      pulses.push(oldest);
+    }
+    flightsRef.current = working;
+    pendingLandRef.current = pending;
+    setFlights(working);
+    setPendingLand(pending);
+    if (pulses.length) {
+      const last = pulses.at(-1);
+      setLandPulse({ cardId: last.cardId, serial: last.serial, rarity: last.rarity });
+    }
+    for (const flight of additions) {
+      flightTimersRef.current.set(flight.serial, window.setTimeout(
+        () => landFlight(flight.serial),
+        FLIGHT_DURATION_MS + 300,
+      ));
+    }
+  }, [opening, landFlight, overflowLayout]);
+
+  // FLIP: when the pile row rewraps (size steps, fusions), existing piles
+  // glide to their new spots instead of teleporting. Positions come from
+  // offsetLeft/offsetTop, which ignore transforms — so in-flight entrance,
+  // pulse, or earlier FLIP animations can never poison the measurements,
+  // even when passes overlap at high reveal speed.
+  useLayoutEffect(() => {
+    if (!overflowActive) {
+      prevPileRectsRef.current = new Map();
+      return;
+    }
+    const nextSpots = new Map();
+    for (const [id, el] of pileRefs.current) {
+      if (el?.isConnected) nextSpots.set(id, { left: el.offsetLeft, top: el.offsetTop });
+    }
+    const previous = prevPileRectsRef.current;
+    const moved = [];
+    for (const [id, spot] of nextSpots) {
+      const before = previous.get(id);
+      if (!before) continue;
+      const dx = before.left - spot.left;
+      const dy = before.top - spot.top;
+      if (Math.abs(dx) + Math.abs(dy) < 3) continue;
+      const el = pileRefs.current.get(id);
+      el.style.transition = "none";
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      moved.push(el);
+    }
+    if (moved.length) {
+      window.requestAnimationFrame(() => {
+        for (const el of moved) {
+          el.style.transition = "transform 400ms cubic-bezier(0.18, 0.8, 0.24, 1)";
+          el.style.transform = "";
+        }
+        window.setTimeout(() => {
+          for (const el of moved) {
+            if (!el.isConnected) continue;
+            el.style.transition = "";
+            el.style.transform = "";
+          }
+        }, 430);
+      });
+    }
+    prevPileRectsRef.current = nextSpots;
+  }, [overflowActive, overflowPiles]);
+
+  // Stack feedback: swell when spill cards join the face-down pile, squash
+  // when a card launches out of it.
+  useEffect(() => {
+    const previous = prevUnrevealedRef.current;
+    prevUnrevealedRef.current = overflowUnrevealed.count;
+    if (!overflowActive || overflowUnrevealed.count === previous) return;
+    setStackPulse({
+      serial: ++fxSerialRef.current,
+      kind: overflowUnrevealed.count > previous ? "gain" : "launch",
+    });
+  }, [overflowActive, overflowUnrevealed.count]);
+
+  // One-shot OVERFLOW! announcement the moment the reveal tips over.
+  useEffect(() => {
+    if (!overflowActive || !opening?.id || opening.overflowAnnounced) return undefined;
+    commitOpening((current) => (current?.id === opening.id
+      ? { ...current, overflowAnnounced: true }
+      : current));
+    setOverflowBanner({ serial: ++impactSerialRef.current });
+    getAudio().sound("caseBreak");
+    getHaptics().pulse("burst");
+    const timer = window.setTimeout(() => setOverflowBanner(null), 2_600);
+    return () => window.clearTimeout(timer);
+  }, [
+    commitOpening,
+    getAudio,
+    getHaptics,
+    opening?.id,
+    opening?.overflowAnnounced,
+    overflowActive,
+  ]);
+
   const handleDisplay = useCallback((cardId) => {
     const next = displayCard(gameRef.current, cardId, Date.now());
     if (next === gameRef.current) {
@@ -2051,8 +2369,7 @@ export default function PackworksGameClean() {
     }
     commit(next);
     getAudio().sound("switch");
-    playGameplayCue("case", getCard(cardId)?.name?.toUpperCase() || "CARD SEATED", "ACTIVE IN THE CASE");
-  }, [commit, getAudio, playGameplayCue]);
+  }, [commit, getAudio]);
 
   const handleUndisplay = useCallback((cardId) => {
     const next = undisplayCard(gameRef.current, cardId);
@@ -2102,8 +2419,7 @@ export default function PackworksGameClean() {
     setSelectedCard(null);
     closeOpening();
     getAudio().sound("legendary", 17);
-    playGameplayCue("rewrite", "THE STORY REWRITES", `+${formatNumber(earned)} INSCRIPTIONS`, 3_600);
-  }, [closeOpening, commit, getAudio, playGameplayCue, rewriteArmed]);
+  }, [closeOpening, commit, getAudio, rewriteArmed]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -2159,6 +2475,8 @@ export default function PackworksGameClean() {
   useEffect(() => () => {
     clearOpeningTimers();
     clearHoldRevealTimer();
+    for (const timer of flightTimersRef.current.values()) window.clearTimeout(timer);
+    flightTimersRef.current.clear();
   }, [clearHoldRevealTimer, clearOpeningTimers]);
 
   const rotatePackType = useCallback((step) => {
@@ -2213,7 +2531,21 @@ export default function PackworksGameClean() {
         <div className="clean-stage-light" />
         <div className="clean-floor"><i /><i /><i /><i /><i /></div>
         <div className={`stage-case-dock${opening ? " is-opening" : ""}`}>
-          <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
+          <div className="case-dock-row">
+            {opening?.canForceFinish && !["complete", "collecting"].includes(opening.phase) && (
+              <button
+                type="button"
+                className="opening-back-button"
+                onClick={forceFinishOpening}
+                aria-label="Finish opening and collect every card"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M15.5 4.5 8 12l7.5 7.5" />
+                </svg>
+              </button>
+            )}
+            <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
+          </div>
           {Object.keys(game.discoverStack || {}).length > 0 && (
             <div className="discover-stack" aria-label="Pending Discover stacks">
               {Object.entries(game.discoverStack).map(([id, count]) => {
@@ -2221,15 +2553,6 @@ export default function PackworksGameClean() {
                 return <span key={id}>{option?.name || id} ×{count}</span>;
               })}
             </div>
-          )}
-          {opening?.canForceFinish && !["complete", "collecting"].includes(opening.phase) && (
-            <button
-              type="button"
-              className="opening-force-finish"
-              onClick={forceFinishOpening}
-            >
-              FINISH
-            </button>
           )}
         </div>
 
@@ -2361,8 +2684,7 @@ export default function PackworksGameClean() {
 
       {opening && (
         <div
-          className={`opening-layer phase-${opening.phase} clean-opening ${opening.impact ? `screen-impact-${opening.impact.rarity}` : ""}`}
-          data-revealed-count={opening.revealedCount || 0}
+          className={`opening-layer phase-${opening.phase} clean-opening ${overflowActive ? "is-overflow" : ""} ${opening.impact ? `screen-impact-${opening.impact.rarity}` : ""}`}
           style={{
             "--set-a": opening.result.set.colors[0],
             "--set-b": opening.result.set.colors[1],
@@ -2377,45 +2699,119 @@ export default function PackworksGameClean() {
             <span className="tear-shockwave" />
             <PackDebris />
           </div>
-          <div
-            className={`reveal-deck ${swipeRevealing ? "is-swipe-revealing" : ""}`}
-            style={boardLayout.count ? {
-              "--board-gap-x": `${boardLayout.gapX}px`,
-              "--board-gap-y": `${boardLayout.gapY}px`,
-            } : undefined}
-            onPointerDown={startSwipeReveal}
-            onPointerMove={continueSwipeReveal}
-            onPointerUp={stopSwipeReveal}
-            onPointerCancel={stopSwipeReveal}
-          >
-            {openingBatchIndices.map((index, position) => {
-              const pull = opening.result.cards[index];
-              return (
-                <RevealCard
-                  key={`${opening.id}-${index}`}
-                  pull={pull}
-                  index={index}
-                  position={position}
-                  count={boardLayout.count}
-                  perRow={boardLayout.perRow}
-                  rows={boardLayout.rows}
-                  shrink={boardLayout.shrink}
-                  revealed={!!pull.revealed}
-                  echo={revealEchoes[index]}
-                  latest={opening.impact?.index === index}
-                  phase={opening.phase}
-                  onReveal={revealCard}
-                />
-              );
-            })}
-          </div>
-          {openingOverflowCount > 0 && (
-            <small
-              className="opening-overflow-count"
-              aria-live="polite"
+          {!overflowActive && (
+            <div
+              className={`reveal-deck ${swipeRevealing ? "is-swipe-revealing" : ""}`}
+              style={boardLayout.count ? {
+                "--board-gap-x": `${boardLayout.gapX}px`,
+                "--board-gap-y": `${boardLayout.gapY}px`,
+              } : undefined}
+              onPointerDown={startSwipeReveal}
+              onPointerMove={continueSwipeReveal}
+              onPointerUp={stopSwipeReveal}
+              onPointerCancel={stopSwipeReveal}
             >
-              {openingOverflowCount} {openingOverflowCount === 1 ? "CARD" : "CARDS"} NOT ON SCREEN
-            </small>
+              {openingActiveIndices.map((index, position) => {
+                const pull = opening.result.cards[index];
+                return (
+                  <RevealCard
+                    key={`${opening.id}-${index}`}
+                    pull={pull}
+                    index={index}
+                    position={position}
+                    count={boardLayout.count}
+                    perRow={boardLayout.perRow}
+                    rows={boardLayout.rows}
+                    shrink={boardLayout.shrink}
+                    revealed={!!pull.revealed}
+                    echo={revealEchoes[index]}
+                    latest={opening.impact?.index === index}
+                    phase={opening.phase}
+                    onReveal={revealCard}
+                  />
+                );
+              })}
+            </div>
+          )}
+          {overflowActive && overflowLayout && (
+            <div
+              ref={overflowBoardRef}
+              className="overflow-board"
+              style={{
+                "--pile-w": `${overflowLayout.pileW}px`,
+                "--pile-scale": +(overflowLayout.pileW / PILE_BASE_WIDTH).toFixed(4),
+                "--pile-gap": `${overflowLayout.gap}px`,
+                "--piles-top": `${overflowLayout.pilesTop}px`,
+                "--piles-bottom": `${overflowLayout.pilesBottom}px`,
+                "--stack-w": `${overflowLayout.stackW}px`,
+              }}
+            >
+              <button
+                type="button"
+                className={`overflow-stack ${overflowUnrevealed.count === 0 ? "is-empty" : ""} ${spaceHeld || mobileAutoHeld ? "is-auto" : ""}`.trim()}
+                onClick={revealNextFromStack}
+                disabled={overflowUnrevealed.count === 0 || opening.phase !== "ready"}
+                aria-label={overflowUnrevealed.count
+                  ? `Reveal the next of ${overflowUnrevealed.count} face-down cards`
+                  : "Every card is revealed"}
+              >
+                <span
+                  key={stackPulse?.serial || "idle"}
+                  className={`overflow-stack-inner ${stackPulse ? `pulse-${stackPulse.kind}` : ""}`.trim()}
+                >
+                  <span className="overflow-stack-cards" ref={overflowStackRef} aria-hidden="true">
+                    <CrestBack label={opening.result.set.short} />
+                    <CrestBack label={opening.result.set.short} />
+                    <CrestBack label={opening.result.set.short} />
+                  </span>
+                  <span className="overflow-stack-meta">
+                    <b className="overflow-stack-count" key={overflowUnrevealed.count}>
+                      {overflowUnrevealed.count}
+                    </b>
+                    <small className="overflow-stack-label">
+                      {overflowUnrevealed.count ? "UNREVEALED" : "ALL REVEALED"}
+                    </small>
+                    {overflowUnrevealed.marked > 0 && (
+                      <i className="overflow-stack-chip is-marked">{overflowUnrevealed.marked} MARKED</i>
+                    )}
+                    {overflowUnrevealed.mystery > 0 && (
+                      <i className="overflow-stack-chip is-mystery">{overflowUnrevealed.mystery} MYSTERY</i>
+                    )}
+                  </span>
+                </span>
+              </button>
+              <div
+                className={`overflow-piles ${overflowLayout.scrollable ? "is-scrollable" : ""}`.trim()}
+                aria-label={`${overflowPiles.length} distinct cards revealed`}
+              >
+                {overflowPiles.map((pile) => {
+                  const shown = Math.max(0, pile.count - (pendingLand[pile.card.id] || 0));
+                  // Only the initial collapse wave staggers in; later arrivals
+                  // pop immediately at the end of the list.
+                  const inWave = pile.seq < pileSeqRef.current.waveSize;
+                  return (
+                    <OverflowPile
+                      key={pile.card.id}
+                      card={pile.card}
+                      count={shown}
+                      foil={pile.foil}
+                      incoming={pile.count > 0 && shown === 0}
+                      depleted={pile.count === 0}
+                      pulse={landPulse?.cardId === pile.card.id ? landPulse : null}
+                      enterDelay={inWave ? Math.min(pile.seq * 14, 420) : 0}
+                      onRef={getPileRefCallback(pile.card.id)}
+                    />
+                  );
+                })}
+              </div>
+              <OverflowFlightLayer flights={flights} onLand={landFlight} />
+            </div>
+          )}
+          {overflowBanner && (
+            <div key={overflowBanner.serial} className="overflow-banner" aria-live="polite">
+              <span className="overflow-banner-shockwave" aria-hidden="true" />
+              <strong>OVERFLOW!</strong>
+            </div>
           )}
           <OpeningImpact impact={opening.impact} />
           {opening.fusionNotice && (
@@ -2509,7 +2905,6 @@ export default function PackworksGameClean() {
       )}
 
       <CashStreamLayer streams={cashStreams} />
-      <GameplayCueLayer cues={gameplayCues} />
 
       {globalBursts.length > 0 && (
         <GlobalBurstLayer

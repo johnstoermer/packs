@@ -3,6 +3,7 @@ import "./globals.css";
 import "./gameplay-v2.css";
 import "./gameplay-clean.css";
 import "./league-overhaul.css";
+import "./overflow-mode.css";
 import "./card-review.css";
 import "./subset-selector.css";
 import "./mini-sets.css";
