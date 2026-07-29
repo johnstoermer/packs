@@ -48,7 +48,11 @@ Normal pulls use seven tiers: Common (75%), Uncommon (18%), Rare (5%), Epic (1.5
 Pack opening remains deliberately elaborate even though the surrounding game is minimal:
 
 - staged foil handling and tear animation;
-- separately dealt cards, staged in bounded batches for large packs;
+- separately dealt cards, up to one loose card per card in the set;
+- **Overflow mode** past that limit: revealed copies collapse into one counted
+  pile per card (binder order, rarity low first), face-down cards wait in a
+  single stack at the top of the screen, and every reveal flies from the stack
+  into its pile;
 - hover rarity signals with occasional false positives;
 - manual click-to-reveal or a paced hold-Space sequence;
 - rarity-specific impact, lighting, particles, and synthesized audio;
@@ -80,9 +84,10 @@ npm run dev
 ```bash
 npm run build
 npm run build:portal
+npm run build:test
 ```
 
-Both builds are written to `dist/`. The default build packages a Sites-compatible Worker plus root-relative assets. The portal build targets `/games/packs/`.
+The first two builds are written to `dist/`. The default build packages a Sites-compatible Worker plus root-relative assets. The portal build targets `/games/packs/`. The test build is written to `dist-test/` and targets `/games/packs/test/` — publish it with `npm run deploy:test -- --push`, which copies it into a sibling `herm.cool` checkout under `games-test/packs/` and pushes (the portal serves that directory at `https://herm.cool/games/packs/test/`).
 
 ## Assets and UI license
 

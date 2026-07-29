@@ -1,0 +1,686 @@
+/* ==========================================================================
+   OVERFLOW MODE
+   Engages when a reveal holds more cards than the set has entries. All
+   revealed copies collapse into one counted pile per card (binder order,
+   rarity low first) and every face-down card waits in a single stack at the
+   top of the screen. Each reveal launches a ghost card that flies from the
+   stack into its pile.
+   ========================================================================== */
+
+.overflow-board {
+  position: absolute;
+  z-index: 7;
+  inset: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Dock back button — leaves the opening, collecting every remaining card.
+   Styled to match the display case beside it.
+   -------------------------------------------------------------------------- */
+
+.case-dock-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+/* Anchored off the row so the display case itself stays perfectly centered. */
+.opening-back-button {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  display: grid;
+  width: 46px;
+  margin-right: 7px;
+  padding: 0;
+  border: 3px solid var(--league-navy, #052752);
+  border-radius: 10px;
+  background: #edf8ff;
+  box-shadow: 0 5px 0 var(--league-navy, #052752);
+  color: var(--league-navy, #052752);
+  cursor: pointer;
+  place-items: center;
+  pointer-events: auto;
+}
+
+.opening-back-button svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.2;
+}
+
+.opening-back-button:hover,
+.opening-back-button:focus-visible {
+  background: white;
+}
+
+.opening-back-button:active {
+  box-shadow: 0 2px 0 var(--league-navy, #052752);
+  transform: translateY(3px);
+}
+
+/* --------------------------------------------------------------------------
+   Face-down stack
+   -------------------------------------------------------------------------- */
+
+.overflow-stack {
+  position: absolute;
+  z-index: 30;
+  top: clamp(92px, 13vh, 124px);
+  left: 50%;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  /* The league opening layer is click-through; the stack opts back in. */
+  pointer-events: auto;
+  translate: -50% 0;
+  animation: overflow-stack-enter 520ms cubic-bezier(0.16, 0.84, 0.24, 1) backwards;
+}
+
+@keyframes overflow-stack-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.72);
+  }
+}
+
+.overflow-stack:disabled {
+  cursor: default;
+}
+
+.overflow-stack-inner {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.overflow-stack-cards {
+  position: relative;
+  width: var(--stack-w, 112px);
+  flex: none;
+  aspect-ratio: 1 / 1.42;
+}
+
+.overflow-stack-cards .card-back {
+  position: absolute;
+  inset: 0;
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.overflow-stack-cards .card-back:nth-child(1) {
+  filter: brightness(0.68);
+  transform: translate(8px, 10px) rotate(3.6deg);
+}
+
+.overflow-stack-cards .card-back:nth-child(2) {
+  filter: brightness(0.85);
+  transform: translate(-5px, 5px) rotate(-2.6deg);
+}
+
+.overflow-stack-cards .card-back:nth-child(3) {
+  animation: overflow-stack-idle 2.8s ease-in-out infinite;
+}
+
+@keyframes overflow-stack-idle {
+  0%, 100% { transform: translateY(0) rotate(0.5deg); }
+  50% { transform: translateY(-5px) rotate(-0.9deg); }
+}
+
+.overflow-stack:not(:disabled):hover .overflow-stack-cards .card-back:nth-child(3),
+.overflow-stack:not(:disabled):focus-visible .overflow-stack-cards .card-back:nth-child(3) {
+  animation: none;
+  filter: brightness(1.12) drop-shadow(0 0 14px rgba(255, 214, 61, 0.5));
+  transform: translateY(-8px) rotate(-1.4deg);
+}
+
+.overflow-stack:not(:disabled):active .overflow-stack-cards {
+  scale: 1.04 0.94;
+  translate: 0 3px;
+}
+
+.overflow-stack-meta {
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+}
+
+.overflow-stack-count {
+  padding: 1px 12px;
+  border: 3px solid var(--league-navy, #052752);
+  border-radius: 12px;
+  background: var(--league-yellow, #ffd63d);
+  box-shadow: 0 4px 0 var(--league-navy, #052752);
+  color: var(--league-navy, #052752);
+  font-size: clamp(18px, 2.2vw, 26px);
+  font-weight: 950;
+  line-height: 1.35;
+  animation: overflow-count-pop 300ms cubic-bezier(0.2, 0.9, 0.28, 1.3);
+}
+
+.overflow-stack-label {
+  color: rgba(226, 243, 255, 0.88);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 0 rgba(3, 26, 56, 0.8);
+}
+
+.overflow-stack-chip {
+  padding: 2px 7px;
+  border: 2px solid var(--league-navy, #052752);
+  border-radius: 8px;
+  background: #e8f6ff;
+  color: var(--league-navy, #052752);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.09em;
+}
+
+.overflow-stack-chip.is-marked {
+  background: #ffe9c2;
+}
+
+.overflow-stack-chip.is-mystery {
+  background: #eadcff;
+  animation: overflow-chip-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes overflow-chip-glow {
+  0%, 100% { box-shadow: 0 0 0 rgba(178, 121, 255, 0); }
+  50% { box-shadow: 0 0 12px rgba(178, 121, 255, 0.75); }
+}
+
+.overflow-stack.is-auto .overflow-stack-count {
+  animation: overflow-auto-pulse 640ms ease-in-out infinite;
+}
+
+@keyframes overflow-auto-pulse {
+  0%, 100% { box-shadow: 0 4px 0 var(--league-navy, #052752); }
+  50% { box-shadow: 0 4px 0 var(--league-navy, #052752), 0 0 22px rgba(255, 214, 61, 0.85); }
+}
+
+.overflow-stack-inner.pulse-launch {
+  animation: overflow-stack-launch 280ms cubic-bezier(0.22, 0.68, 0.31, 1);
+}
+
+@keyframes overflow-stack-launch {
+  0% { transform: scale(1.05, 0.9) translateY(4px); }
+  100% { transform: none; }
+}
+
+.overflow-stack-inner.pulse-gain {
+  animation: overflow-stack-gain 480ms cubic-bezier(0.16, 0.84, 0.3, 1);
+}
+
+@keyframes overflow-stack-gain {
+  0% { filter: brightness(1.75) drop-shadow(0 0 20px rgba(255, 214, 61, 0.8)); transform: scale(1.14); }
+  100% { transform: none; }
+}
+
+.overflow-stack.is-empty .overflow-stack-inner {
+  animation: overflow-stack-out 480ms cubic-bezier(0.5, 0, 0.74, 0.3) both;
+}
+
+@keyframes overflow-stack-out {
+  to {
+    opacity: 0;
+    transform: scale(0.55) translateY(-16px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Revealed piles
+   -------------------------------------------------------------------------- */
+
+.overflow-piles {
+  position: absolute;
+  top: var(--piles-top, 278px);
+  right: 2.5vw;
+  bottom: var(--piles-bottom, 88px);
+  left: 2.5vw;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pile-gap, 10px);
+  align-content: center;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* Last-resort fallback for screens that cannot fit every pile of the set at
+   a readable size: the pile area scrolls vertically. */
+.overflow-piles.is-scrollable {
+  align-content: flex-start;
+  padding: 4px 2px 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.overflow-pile {
+  position: relative;
+  width: var(--pile-w, 60px);
+  height: calc(var(--pile-w, 60px) * 1.42 + 22px);
+  animation: overflow-pile-enter 460ms cubic-bezier(0.16, 0.84, 0.24, 1) var(--enter-delay, 0ms) backwards;
+  transition: width 300ms ease, height 300ms ease;
+}
+
+@keyframes overflow-pile-enter {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.66);
+  }
+}
+
+.overflow-pile-under {
+  position: absolute;
+  inset: 0 0 22px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.overflow-pile.is-stacked .overflow-pile-under {
+  opacity: 1;
+}
+
+.overflow-pile-under i {
+  position: absolute;
+  inset: 0;
+  border: 2px solid color-mix(in srgb, var(--rarity) 55%, #0a2f52);
+  border-radius: calc(14px * var(--pile-scale, 0.4) + 3px);
+  background: color-mix(in srgb, var(--rarity) 24%, #05294e);
+}
+
+.overflow-pile-under i:nth-child(1) {
+  transform: translate(5px, 6px) rotate(2.2deg);
+}
+
+.overflow-pile-under i:nth-child(2) {
+  transform: translate(-4px, 3px) rotate(-1.6deg);
+}
+
+.overflow-pile-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 148px;
+  height: calc(148px * 1.42);
+  transform: scale(var(--pile-scale, 0.4));
+  transform-origin: top left;
+  transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.overflow-pile-card > .card-front {
+  position: absolute;
+  inset: 0;
+  /* The global card-front rule pre-flips faces for reveal decks; piles show
+     the face directly. */
+  transform: none;
+}
+
+.overflow-pile.is-incoming .overflow-pile-card {
+  opacity: 0.34;
+  filter: saturate(0.35) brightness(0.68);
+}
+
+.overflow-pile.is-incoming .overflow-pile-count {
+  opacity: 0;
+}
+
+.overflow-pile-card.is-landing > .card-front {
+  animation: overflow-pile-kick 430ms cubic-bezier(0.1, 0.84, 0.2, 1) both;
+}
+
+@keyframes overflow-pile-kick {
+  0% {
+    filter: brightness(2.5) drop-shadow(0 0 22px var(--rarity));
+    transform: scale(1.14) translateY(-5px);
+  }
+  45% {
+    filter: brightness(1.35);
+    transform: scale(0.965) translateY(1px);
+  }
+  100% {
+    filter: brightness(1);
+    transform: none;
+  }
+}
+
+.overflow-pile-count {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  display: inline-flex;
+  gap: 1px;
+  align-items: baseline;
+  padding: 0 8px;
+  border: 2px solid var(--league-navy, #052752);
+  border-radius: 9px;
+  background: white;
+  box-shadow: 0 2px 0 var(--league-navy, #052752), inset 0 0 0 1px color-mix(in srgb, var(--rarity) 55%, white);
+  color: var(--league-navy, #052752);
+  font-size: 11px;
+  font-weight: 950;
+  line-height: 1.5;
+  transition: opacity 200ms ease;
+  translate: -50% 0;
+  animation: overflow-count-pop 320ms cubic-bezier(0.2, 0.9, 0.28, 1.34);
+}
+
+.overflow-pile-count span {
+  font-size: 8px;
+  opacity: 0.75;
+}
+
+@keyframes overflow-count-pop {
+  0% { scale: 1.5; filter: brightness(1.6); }
+  100% { scale: 1; filter: brightness(1); }
+}
+
+.overflow-pile.is-stacked .overflow-pile-count {
+  background: var(--league-yellow, #ffd63d);
+}
+
+/* Landing burst: rarity ring plus eight sparks. */
+
+.overflow-land-burst {
+  position: absolute;
+  z-index: 24;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overflow-land-burst::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 58px;
+  height: 78px;
+  border: 4px solid var(--rarity);
+  border-radius: 16px;
+  content: "";
+  animation: overflow-burst-ring 460ms cubic-bezier(0.1, 0.8, 0.24, 1) both;
+  translate: -50% -50%;
+}
+
+@keyframes overflow-burst-ring {
+  0% { opacity: 0.95; scale: 0.55; }
+  100% { opacity: 0; scale: 2.5; }
+}
+
+.overflow-land-burst i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--rarity);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--rarity) 80%, transparent);
+  animation: overflow-burst-spark 520ms cubic-bezier(0.14, 0.8, 0.3, 1) both;
+}
+
+.overflow-land-burst i:nth-child(1) { --angle: 0deg; }
+.overflow-land-burst i:nth-child(2) { --angle: 45deg; }
+.overflow-land-burst i:nth-child(3) { --angle: 90deg; }
+.overflow-land-burst i:nth-child(4) { --angle: 135deg; }
+.overflow-land-burst i:nth-child(5) { --angle: 180deg; }
+.overflow-land-burst i:nth-child(6) { --angle: 225deg; }
+.overflow-land-burst i:nth-child(7) { --angle: 270deg; }
+.overflow-land-burst i:nth-child(8) { --angle: 315deg; }
+
+@keyframes overflow-burst-spark {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--angle)) translateY(-8px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateY(-96px) scale(0.3);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Flight ghosts
+   -------------------------------------------------------------------------- */
+
+.overflow-flight-layer {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overflow-flight {
+  position: absolute;
+  width: 148px;
+  height: calc(148px * 1.42);
+  margin: calc(148px * -0.71) 0 0 -74px;
+  animation: overflow-flight-move 460ms cubic-bezier(0.32, 0.02, 0.18, 1) both;
+  filter:
+    drop-shadow(0 14px 16px rgba(3, 20, 40, 0.5))
+    drop-shadow(0 0 16px color-mix(in srgb, var(--rarity) 50%, transparent));
+  will-change: transform;
+}
+
+@keyframes overflow-flight-move {
+  0% {
+    transform: translate(0, 0) scale(calc(var(--flight-scale, 0.4) * 1.5));
+  }
+  55% {
+    transform:
+      translate(calc(var(--fdx) * 0.55), calc(var(--fdy) * 0.55 - 60px))
+      scale(calc(var(--flight-scale, 0.4) * 1.34));
+  }
+  100% {
+    transform: translate(var(--fdx), var(--fdy)) scale(calc(var(--flight-scale, 0.4) * 0.96));
+  }
+}
+
+.overflow-flight-inner {
+  position: absolute;
+  inset: 0;
+  animation: overflow-flight-flip 460ms cubic-bezier(0.4, 0.05, 0.28, 1) both;
+  transform-style: preserve-3d;
+}
+
+@keyframes overflow-flight-flip {
+  0% { transform: rotateY(0); }
+  100% { transform: rotateY(180deg); }
+}
+
+.overflow-flight-inner .card-back,
+.overflow-flight-inner .card-front {
+  position: absolute;
+  inset: 0;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.overflow-flight-inner .card-front {
+  transform: rotateY(180deg);
+}
+
+.overflow-flight-trail {
+  position: absolute;
+  inset: -34%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--rarity) 50%, transparent), transparent 62%);
+  border-radius: 50%;
+  animation: overflow-trail-fade 460ms ease-out both;
+  filter: blur(7px);
+}
+
+@keyframes overflow-trail-fade {
+  0% { opacity: 0.95; scale: 1.25; }
+  100% { opacity: 0; scale: 0.5; }
+}
+
+/* --------------------------------------------------------------------------
+   OVERFLOW! announcement
+   -------------------------------------------------------------------------- */
+
+.overflow-banner {
+  position: absolute;
+  z-index: 46;
+  top: 42%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.overflow-banner strong {
+  color: var(--league-yellow, #ffd63d);
+  font-size: clamp(40px, 7.5vw, 88px);
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  paint-order: stroke fill;
+  text-shadow:
+    0 6px 0 var(--league-navy, #052752),
+    0 0 38px rgba(255, 214, 61, 0.6);
+  -webkit-text-stroke: 4px var(--league-navy, #052752);
+  animation: overflow-banner-slam 2500ms cubic-bezier(0.08, 0.9, 0.18, 1) both;
+}
+
+@keyframes overflow-banner-slam {
+  0% { opacity: 0; transform: rotate(-6deg) scale(3.6); }
+  11% { opacity: 1; transform: rotate(-6deg) scale(0.98); }
+  16% { transform: rotate(-5deg) scale(1.14); }
+  24%, 80% { opacity: 1; transform: rotate(-6deg) scale(1); }
+  100% { opacity: 0; transform: rotate(-6deg) scale(0.92) translateY(-12px); }
+}
+
+.overflow-banner-shockwave {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  width: 130px;
+  height: 130px;
+  border: 5px solid var(--league-yellow, #ffd63d);
+  border-radius: 50%;
+  animation: overflow-banner-shock 700ms cubic-bezier(0.08, 0.8, 0.2, 1) 60ms both;
+  translate: -50% -50%;
+}
+
+@keyframes overflow-banner-shock {
+  0% { opacity: 0.9; scale: 0.3; }
+  100% { opacity: 0; scale: 6; }
+}
+
+/* --------------------------------------------------------------------------
+   Phase integration
+   -------------------------------------------------------------------------- */
+
+.phase-sealed .overflow-board,
+.phase-torn .overflow-board {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overflow-board {
+  transition: opacity 300ms ease;
+}
+
+.phase-collecting .overflow-stack,
+.phase-collecting .overflow-flight-layer,
+.phase-collecting .overflow-banner {
+  opacity: 0;
+}
+
+.theme-league .phase-collecting .overflow-piles {
+  animation: league-deck-collect 680ms cubic-bezier(0.38, 0, 0.72, 0.35) 140ms both;
+  pointer-events: none;
+}
+
+.phase-collecting .overflow-board {
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Small screens
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .overflow-stack {
+    top: 76px;
+  }
+
+  .overflow-stack-inner {
+    gap: 10px;
+  }
+
+  .overflow-stack-count {
+    padding: 0 9px;
+    border-width: 2px;
+    box-shadow: 0 3px 0 var(--league-navy, #052752);
+    font-size: 16px;
+  }
+
+  .overflow-stack-label {
+    font-size: 7px;
+  }
+
+  .overflow-piles {
+    right: 2vw;
+    left: 2vw;
+  }
+
+  .overflow-pile {
+    height: calc(var(--pile-w, 48px) * 1.42 + 18px);
+  }
+
+  .overflow-pile-count {
+    padding: 0 6px;
+    font-size: 9px;
+  }
+
+  .overflow-banner strong {
+    -webkit-text-stroke: 3px var(--league-navy, #052752);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .overflow-flight {
+    animation-duration: 140ms;
+  }
+
+  .overflow-flight-inner {
+    animation-duration: 140ms;
+  }
+
+  .overflow-flight-trail {
+    display: none;
+  }
+
+  .overflow-pile {
+    animation-duration: 180ms;
+  }
+
+  .overflow-stack-cards .card-back:nth-child(3) {
+    animation: none;
+  }
+
+  .overflow-banner strong {
+    animation-duration: 1100ms;
+  }
+
+  .overflow-banner-shockwave {
+    display: none;
+  }
+}

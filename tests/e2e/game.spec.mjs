@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { LEGACY_CARD_MAP, SETS, getCard } from "../../lib/gameData.js";
+import { LEGACY_CARD_MAP, RARITIES, SETS, getCard } from "../../lib/gameData.js";
 import { SAVE_KEY, advanceBeat, createInitialState } from "../../lib/gameLogic.js";
 
 async function seedState(page, state) {
@@ -138,7 +138,8 @@ test("the pack rotunda presents every real pack type without duplicating wrapper
   await expect(page.locator(".clean-pack-station .pack-title strong")).toHaveText("Standard");
 });
 
-test("desktop mounts at most 72 cards", async ({ page }) => {
+test("a spilling mega reveal mounts every card loose, then tips into Overflow mode", async ({ page }) => {
+  test.setTimeout(90_000);
   const fractureId = SETS[0].cards.find((card) => card.name === "Dawnrift").id;
   const locklureId = SETS[0].cards.find((card) => card.name === "Locklure").id;
   const state = createInitialState(Date.now());
@@ -166,27 +167,159 @@ test("desktop mounts at most 72 cards", async ({ page }) => {
   await page.getByRole("button", { name: "Next pack type" }).click();
   await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(72);
-  await expect(page.getByRole("button", { name: "FINISH" })).toHaveCount(0);
-  await page.waitForTimeout(2_000);
-  await expect(page.locator(".opening-overflow-count")).toContainText(/^\d+ CARDS NOT ON SCREEN$/);
+  // Base pack plus one Fracture spill: 72 loose cards, all mounted at once —
+  // batching is gone. (Locklure grows the board as the spill auto-reveals.)
+  await expect.poll(() => page.locator(".reveal-card").count()).toBeGreaterThanOrEqual(72);
+  // Oversized reveals offer the dock back button from the start.
+  await expect(page.getByRole("button", { name: /Finish opening/ })).toBeVisible();
+  await expect(page.locator(".opening-overflow-count")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/clean-mega-pack.png" });
 
+  // Locklure keeps adding Commons while the Fracture spill auto-reveals, so
+  // the reveal outgrows the 98-card set and tips into Overflow mode.
+  await expect(page.locator(".overflow-stack")).toBeVisible({ timeout: 45_000 });
+  await expect(page.locator(".reveal-card")).toHaveCount(0);
+  await expect(page.locator(".overflow-pile").first()).toBeVisible();
+  await expect(page.locator(".overflow-stack-count")).toHaveText(/^\d+$/);
+  await expect(page.getByRole("button", { name: /Finish opening/ })).toBeVisible();
+  await page.screenshot({ path: "test-results/clean-overflow-board.png" });
+
+  // Wait for the generated-card chain to settle, then reveal one manually
+  // from the face-down stack and watch it fly into a pile.
+  await expect.poll(
+    () => page.locator(".overflow-flight").count(),
+    { timeout: 45_000 },
+  ).toBe(0);
+  const stackBefore = Number(await page.locator(".overflow-stack-count").textContent());
+  expect(stackBefore).toBeGreaterThan(0);
+  const totalPiled = async () => {
+    const counts = await page.locator(".overflow-pile-count").allTextContents();
+    return counts.reduce((sum, text) => sum + (Number(text.replace(/[^0-9]/g, "")) || 0), 0);
+  };
+  const piledBefore = await totalPiled();
+  await page.locator(".overflow-stack").click();
+  await expect(page.locator(".overflow-flight")).toHaveCount(1, { timeout: 2_000 });
+  // The revealed copy lands in its pile; Locklure adds a fresh Common back
+  // into the face-down stack, so the stack count holds steady.
+  await expect.poll(totalPiled, { timeout: 4_000 }).toBeGreaterThanOrEqual(piledBefore + 1);
+  await expect(page.locator(".overflow-stack-count")).toHaveText(String(stackBefore));
+
+  // Piles sit in binder order: rarity low first, then card number.
+  const pileOrder = await page.locator(".overflow-pile").evaluateAll((nodes) => nodes.map((node) => (
+    [...node.classList].find((name) => name.startsWith("rarity-"))
+  )));
+  const rarityRank = { "rarity-common": 0, "rarity-uncommon": 1, "rarity-rare": 2, "rarity-epic": 3, "rarity-legendary": 4, "rarity-mythic": 5, "rarity-divine": 6, "rarity-nameless": 7 };
+  const ranks = pileOrder.map((name) => rarityRank[name] ?? 99);
+  expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
+
+  await page.getByRole("button", { name: /Finish opening/ }).click();
+  await expect(page.locator(".opening-layer.phase-collecting")).toBeVisible({ timeout: 6_000 });
+  await expect(page.locator(".opening-layer")).toHaveCount(0, { timeout: 4_000 });
+});
+
+test("a Salvage flood grows the overflow board with new piles for never-stacked cards", async ({ page }) => {
+  test.setTimeout(150_000);
+  const state = createInitialState(Date.now());
+  state.coins = 1_000_000;
+  state.lifetimeCoins = 1_000_000;
+  state.collection = Object.fromEntries(SETS[0].cards.map((card) => [card.id, 1]));
+  state.bestRarities = Object.fromEntries(SETS[0].cards.map((card) => [card.id, card.rarity]));
+  // Salvatort + Salvoon + Twinmoon + Rarehouse + Dawnrift: bounded Mystery
+  // flood with a rare-or-better floor, so fresh high-tier cards keep landing.
+  state.displayed = [
+    "tideworks-02",
+    "tideworks-07",
+    "tideworks-19",
+    "tideworks-43",
+    "lastarchive-29",
+  ].map((id, index) => ({ id, at: Date.now() + index }));
+  state.sealed[SETS[0].id]["mega-standard"] = 1;
+  state.settings.sound = false;
+  state.settings.quickOpen = true;
+  state.lastSavedAt = Date.now();
+  await seedState(page, advanceBeat(state));
+  await page.goto("/");
+  await page.evaluate(() => {
+    // Deterministic pseudo-random stream (mulberry32, seed 1).
+    let a = 1;
+    Math.random = () => {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  });
+
+  await page.getByRole("button", { name: "Next pack type" }).click();
+  await page.getByRole("button", { name: "Next pack type" }).click();
+  await page.getByRole("button", { name: /Open a pack: Mega Standard/ }).click();
+  await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
+
+  // Held Space drives the reveal; duplicate sales trigger Salvage, and the
+  // Mystery flood pushes the reveal past the 98-card set: Overflow mode.
+  await page.keyboard.down("Space");
+  await expect(page.locator(".overflow-stack")).toBeVisible({ timeout: 90_000 });
+
+  const readPiles = () => page.locator(".overflow-pile").evaluateAll(
+    (nodes) => nodes.map((node) => node.dataset.cardId),
+  );
+  const rarityOf = Object.fromEntries(SETS[0].cards.map((card) => [card.id, card]));
+  const assertBinderOrder = (ids) => {
+    const ranks = ids.map((id) => {
+      const card = rarityOf[id];
+      return RARITIES[card.rarity].order * 1_000 + card.number;
+    });
+    expect([...ranks].sort((left, right) => left - right)).toEqual(ranks);
+  };
+
+  // While the flood runs, cards that never had a pile keep arriving: each
+  // snapshot contains every earlier pile plus new ones, still in binder order.
+  const first = await readPiles();
+  assertBinderOrder(first);
+  await expect.poll(async () => (await readPiles()).length, { timeout: 30_000 })
+    .toBeGreaterThan(first.length);
+  const second = await readPiles();
+  assertBinderOrder(second);
+  for (const id of first) expect(second).toContain(id);
+
+  // Space stays held until the stack drains; Mystery cards auto-reveal in
+  // parallel, then the pack completes on its own.
+  await expect
+    .poll(async () => {
+      const stack = page.locator(".overflow-stack-count");
+      if (!(await stack.count())) return 0;
+      return Number(await stack.textContent());
+    }, { timeout: 110_000 })
+    .toBe(0);
+  await page.keyboard.up("Space");
+
+  const finalIds = await readPiles();
+  assertBinderOrder(finalIds);
+  expect(finalIds.length).toBeGreaterThanOrEqual(40);
+  const tiers = new Set(finalIds.map((id) => rarityOf[id].rarity));
+  expect(tiers.size).toBeGreaterThanOrEqual(3);
+  for (const id of second) expect(finalIds).toContain(id);
+
+  // Every pile of this well-past-the-limit board sits inside the viewport.
   const viewport = page.viewportSize();
-  const bounds = await page.locator(".reveal-card").evaluateAll((nodes) => nodes.map((node) => {
+  const bounds = await page.locator(".overflow-pile").evaluateAll((nodes) => nodes.map((node) => {
     const box = node.getBoundingClientRect();
-    return { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
+    return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width };
   }));
   for (const box of bounds) {
+    expect(box.width).toBeGreaterThanOrEqual(38);
     expect(box.left).toBeGreaterThanOrEqual(0);
     expect(box.top).toBeGreaterThanOrEqual(0);
     expect(box.right).toBeLessThanOrEqual(viewport.width);
     expect(box.bottom).toBeLessThanOrEqual(viewport.height);
   }
+  await page.screenshot({ path: "test-results/clean-overflow-full-board.png" });
 
-  await page.screenshot({ path: "test-results/clean-mega-pack.png" });
+  await expect(page.locator(".opening-layer")).toHaveCount(0, { timeout: 15_000 });
 });
 
-test("mobile lays out up to eighteen cards in fixed rows of six", async ({ page }) => {
+test("mobile mounts a full mega pack in six-wide rows with no batching", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
   const state = createInitialState(Date.now());
   state.coins = 10_000;
@@ -202,36 +335,46 @@ test("mobile lays out up to eighteen cards in fixed rows of six", async ({ page 
   await page.getByRole("button", { name: "Next pack type" }).click();
   await page.getByRole("button", { name: /Buy and open a pack: Mega Standard/ }).click();
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(18);
-  await expect(page.locator(".opening-overflow-count")).toHaveText("18 CARDS NOT ON SCREEN");
+  // Every card of the 36-card pack mounts at once — batching is gone.
+  await expect(page.locator(".reveal-card")).toHaveCount(36);
+  await expect(page.locator(".opening-overflow-count")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Finish opening/ })).toBeVisible();
   await page.waitForTimeout(2_000);
-  const mobileWidths = await page.locator(".reveal-card").evaluateAll(
-    (nodes) => nodes.map((node) => node.getBoundingClientRect().width),
-  );
-  expect(Math.min(...mobileWidths)).toBeGreaterThan(70);
   const rows = await page.locator(".reveal-card").evaluateAll((nodes) => {
     const offsets = nodes.map((node) => node.style.getPropertyValue("--rowoff"));
     return [...new Set(offsets)].map((offset) => offsets.filter((candidate) => candidate === offset).length);
   });
-  expect(rows).toEqual([6, 6, 6]);
+  expect(rows).toEqual([6, 6, 6, 6, 6, 6]);
+  const viewport = page.viewportSize();
+  const bounds = await page.locator(".reveal-card").evaluateAll((nodes) => nodes.map((node) => {
+    const box = node.getBoundingClientRect();
+    return { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
+  }));
+  for (const box of bounds) {
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.top).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(viewport.width);
+    expect(box.bottom).toBeLessThanOrEqual(viewport.height);
+  }
   await expect(page.locator(".stage-case-dock")).toBeVisible();
   await expect(page.locator(".discover-stack")).toBeVisible();
-  await page.screenshot({ path: "test-results/clean-mobile-overflow.png" });
+  await page.screenshot({ path: "test-results/clean-mobile-mega.png" });
+  // The back button sits to the left of the display case, styled like it.
+  const caseLeft = await page.locator(".case-strip").evaluate(
+    (node) => node.getBoundingClientRect().left,
+  );
+  const backBounds = await page.getByRole("button", { name: /Finish opening/ }).evaluate(
+    (node) => node.getBoundingClientRect(),
+  );
+  expect(backBounds.right).toBeLessThanOrEqual(caseLeft + 1);
   const cards = page.locator(".reveal-card");
   for (let index = 0; index < await cards.count(); index += 1) {
     await cards.nth(index).evaluate((node) => node.click());
   }
-  await expect(page.getByRole("button", { name: "FINISH" })).toBeVisible();
-  const badgeBottom = await page.locator(".discover-stack").evaluate(
-    (node) => node.getBoundingClientRect().bottom,
-  );
-  const finishTop = await page.getByRole("button", { name: "FINISH" }).evaluate(
-    (node) => node.getBoundingClientRect().top,
-  );
-  expect(finishTop).toBeGreaterThanOrEqual(badgeBottom);
-  await page.screenshot({ path: "test-results/clean-mobile-finish.png" });
-  await expect(page.locator(".opening-layer.phase-filing")).toBeVisible();
-  await expect(page.locator(".reveal-card")).toHaveCount(18);
+  // No filing phase between screenfuls any more — the pack completes and
+  // collects directly.
+  await expect(page.locator(".opening-layer.phase-collecting")).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator(".opening-layer")).toHaveCount(0, { timeout: 4_000 });
 });
 
 test("mobile keeps a standard six-card pack in one row", async ({ page }) => {
@@ -468,6 +611,7 @@ test("Fusion immediately replaces the earlier card and reveals it through displa
 });
 
 test("generated Mystery cards auto-reveal through the live opening", async ({ page }) => {
+  test.setTimeout(90_000);
   const locklureId = LEGACY_CARD_MAP["crown-11"];
   const salvageId = LEGACY_CARD_MAP["frontier-01"];
   const state = createInitialState(Date.now());
@@ -490,12 +634,21 @@ test("generated Mystery cards auto-reveal through the live opening", async ({ pa
   await expect(page.locator(".opening-layer.phase-ready")).toBeVisible();
   await page.locator(".reveal-card").first().click();
 
-  await expect(page.locator(".reveal-card")).toHaveCount(72);
+  // Salvage floods the reveal with Mystery cards; they auto-reveal, keep
+  // selling as duplicates, and push the opening past the set size.
   await expect.poll(
-    () => page.locator(".reveal-card.is-revealed").count(),
-    { timeout: 5_000 },
-  ).toBeGreaterThan(1);
+    () => page.locator(".reveal-card, .overflow-pile").count(),
+    { timeout: 8_000 },
+  ).toBeGreaterThan(6);
   await expect(page.locator('.case-strip-slot[title="Locklure"]')).toHaveClass(/is-triggered/);
+  await expect(page.locator(".overflow-stack")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".overflow-pile").first()).toBeVisible();
+  await expect(page.locator(".reveal-card")).toHaveCount(0);
+
+  // The back button remains the hard loop breaker for a self-feeding reveal.
+  await page.getByRole("button", { name: /Finish opening/ }).click();
+  await expect(page.locator(".opening-layer.phase-collecting")).toBeVisible({ timeout: 6_000 });
+  await expect(page.locator(".opening-layer")).toHaveCount(0, { timeout: 4_000 });
 });
 
 test("Fracture spill cards auto-reveal without flipping the original pack", async ({ page }) => {
