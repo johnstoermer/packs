@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A clean incremental game about opening card packs, improving a collection, and selling duplicates.",
+  "description": "A clean incremental game about opening card packs, collecting all 50 cards, and wiring the display case into an engine of Cash and Scrap.",
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/build-static.mjs",
@@ -14,8 +14,7 @@
     "test": "node --test tests/*.test.mjs",
     "test:e2e": "playwright test",
     "art:pixellab": "node scripts/generate-pixellab-art.mjs",
-    "art:audit": "node scripts/audit-pixellab-art.mjs",
-    "simulate": "node scripts/simulate-balance.mjs"
+    "art:audit": "node scripts/audit-pixellab-art.mjs"
   },
   "dependencies": {
     "augmented-ui": "^2.0.0",

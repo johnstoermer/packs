@@ -1,495 +1,406 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as gameLogic from "../lib/gameLogic.js";
 import {
-  BASE_PASSIVE_RATE,
-  BINDER_PAYOUT_SCALE,
-  MANUAL_RATE_CAP_MS,
-  NAMELESS_CARD_ID,
-  SAVE_VERSION,
-  advanceBeat,
-  revealAllPackCards,
-  breakProduct,
-  buyProduct,
-  buyUpgrade,
+  PACK_SIZE,
+  buyPack,
+  clearOpeningQueue,
   createInitialState,
-  getBinderIncome,
-  getCurrentBeat,
-  getDuplicateCount,
-  getDuplicateSaleValue,
-  getFusionLevel,
-  getPackPrice,
-  getProductCount,
-  getSetUnlockStatus,
-  getUpgradeCost,
+  displayCard,
+  enqueueReveal,
   hydrateState,
+  isOpeningSettled,
   openPack,
-  revealPackCard,
-  sellDuplicates,
-  tickEconomy,
+  reorderDisplayed,
+  stepOpening,
+  storedSaveDominates,
+  undisplayCard,
 } from "../lib/gameLogic.js";
-import {
-  ALL_CARDS,
-  LEGACY_CARD_MAP,
-  PACK_PRODUCTS,
-  PACK_TYPES,
-  RARITIES,
-  SETS,
-  getCard,
-} from "../lib/gameData.js";
-import { CORE_ART_TRANSFERS } from "../lib/coreArtTransfers.js";
-import { CORE_CARD_IDS } from "../lib/coreSetManifest.js";
+import { ALL_CARDS, RARITIES } from "../lib/gameData.js";
 
-const L = (legacyId) => LEGACY_CARD_MAP[legacyId] || legacyId;
-const FIRST = SETS[0].id;
-
-function clone(value) {
-  return structuredClone(value);
+// A deterministic rng: yields the listed values in order, then repeats the
+// last one forever.
+function rngSeq(values) {
+  let index = 0;
+  return () => values[Math.min(index++, values.length - 1)];
 }
 
-
-function openAndRevealAll(state, options) {
-  const opened = openPack(state, options);
-  if (!opened.result) return opened;
-  let working = opened.state;
-  let cards = opened.result.cards;
-  for (let index = 0; index < cards.length; index += 1) {
-    if (cards[index].revealed || cards[index].fusedAway) continue;
-    const step = revealPackCard(working, cards, index, { manual: options?.manual !== false, rng: options?.rng });
-    working = step.state;
-    cards = step.cards;
-  }
-  return { state: working, result: { ...opened.result, cards }, error: null };
+function findCard(name) {
+  const card = ALL_CARDS.find((entry) => entry.name === name);
+  assert.ok(card, `card ${name} exists`);
+  return card;
 }
 
-test("a new game starts with three packs and no cards", () => {
-  const state = createInitialState(1);
-  assert.equal(getProductCount(state, FIRST, "loose"), 3);
-  assert.deepEqual(state.collection, {});
-  assert.equal(state.coins, 0);
-  assert.equal(state.packsOpened, 0);
-});
+function vanillaCardOf(rarity) {
+  const card = ALL_CARDS.find((entry) => entry.rarity === rarity && !entry.effectId);
+  assert.ok(card, `vanilla ${rarity} exists`);
+  return card;
+}
 
-test("buying product changes pack stock but can never create a card", () => {
-  const state = { ...createInitialState(1), coins: 500 };
-  const beforeCollection = clone(state.collection);
-  const next = buyProduct(state, "loose");
-  assert.equal(getProductCount(next, FIRST, "loose"), 4);
-  assert.deepEqual(next.collection, beforeCollection);
-  assert.equal(next.coins, 400);
-});
+function makeState({ caseNames = [], cash = 0, scrap = 0, packs = 3 } = {}) {
+  const state = createInitialState(0);
+  state.cash = cash;
+  state.scrap = scrap;
+  state.packs = packs;
+  // Meet every case milestone so all six slots are legal in tests.
+  state.packsOpened = 100;
+  for (const card of ALL_CARDS.slice(0, 30)) state.collection[card.id] = 1;
+  for (const name of caseNames) state.collection[findCard(name).id] = 1;
+  state.displayed = caseNames.map((name) => ({ id: findCard(name).id }));
+  return state;
+}
 
-test("pack prices stay simple as opened volume grows", () => {
-  const fresh = createInitialState(1);
-  const knownBuyer = { ...fresh, packsOpened: 866 };
-  assert.equal(getPackPrice(fresh, "loose"), 100);
-  assert.equal(getPackPrice(knownBuyer, "loose"), 100);
-});
-
-test("the five pack types have exact prices, concise copy, and distinct wrapper creatures", () => {
-  const state = createInitialState(1);
-  assert.deepEqual(PACK_TYPES.map((packType) => packType.name), [
-    "Standard",
-    "Rare",
-    "Mega Standard",
-    "Mega Rare",
-    "Collector",
-  ]);
-  assert.deepEqual(PACK_TYPES.map((packType) => getPackPrice(state, packType.id)), [
-    100,
-    10_000,
-    10_000,
-    1_000_000,
-    10_000,
-  ]);
-  assert.deepEqual(PACK_TYPES.map((packType) => packType.cardCount), [6, 6, 36, 36, 6]);
-  assert.deepEqual(PACK_TYPES[0].featuredNames, ["Bankslime", "Coinbud", "Packross"]);
-  assert.equal(new Set(PACK_TYPES.flatMap((packType) => packType.featuredNames)).size, 15);
-  for (const packType of PACK_TYPES) {
-    assert.doesNotMatch(packType.description, /\d|\bcash\b/i);
-  }
-});
-
-test("premium pack types change the actual deal", () => {
-  const state = createInitialState(1);
-  const rare = openPack(state, { manual: true, free: true, source: "rare", rng: () => 0.99 });
-  const megaStandard = openPack(state, { manual: true, free: true, source: "mega-standard", rng: () => 0.99 });
-  const megaRare = openPack(state, { manual: true, free: true, source: "mega-rare", rng: () => 0.99 });
-  const collector = openPack(state, { manual: true, free: true, source: "collector", rng: () => 0.99 });
-
-  assert.equal(rare.result.cards.length, 6);
-  assert.ok(rare.result.cards.every((pull) => RARITIES[pull.rarity].order >= RARITIES.rare.order));
-  assert.equal(megaStandard.result.cards.length, 36);
-  assert.equal(megaRare.result.cards.length, 36);
-  assert.ok(megaRare.result.cards.every((pull) => RARITIES[pull.rarity].order >= RARITIES.rare.order));
-  assert.ok(collector.result.cards.some((pull) => pull.foil));
-});
-
-test("supplier terms reduce purchase cost", () => {
-  const state = { ...createInitialState(1), upgrades: { ...createInitialState(1).upgrades, supplier: 2 } };
-  assert.equal(getPackPrice(state, "loose"), 95);
-  assert.equal(Number.isInteger(getPackPrice(state, "loose")), true);
-});
-
-test("opening consumes one pack; cards file into the binder as they are revealed", () => {
-  const state = { ...createInitialState(1), coins: 17 };
-  const opened = openPack(state, { manual: true, now: 2_000, rng: () => 0.99 });
-  assert.equal(opened.error, null);
-  assert.equal(opened.result.cards.length, 6);
-  assert.equal(opened.state.cardsPulled, 0);
-  assert.equal(Object.keys(opened.state.collection).length, 0);
-  assert.equal(getProductCount(opened.state, FIRST, "loose"), 2);
-
-  const revealed = openAndRevealAll(state, { manual: true, now: 2_000, rng: () => 0.99 });
-  assert.equal(revealed.state.cardsPulled, 6);
-  assert.equal(revealed.state.coins, 17);
-  assert.ok(Object.keys(revealed.state.collection).length > 0);
-});
-
-test("cash income is a flat one per second and the binder pays nothing", () => {
-  const state = createInitialState(1);
-  const opened = openPack(state, { manual: true, now: 2_000, rng: () => 0.99 });
-  assert.equal(getBinderIncome(opened.state), 0);
-  assert.equal(BINDER_PAYOUT_SCALE, 0);
-  assert.equal(BASE_PASSIVE_RATE, 1);
-  assert.equal(tickEconomy(opened.state, 1).coins, opened.state.coins + 1);
-
-  let ticking = opened.state;
-  for (let step = 0; step < 3; step += 1) {
-    ticking = tickEconomy(ticking, 0.25);
-    assert.equal(ticking.coins, opened.state.coins);
-    assert.equal(Number.isInteger(ticking.coins), true);
-  }
-  ticking = tickEconomy(ticking, 0.25);
-  assert.equal(ticking.coins, opened.state.coins + 1);
-  assert.equal(Number.isInteger(ticking.coins), true);
-});
-
-test("the seven normal rarities use a coherent 100% ladder with Nameless outside it", () => {
-  const expected = {
-    common: 0.75,
-    uncommon: 0.18,
-    rare: 0.05,
-    epic: 0.015,
-    legendary: 0.004,
-    mythic: 0.0009,
-    divine: 0.0001,
-    nameless: 0,
-  };
-  assert.equal(Object.keys(RARITIES).length, 8);
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(RARITIES).map(([id, rarity]) => [id, rarity.odds])),
-    expected,
-  );
-  assert.equal(
-    Object.entries(RARITIES)
-      .filter(([id]) => id !== "nameless")
-      .reduce((total, [, rarity]) => total + rarity.odds, 0),
-    1,
-  );
-  assert.deepEqual(
-    Object.values(RARITIES).map((rarity) => rarity.order),
-    Array.from({ length: 8 }, (_, index) => index),
-  );
-  assert.ok(Object.values(RARITIES).every((rarity) => rarity.border && rarity.rateLabel));
-  assert.ok(Object.values(RARITIES).every((rarity, index, all) => index === 0 || rarity.sellValue > all[index - 1].sellValue));
-});
-
-test("the 98-card set has fewer cards at every higher normal rarity", () => {
-  assert.equal(SETS.length, 1);
-  assert.equal(SETS[0].id, "core");
-  assert.equal(ALL_CARDS.length, 98);
-  assert.deepEqual(ALL_CARDS.map((card) => card.id), CORE_CARD_IDS);
-  assert.equal(new Set(SETS.map((set) => set.id)).size, SETS.length);
-  assert.equal(new Set(ALL_CARDS.map((card) => card.id)).size, ALL_CARDS.length);
-  assert.equal(new Set(ALL_CARDS.map((card) => card.name)).size, ALL_CARDS.length);
-  assert.ok(ALL_CARDS.every((card) => /^[A-Z][A-Za-z]+$/.test(card.name)));
-  assert.ok(ALL_CARDS.every((card) => card.flavor && card.flavor.endsWith(".")));
-  assert.equal(SETS[0].cards.length, 98);
-  assert.deepEqual(new Set(ALL_CARDS.map((card) => card.rarity)), new Set(Object.keys(RARITIES)));
-
-  const distribution = Object.fromEntries(Object.keys(RARITIES).map((rarity) => [
+function pullOf(rarity, { revealed = false, foil = false } = {}) {
+  return {
+    card: vanillaCardOf(rarity),
     rarity,
-    ALL_CARDS.filter((card) => card.rarity === rarity).length,
-  ]));
-  assert.deepEqual(distribution, {
-    common: 25,
-    uncommon: 21,
-    rare: 16,
-    epic: 12,
-    legendary: 9,
-    mythic: 8,
-    divine: 6,
-    nameless: 1,
-  });
-  const normalCounts = Object.keys(RARITIES)
-    .filter((rarity) => rarity !== "nameless")
-    .map((rarity) => distribution[rarity]);
-  assert.ok(normalCounts.every((count, index) => index === 0 || count < normalCounts[index - 1]));
-  assert.equal(SETS[0].cards.at(-1).name, "Nameling");
-  assert.equal(SETS[0].cards.at(-1).rarity, "nameless");
-  assert.deepEqual(SETS[0].unlockRequirements, []);
+    foil,
+    revealed,
+    salvaged: false,
+    fusedAway: false,
+    isNew: false,
+  };
+}
 
-  assert.equal(Object.keys(LEGACY_CARD_MAP).length, 98);
-  assert.equal(new Set(Object.values(LEGACY_CARD_MAP)).size, 98);
-  for (const [legacyId, liveId] of Object.entries(LEGACY_CARD_MAP)) {
-    assert.ok(getCard(liveId), legacyId);
+function makeSession(pulls, queue = []) {
+  return {
+    id: "test-opening",
+    cards: pulls,
+    queue,
+    revealsDone: pulls.filter((pull) => pull.revealed).length,
+  };
+}
+
+function drainQueue(state, session, rng, maxSteps = 100) {
+  let working = { state, session };
+  for (let step = 0; step < maxSteps; step += 1) {
+    if (working.session.queue.length === 0) break;
+    working = stepOpening(working.state, working.session, { rng });
   }
-  assert.equal(Object.keys(CORE_ART_TRANSFERS).length, 47);
-  assert.equal(ALL_CARDS.filter((card) => card.artTransferredFrom).length, 47);
+  return working;
+}
+
+test("there is no passive income and no timer hooks in the logic layer", () => {
+  assert.ok(!("tickEconomy" in gameLogic));
+  assert.ok(!("getPassiveIncomeRate" in gameLogic));
+  assert.ok(!("evaluateIdleThresholds" in gameLogic));
 });
 
-test("every card keeps its authored rarity in pulls and migrated saves", () => {
-  const state = {
-    ...createInitialState(1),
-    collection: { [L("corner-02")]: 1 },
-    bestRarities: { [L("corner-02")]: "nameless" },
-  };
-  const migrated = hydrateState(state, 2);
-  assert.equal(migrated.bestRarities[L("corner-02")], getCard(L("corner-02")).rarity);
-
-  const highRoll = openAndRevealAll(migrated, { manual: true, free: true, now: 2_000, rng: () => 0 });
-  assert.ok(highRoll.result.cards.every((pull) => pull.rarity === pull.card.rarity));
-  assert.ok(Object.entries(highRoll.state.bestRarities).every(([id, rarity]) => getCard(id)?.rarity === rarity));
-
-  const commonRoll = openAndRevealAll(createInitialState(1), {
-    manual: true,
-    free: true,
-    now: 2_000,
-    rng: () => 0.99,
-  });
-  const common = commonRoll.result.cards.find((pull) => pull.rarity === "common");
-  assert.ok(common);
-  assert.equal(common.rarity, common.card.rarity);
-  assert.equal(commonRoll.state.bestRarities[common.card.id], common.card.rarity);
+test("openPack consumes a sealed pack and deals six cards", () => {
+  const state = makeState({ packs: 1 });
+  const opened = openPack(state, { rng: rngSeq([0.5]) });
+  assert.equal(opened.error, null);
+  assert.equal(opened.state.packs, 0);
+  assert.equal(opened.session.cards.length, PACK_SIZE);
+  assert.equal(opened.session.queue.length, 0);
+  const again = openPack(opened.state, { rng: rngSeq([0.5]) });
+  assert.equal(again.error, "NO_STOCK");
+  assert.equal(again.session, null);
 });
 
-test("retired rarity totals migrate into Mythic and Divine", () => {
-  const migrated = hydrateState({
-    ...createInitialState(1),
-    rarityPulls: {
-      exalted: 2,
-      astral: 3,
-      divine: 4,
-      eternal: 5,
-      singularity: 7,
-    },
-  }, 2);
-  assert.equal(migrated.rarityPulls.mythic, 9);
-  assert.equal(migrated.rarityPulls.divine, 12);
-  assert.equal("exalted" in migrated.rarityPulls, false);
-  assert.equal("singularity" in migrated.rarityPulls, false);
+test("rapidly queued reveals process strictly one at a time, in order", () => {
+  const state = makeState({});
+  let session = makeSession([pullOf("common"), pullOf("common"), pullOf("common")]);
+  session = enqueueReveal(session, 2);
+  session = enqueueReveal(session, 0);
+  session = enqueueReveal(session, 1);
+  assert.equal(session.queue.length, 3);
+
+  const rng = rngSeq([0.99]);
+  let outcome = stepOpening(state, session, { rng });
+  assert.deepEqual(outcome.action, { type: "reveal", index: 2 });
+  assert.equal(outcome.session.cards[2].revealed, true);
+  assert.equal(outcome.session.cards[0].revealed, false);
+
+  outcome = stepOpening(outcome.state, outcome.session, { rng });
+  assert.deepEqual(outcome.action, { type: "reveal", index: 0 });
+  outcome = stepOpening(outcome.state, outcome.session, { rng });
+  assert.deepEqual(outcome.action, { type: "reveal", index: 1 });
+  assert.equal(outcome.session.queue.length, 0);
+  assert.equal(outcome.state.cash, 3);
+  assert.ok(isOpeningSettled(outcome.session));
 });
 
-test("Nameless cannot roll early and appears once after the other 97 cards", () => {
-  const early = openPack(createInitialState(1), {
-    manual: true,
-    free: true,
-    source: "mega-rare",
-    rng: () => 0,
-  });
-  assert.equal(early.result.cards.some((pull) => pull.card.id === NAMELESS_CARD_ID), false);
-
-  const ready = createInitialState(1);
-  for (const card of ALL_CARDS) {
-    if (card.id === NAMELESS_CARD_ID) continue;
-    ready.collection[card.id] = 1;
-    ready.bestRarities[card.id] = card.rarity;
-  }
-  const winning = openPack(ready, { manual: true, free: true, source: "mega-standard", rng: () => 0.99 });
-  const namelessIndex = winning.result.cards.findIndex((pull) => pull.card.id === NAMELESS_CARD_ID);
-  assert.ok(namelessIndex >= 0);
-  assert.equal(winning.result.cards.filter((pull) => pull.card.id === NAMELESS_CARD_ID).length, 1);
-  assert.ok(winning.result.events.some((event) => event.t === "namelessUnlocked"));
-
-  const revealed = revealPackCard(winning.state, winning.result.cards, namelessIndex, {
-    manual: true,
-    rng: () => 0.99,
-  });
-  const later = openPack(revealed.state, { manual: true, free: true, rng: () => 0 });
-  assert.equal(later.result.cards.some((pull) => pull.card.id === NAMELESS_CARD_ID), false);
+test("enqueueReveal ignores duplicates and already-revealed cards", () => {
+  let session = makeSession([pullOf("common"), pullOf("common", { revealed: true })]);
+  session = enqueueReveal(session, 0);
+  session = enqueueReveal(session, 0);
+  session = enqueueReveal(session, 1);
+  assert.equal(session.queue.length, 1);
 });
 
-test("manual opening retains a measured rate cap", () => {
-  const state = createInitialState(1);
-  const first = openPack(state, { manual: true, now: 10_000, rng: () => 0.99 }).state;
-  const capped = openPack(first, { manual: true, now: 10_000 + MANUAL_RATE_CAP_MS - 1, rng: () => 0.99 });
-  const allowed = openPack(first, { manual: true, now: 10_000 + MANUAL_RATE_CAP_MS, rng: () => 0.99 });
-  assert.equal(capped.error, "MANUAL_RATE_CAP");
-  assert.equal(allowed.error, null);
+test("reveals pay cash by rarity, foil pays double, new cards join the collection", () => {
+  const state = makeState({});
+  const rareCard = pullOf("rare", { foil: true });
+  let session = makeSession([rareCard]);
+  session = enqueueReveal(session, 0);
+  const outcome = stepOpening(state, session, { rng: rngSeq([0.99]) });
+  assert.equal(outcome.state.cash, RARITIES.rare.sellValue * 2);
+  assert.equal(outcome.session.cards[0].isNew, true);
+  assert.equal(outcome.state.collection[rareCard.card.id], 1);
+  assert.equal(outcome.state.foils[rareCard.card.id], 1);
+
+  // The same card again is a duplicate, not new.
+  let second = makeSession([pullOf("rare")]);
+  second.cards[0].card = rareCard.card;
+  second = enqueueReveal(second, 0);
+  const dupOutcome = stepOpening(outcome.state, second, { rng: rngSeq([0.99]) });
+  assert.equal(dupOutcome.session.cards[0].isNew, false);
+  assert.equal(dupOutcome.state.collection[rareCard.card.id], 2);
 });
 
-test("rarity signals may bluff without changing the printed pull", () => {
-  const state = createInitialState(1);
-  const result = openPack(state, { manual: true, free: true, rng: () => 0.01 }).result;
-  assert.ok(result.cards.some((pull) => pull.falseSignal));
-  assert.ok(result.cards.some((pull) => RARITIES[pull.signalRarity].order > RARITIES[pull.rarity].order));
+test("Coinbud doubles Common cash; Omniecho makes reveal triggers fire twice", () => {
+  const single = drainQueue(
+    makeState({ caseNames: ["Coinbud"] }),
+    enqueueReveal(makeSession([pullOf("common")]), 0),
+    rngSeq([0.99]),
+  );
+  assert.equal(single.state.cash, 2);
+
+  const doubled = drainQueue(
+    makeState({ caseNames: ["Coinbud", "Omniecho"] }),
+    enqueueReveal(makeSession([pullOf("common")]), 0),
+    rngSeq([0.99]),
+  );
+  assert.equal(doubled.state.cash, 3);
+
+  // Rare reveals get no Coinbud bonus.
+  const rare = drainQueue(
+    makeState({ caseNames: ["Coinbud"] }),
+    enqueueReveal(makeSession([pullOf("rare")]), 0),
+    rngSeq([0.99]),
+  );
+  assert.equal(rare.state.cash, RARITIES.rare.sellValue);
 });
 
-test("duplicate counts remain explicit at the legacy collection milestones", () => {
-  for (const [copies, expectedLevel] of [[2, 1], [4, 2], [8, 3], [16, 4], [32, 5]]) {
-    assert.equal(getFusionLevel(copies), expectedLevel);
-  }
+test("Scrapactus salvages the reveal into Scrap through the queue", () => {
+  const state = makeState({ caseNames: ["Scrapactus"] });
+  let session = enqueueReveal(makeSession([pullOf("common")]), 0);
+  // First rng value drives the 25% roll: 0.1 procs.
+  let outcome = stepOpening(state, session, { rng: rngSeq([0.1]) });
+  assert.equal(outcome.session.queue.length, 1);
+  assert.equal(outcome.session.queue[0].type, "salvage");
+  outcome = stepOpening(outcome.state, outcome.session, { rng: rngSeq([0.99]) });
+  assert.equal(outcome.session.cards[0].salvaged, true);
+  assert.equal(outcome.state.scrap, RARITIES.common.scrapValue);
+  assert.equal(outcome.state.stats.salvages, 1);
 });
 
-test("selling duplicates keeps one of every card and pays the full sell pile", () => {
-  const state = hydrateState({
-    ...createInitialState(1),
-    collection: { [L("corner-01")]: 4, [L("corner-02")]: 2 },
-  }, 2);
-  const count = getDuplicateCount(state);
-  const value = getDuplicateSaleValue(state);
-  const sold = sellDuplicates(state);
-  assert.equal(count, 4);
-  assert.equal(Number.isInteger(value), true);
-  assert.equal(sold.collection[L("corner-01")], 1);
-  assert.equal(sold.collection[L("corner-02")], 1);
-  assert.equal(getDuplicateCount(sold), 0);
-  assert.equal(sold.coins, state.coins + value);
+test("Salvatort and Cinderscrap double Scrap and Cinderscrap zeroes cash", () => {
+  const state = makeState({ caseNames: ["Salvatort", "Cinderscrap"] });
+  const session = makeSession(
+    [pullOf("common", { revealed: true })],
+    [{ type: "salvage", index: 0 }],
+  );
+  const outcome = stepOpening(state, session, { rng: rngSeq([0.99]) });
+  // Base 1, doubled by Cinderscrap, doubled again by Salvatort on a Common.
+  assert.equal(outcome.state.scrap, 4);
+
+  const noCash = drainQueue(
+    makeState({ caseNames: ["Cinderscrap"] }),
+    enqueueReveal(makeSession([pullOf("legendary")]), 0),
+    rngSeq([0.99]),
+  );
+  assert.equal(noCash.state.cash, 0);
 });
 
-test("the three upgrade tracks unlock slowly and have one clear effect each", () => {
-  const card = getCard(L("corner-01"));
-  const base = {
-    ...createInitialState(1),
-    packsOpened: 5,
-    coins: 25,
-    collection: { [card.id]: 1 },
-  };
-  assert.equal(getUpgradeCost(base, "shelf"), 25);
-  const shelf = buyUpgrade(base, "shelf");
-  assert.equal(shelf.upgrades.shelf, 1);
-  const withDuplicates = hydrateState({ ...base, collection: { [card.id]: 2 } }, 2);
-  const dealer = buyUpgrade({ ...withDuplicates, coins: 25 }, "shelf");
-  assert.ok(getDuplicateSaleValue(dealer) > getDuplicateSaleValue(withDuplicates));
-  assert.equal(Number.isInteger(getDuplicateSaleValue(dealer)), true);
-  assert.equal(buyUpgrade(base, "lamp"), base);
-
-  const supplierReady = {
-    ...advanceBeat({ ...base, packsOpened: 50 }),
-    coins: 280,
-  };
-  const supplier = buyUpgrade(supplierReady, "supplier");
-  assert.equal(supplier.upgrades.supplier, 1);
-  assert.ok(getPackPrice(supplier, "loose") < getPackPrice(supplierReady, "loose"));
+test("Reclaimotive spends 20 Scrap on Salvage to burst a pack into the opening", () => {
+  const state = makeState({ caseNames: ["Reclaimotive"], scrap: 25 });
+  const session = makeSession(
+    [pullOf("common", { revealed: true })],
+    [{ type: "salvage", index: 0 }],
+  );
+  const outcome = drainQueue(state, session, rngSeq([0.99]));
+  assert.equal(outcome.state.scrap, 25 - 20 + RARITIES.common.scrapValue);
+  assert.equal(outcome.session.cards.length, 1 + PACK_SIZE);
+  assert.ok(outcome.session.cards.slice(1).every((pull) => pull.fromEffect));
 });
 
-test("booster boxes are removed while cases remain a late bulk option", () => {
-  assert.equal(PACK_PRODUCTS.some((product) => product.id === "box"), false);
-  const fresh = { ...createInitialState(1), coins: 10_000 };
-  const caseReady = advanceBeat({ ...fresh, packsOpened: 150 });
-  const withCase = buyProduct(caseReady, "case");
-  assert.equal(getProductCount(withCase, FIRST, "case"), 1);
+test("Scrapanvil adds a card when a Rare-or-better card is salvaged", () => {
+  const state = makeState({ caseNames: ["Scrapanvil"] });
+  const session = makeSession(
+    [pullOf("epic", { revealed: true }), pullOf("common", { revealed: true })],
+    [{ type: "salvage", index: 0 }, { type: "salvage", index: 1 }],
+  );
+  const outcome = drainQueue(state, session, rngSeq([0.99]));
+  // The Epic salvage adds one card; the Common salvage does not.
+  assert.equal(outcome.session.cards.length, 3);
 });
 
-test("breaking a case moves its packs to the opening table", () => {
-  const state = advanceBeat({ ...createInitialState(1), packsOpened: 150, coins: 2_000 });
-  const bought = buyProduct(state, "case");
-  const broken = breakProduct(bought, "case");
-  assert.equal(getProductCount(broken, FIRST, "case"), 0);
-  assert.equal(getProductCount(broken, FIRST, "loose"), 147);
-  assert.deepEqual(broken.collection, state.collection);
+test("Firstseer's first reveal queues every other card in the pack", () => {
+  const state = makeState({ caseNames: ["Firstseer"] });
+  let session = enqueueReveal(makeSession([pullOf("common"), pullOf("common"), pullOf("rare")]), 1);
+  let outcome = stepOpening(state, session, { rng: rngSeq([0.99]) });
+  assert.equal(outcome.session.queue.length, 2);
+  outcome = drainQueue(outcome.state, outcome.session, rngSeq([0.99]));
+  assert.ok(outcome.session.cards.every((pull) => pull.revealed));
 });
 
-test("the single Core stock is always unlocked across progression beats", () => {
-  const state = createInitialState(1);
-  assert.equal(getCurrentBeat(state), 1);
-  assert.equal(getCurrentBeat({ ...state, packsOpened: 9 }), 1);
-  assert.equal(getCurrentBeat({ ...state, packsOpened: 10 }), 2);
-  assert.equal(getCurrentBeat({ ...state, packsOpened: 30 }), 3);
-  assert.equal(getCurrentBeat({ ...state, packsOpened: 75 }), 4);
-  assert.equal(getCurrentBeat({ ...state, packsOpened: 150 }), 5);
-  assert.equal(getSetUnlockStatus(state, FIRST).unlocked, true);
-  assert.deepEqual(getSetUnlockStatus(state, FIRST).requirements, []);
-  const late = advanceBeat({ ...state, packsOpened: 500 });
-  assert.deepEqual(late.unlockedSets, [FIRST]);
-  assert.equal(late.activeSet, FIRST);
+test("Heartmerge fuses same-rarity reveals; the result reveals through the queue", () => {
+  const state = makeState({ caseNames: ["Heartmerge"] });
+  let session = makeSession([pullOf("common", { revealed: true }), pullOf("common")]);
+  session = enqueueReveal(session, 1);
+  let outcome = stepOpening(state, session, { rng: rngSeq([0.99]) });
+  assert.equal(outcome.session.queue[0].type, "fuse");
+  outcome = drainQueue(outcome.state, outcome.session, rngSeq([0.5, 0.99]));
+  assert.equal(outcome.session.cards[0].fusedAway, true);
+  assert.equal(outcome.session.cards[1].fusedAway, true);
+  assert.equal(outcome.session.cards.length, 3);
+  const result = outcome.session.cards[2];
+  assert.equal(result.rarity, "common");
+  assert.equal(result.revealed, true);
+  assert.equal(outcome.state.stats.fusions, 1);
 });
 
-test("economy ticks add exactly one cash per second and never buy or open product", () => {
-  const state = {
-    ...createInitialState(1),
-    collection: { [L("corner-01")]: 2, [L("corner-02")]: 1 },
-    standingOrder: {
-      ...createInitialState(1).standingOrder,
-      enabled: true,
-      product: "loose",
-    },
-  };
-  const stockBefore = clone(state.sealed);
-  const next = tickEconomy(state, 1);
-  assert.equal(next.coins, state.coins + 1);
-  assert.equal(next.packsOpened, 0);
-  assert.deepEqual(next.sealed, stockBefore);
-  assert.deepEqual(next.collection, state.collection);
+test("Fusihare gives fusions a chance to jump a rarity tier", () => {
+  const state = makeState({ caseNames: ["Heartmerge", "Fusihare"] });
+  const session = makeSession(
+    [pullOf("common", { revealed: true }), pullOf("common", { revealed: true })],
+    [{ type: "fuse", a: 0, b: 1 }],
+  );
+  // First rng value is the jump roll: 0.01 < 0.05 jumps.
+  const outcome = stepOpening(state, session, { rng: rngSeq([0.01, 0.5, 0.99]) });
+  assert.equal(outcome.session.cards[2].rarity, "rare");
+  assert.ok(outcome.events.some((event) => event.t === "fusion" && event.jumped));
 });
 
-test("FINISH collects a flooded table of thousands of cards without stalling", () => {
-  const state = createInitialState(1);
-  const commons = SETS[0].cards.filter((card) => card.rarity === "common");
-  const cards = Array.from({ length: 5_000 }, (_, index) => ({
-    card: commons[index % commons.length],
-    rarity: "common",
-    foil: false,
-    grade: 0,
-    revealed: false,
-  }));
-  const startedAt = performance.now();
-  const result = revealAllPackCards(state, cards);
-  const elapsed = performance.now() - startedAt;
-  assert.ok(elapsed < 1_000, `bulk reveal took ${Math.round(elapsed)}ms`);
-  assert.equal(result.cards.length, 5_000);
-  assert.ok(result.cards.every((pull) => pull.revealed));
-  assert.equal(result.events.filter((event) => event.t === "reveal").length, 5_000);
-  const collected = Object.values(result.state.collection).reduce((sum, count) => sum + count, 0);
-  assert.equal(collected, 5_000);
+test("Foilpress jumps double-foil fusions straight to Legendary", () => {
+  const state = makeState({ caseNames: ["Foilpress"] });
+  const session = makeSession(
+    [
+      pullOf("common", { revealed: true, foil: true }),
+      pullOf("common", { revealed: true, foil: true }),
+    ],
+    [{ type: "fuse", a: 0, b: 1 }],
+  );
+  const outcome = stepOpening(state, session, { rng: rngSeq([0.99]) });
+  const result = outcome.session.cards[2];
+  assert.equal(result.rarity, "legendary");
+  assert.equal(result.foil, true);
 });
 
-test("hydration migrates earlier saves without inventing cards", () => {
-  const state = hydrateState({
-    version: 2,
-    coins: 90.75,
-    packsOpened: 4,
-    collection: { "corner-01": 2, invalid: 99 },
-    activeSet: "corner",
-    standingOrder: { enabled: true, product: "loose" },
-    settings: { sound: false, reducedEffects: true },
-    filingRules: [{ id: 1, rarity: "common", threshold: 2, action: "shred", enabled: true }],
-    forged: { corner: { swarm: 2 } },
-    sealed: { corner: { loose: 0, box: 1 } },
-    sealedRun: { id: "legacy-run", setId: "corner", remainingPacks: 3, pool: {}, deck: [] },
-  }, 50);
-  assert.equal(state.version, SAVE_VERSION);
-  assert.equal(state.coins, 90);
-  assert.ok(state.passiveCarry > 0 && state.passiveCarry < 1);
-  // Legacy card ids land on their reprinted cards; junk is dropped.
-  assert.equal(state.collection[L("corner-01")], 2);
-  assert.equal(state.collection["corner-01"], undefined);
-  assert.equal(state.collection.invalid, undefined);
-  assert.equal(state.activeSet, FIRST);
-  assert.equal(state.beat, 1);
-  assert.equal(Object.keys(state.collection).length, 1);
-  assert.equal(state.standingOrder.enabled, false);
-  assert.equal(state.settings.sound, false);
-  assert.equal("reducedEffects" in state.settings, false);
-  assert.deepEqual(state.filingRules, []);
-  assert.equal(state.sealedRun, null);
-  assert.equal(getProductCount(state, FIRST, "loose"), 29);
-  assert.equal(state.bestRarities[L("corner-01")], getCard(L("corner-01")).rarity);
-  assert.ok(state.duplicateBank > 0);
+test("Recyclen rerolls a Common once for 1 Scrap", () => {
+  const state = makeState({ caseNames: ["Recyclen"], scrap: 1 });
+  const session = enqueueReveal(makeSession([pullOf("common")]), 0);
+  const outcome = drainQueue(state, session, rngSeq([0.99]));
+  assert.equal(outcome.state.scrap, 0);
+  assert.equal(outcome.state.stats.rerolls, 1);
+  assert.equal(outcome.session.cards.length, 1);
+  assert.equal(outcome.session.cards[0].revealed, true);
+  assert.equal(outcome.session.cards[0].rerolled, true);
+  assert.ok(isOpeningSettled(outcome.session));
 });
 
-test("every non-pack action preserves the collection", () => {
-  const state = advanceBeat({
-    ...createInitialState(1),
-    packsOpened: 150,
-    coins: 100_000,
-    collection: Object.fromEntries(ALL_CARDS.slice(0, 5).map((card) => [card.id, 1])),
-  });
-  const original = clone(state.collection);
-  const afterProduct = buyProduct(state, "case");
-  const afterUpgrade = buyUpgrade({ ...afterProduct, packsOpened: 150 }, "supplier");
-  const afterTick = tickEconomy(afterUpgrade, 1);
-  assert.deepEqual(afterProduct.collection, original);
-  assert.deepEqual(afterUpgrade.collection, original);
-  assert.deepEqual(afterTick.collection, original);
+test("Scrapcup can spend 1 Scrap to reveal an additional Common", () => {
+  const state = makeState({ caseNames: ["Scrapcup"], scrap: 1 });
+  const session = enqueueReveal(makeSession([pullOf("common")]), 0);
+  // 0.1 procs the 25% roll; later values keep replacement rolls tame.
+  const outcome = drainQueue(state, session, rngSeq([0.1, 0.5, 0.99]));
+  assert.equal(outcome.state.scrap, 0);
+  assert.equal(outcome.session.cards.length, 2);
+  assert.equal(outcome.session.cards[1].rarity, "common");
+  assert.equal(outcome.session.cards[1].revealed, true);
+});
+
+test("Bellpack spends 10 Scrap on pack open to add 3 cards", () => {
+  const state = makeState({ caseNames: ["Bellpack"], scrap: 10, packs: 1 });
+  const opened = openPack(state, { rng: rngSeq([0.5]) });
+  assert.equal(opened.state.scrap, 0);
+  assert.equal(opened.session.cards.length, PACK_SIZE + 3);
+});
+
+test("Rarehouse spends half your cash for a Rare-or-better pack", () => {
+  const state = makeState({ caseNames: ["Rarehouse"], cash: 100, packs: 1 });
+  const opened = openPack(state, { rng: rngSeq([0.5]) });
+  assert.equal(opened.state.cash, 50);
+  assert.ok(opened.session.cards.every(
+    (pull) => RARITIES[pull.rarity].order >= RARITIES.rare.order,
+  ));
+});
+
+test("Encorekeep can trigger the first display case card an additional time", () => {
+  const state = makeState({ caseNames: ["Coinbud", "Encorekeep"] });
+  const session = enqueueReveal(makeSession([pullOf("common")]), 0);
+  // The first rng value is the 5% encore roll.
+  const outcome = stepOpening(state, session, { rng: rngSeq([0.01, 0.99]) });
+  assert.equal(outcome.state.cash, 3);
+  assert.ok(outcome.events.some((event) => event.t === "encore"));
+});
+
+test("Boiloreverb can trigger the card to its right when a fusion happens", () => {
+  const state = makeState({ caseNames: ["Heartmerge", "Boiloreverb", "Scrapactus"] });
+  const session = makeSession(
+    [pullOf("common", { revealed: true }), pullOf("common", { revealed: true })],
+    [{ type: "fuse", a: 0, b: 1 }],
+  );
+  // rng order: fused card pick, fused foil roll, Boiloreverb 50% roll,
+  // Scrapactus 25% roll — both succeed at 0.1.
+  let outcome = stepOpening(state, session, { rng: rngSeq([0.5, 0.99, 0.1, 0.1]) });
+  assert.ok(outcome.session.queue.some((action) => action.type === "salvage"));
+  outcome = drainQueue(outcome.state, outcome.session, rngSeq([0.99]));
+  assert.equal(outcome.session.cards[2].salvaged, true);
+  assert.ok(outcome.state.scrap > 0);
+});
+
+test("leaving an opening clears the action stack", () => {
+  let session = makeSession([pullOf("common"), pullOf("common")]);
+  session = enqueueReveal(session, 0);
+  session = enqueueReveal(session, 1);
+  const cleared = clearOpeningQueue(session);
+  assert.equal(cleared.queue.length, 0);
+  assert.equal(cleared.cards.length, 2);
+  assert.ok(!isOpeningSettled(cleared), "face-down cards remain unresolved");
+});
+
+test("buyPack charges the pack price", () => {
+  const state = { ...createInitialState(0), cash: 20, packs: 0 };
+  const bought = buyPack(state);
+  assert.equal(bought.packs, 1);
+  assert.equal(bought.cash, 20 - gameLogic.PACK_COST);
+  const broke = buyPack({ ...state, cash: 5 });
+  assert.equal(broke.packs, 0);
+});
+
+test("display case respects ownership, slot count, and order", () => {
+  const owned = findCard("Coinbud");
+  const second = findCard("Zeraph");
+  let state = createInitialState(0);
+  state.collection[owned.id] = 1;
+  state.collection[second.id] = 1;
+  state = displayCard(state, owned.id);
+  assert.deepEqual(state.displayed, [{ id: owned.id }]);
+  // A fresh save has one slot; a second display is rejected.
+  state = displayCard(state, second.id);
+  assert.equal(state.displayed.length, 1);
+  // Unowned cards are rejected.
+  const unowned = displayCard(state, findCard("Omniecho").id);
+  assert.equal(unowned.displayed.length, 1);
+
+  state.packsOpened = 3;
+  state = displayCard(state, second.id);
+  assert.equal(state.displayed.length, 2);
+  state = reorderDisplayed(state, 0, 1);
+  assert.deepEqual(state.displayed.map((entry) => entry.id), [second.id, owned.id]);
+  state = undisplayCard(state, second.id);
+  assert.deepEqual(state.displayed.map((entry) => entry.id), [owned.id]);
+});
+
+test("saves from the pre-redesign game restart fresh", () => {
+  const legacy = { version: 11, coins: 50_000, packsOpened: 400, collection: {} };
+  const hydrated = hydrateState(legacy, 0);
+  assert.equal(hydrated.cash, 0);
+  assert.equal(hydrated.packs, gameLogic.STARTING_PACKS);
+  assert.equal(hydrated.packsOpened, 0);
+  assert.equal(storedSaveDominates(JSON.stringify(legacy), hydrated), false);
+});
+
+test("current saves round-trip through hydrate", () => {
+  const state = makeState({ caseNames: ["Coinbud"], cash: 44, scrap: 7, packs: 2 });
+  state.lifetimeCash = 44;
+  state.lifetimeScrap = 7;
+  const hydrated = hydrateState(JSON.parse(gameLogic.serializeState(state, 1)), 1);
+  assert.equal(hydrated.cash, 44);
+  assert.equal(hydrated.scrap, 7);
+  assert.equal(hydrated.packs, 2);
+  assert.deepEqual(hydrated.displayed, [{ id: findCard("Coinbud").id }]);
 });

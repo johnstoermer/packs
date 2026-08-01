@@ -1,83 +1,54 @@
 # PACKWORKS
 
-PACKWORKS is a clean incremental game about opening card packs, improving a collection, and selling duplicates.
+PACKWORKS is a clean incremental game about opening card packs, completing a
+50-card collection, and wiring the display case into an engine of Cash and
+Scrap.
 
 ## The loop
 
-1. Open a six-card pack.
-2. Hover each card for a rarity signal, then click through it or hold Space.
-3. Earn cash every second and sell every extra copy with one button.
-4. Build an engine in the display case: signatures anchor verbs, supports tune them.
-5. Spend cash on packs from newly unlocked sets or one of three upgrades.
+1. Buy a Core Pack for 12 cash and tear it open — six cards, face down.
+2. Click through the cards (or hold Space). Every reveal pays cash by
+   rarity: Common 1, Rare 4, Epic 15, Legendary 60. Foil pays double.
+3. Any card you have never opened before joins the collection — 50 cards to
+   find.
+4. Display owned cards in the case. Twenty of the fifty carry printed
+   effects that fire while a pack is open: salvaging reveals into Scrap,
+   fusing same-rarity cards, bursting extra packs into the opening, and
+   more. The other thirty are pure collection pieces.
 
-The display case is the core progression engine. There are no duel, filing-rule, contract, or beat dashboards.
+## The action stack
 
-## The verb engine
+The engine's one structural rule: **nothing resolves simultaneously.**
+Every input and every card effect becomes an action on the opening's stack,
+and the stack pops strictly in order, one action at a time. Rapidly
+clicking five cards queues five reveals; a Firstseer flip queues the whole
+pack; a Heartmerge fusion queues the fused card's reveal behind everything
+already waiting.
 
-- Each verb has one **signature** card — its biggest chance source or defining rule: Common Echo, Mark, Salvage, Mimic, Rare Echo, Fusion, Transmute, Fracture, Catalyst, Blueprint, Relay, or Autopilot. Signatures are the high-rarity anchors of their print line.
-- Every other card is a **support** that adds its own chance source or pays out on a trigger (reveals, duplicate sales, pack opens, coin or pack thresholds). Every chance source works standalone; pure dials (biases, depths, preferences) modify a verb and wait for a source to feed them.
-- Late sets carry **capstones** — cross-engine cards that bridge two verbs at once.
-- **Discover** is the universal support mechanic: qualifying triggers offer a choice of three boons (Insight, Resonance, Catalyst, Reflection, Acceleration); picks stack until an event consumes them.
-- **Salvage** converts duplicate sales into Mystery Packs that inject extra cards into the current reveal.
-- Automation runs on coin and pack **thresholds** (watermarks), never timers: displayed cards fire when totals cross their lines, including while idle.
+Effects only trigger while you are inside a pack opening. Leaving an
+opening clears the stack — pending effects die, face-down cards are left
+behind, and everything already revealed stays paid.
 
-## Progression
+There is no cash per second, no offline progress, and no timer-driven
+gameplay.
 
-- The player begins with three packs and earns exactly 1 whole cash per second while the game is open. Nothing accrues offline.
-- The binder is a collection view and never generates cash.
-- Selling duplicates keeps one copy of every card and converts every extra copy into cash.
-- Dealer trays improve duplicate sale value.
-- Inspection lamps improve premium-card weight.
-- Supplier terms reduce the purchase price of packs.
-- Booster boxes do not exist. Cases remain a late bulk option.
-- There is one 98-card collection; each card is a signature, a support, a capstone, or the prestige door, with player-facing rules text.
-- The display case holds up to six cards; slots unlock through milestones, and the displayed signatures-plus-supports engine drives the run. Editing the case first sells that card's duplicate stack — displaying is a commitment.
-- Card counts taper at every step from Common through Divine. Nameless is not a normal rarity roll: it replaces one card in the next pack only after all other 97 cards have been discovered.
-- Owning Nameling unlocks the Rewrite: a prestige reset that grants permanent Inscriptions (+25% income and sale value each, doubled if the Nameless is displayed when you Rewrite).
+## Resources
 
-The full engine design — verbs, triggers, pipeline order, animation language, and rejected directions — lives in `docs/ENGINE_SPEC.md`.
-
-Cases are inventory bundles that the player can break into loose packs. Packs have no resale value or appreciation system. Only `openPack` can increase a collection count.
-
-## Rarity
-
-Normal pulls use seven tiers: Common (75%), Uncommon (18%), Rare (5%), Epic (1.5%), Legendary (0.4%), Mythic (0.09%), and Divine (0.01%). The retired Exalted, Ascendant, Celestial, old Divine, and Astral labels collapse into Mythic; Eternal, Primordial, Transcendent, Empyrean, Absolute, and Singularity collapse into Divine. Nameless remains a one-card completion unlock outside that percentage ladder. Fusion, Transmute, Salvage, and Fracture provide engine-driven routes upward without allowing an early Nameless pull.
-
-## Opening
-
-Pack opening remains deliberately elaborate even though the surrounding game is minimal:
-
-- staged foil handling and tear animation;
-- separately dealt cards, up to one standard pack (six) loose on the table;
-- **Overflow mode** past that limit: revealed copies collapse into one counted
-  pile per card (appended in first-revealed order), face-down cards wait in a
-  single stack at the top of the screen, and every reveal flies from the stack
-  into its pile;
-- hover rarity signals with occasional false positives;
-- manual click-to-reveal or a paced hold-Space sequence;
-- rarity-specific impact, lighting, particles, and synthesized audio;
-- distinctive animated PixelLab artwork for all 98 cards.
-
-Manual opening is capped near forty packs per minute. Reduced-motion preferences shorten packaging without skipping individual reveals.
-
-## Controls
-
-- Tap a face-down card or press and swipe across several cards to reveal them
-- Hold `Space`: open a pack, reveal its cards one by one, and continue opening while held
-- On mobile, hold the large bottom control to reveal slowly and continue into the next pack
-- In the Shop, tap a pack price to buy one or hold it to buy that set rapidly
-- `Escape`: close the current panel, card, or completed opening
-
-Progress is stored locally. The game only advances while it is open — there is no offline income and nothing opens or generates in the background.
+- **Cash** buys packs. It only comes from revealing cards.
+- **Scrap** comes from Salvage — tearing up a revealed card (Common 1,
+  Rare 2, Epic 4, Legendary 8). Displayed effects spend it automatically:
+  rerolling Commons, adding cards to packs, bursting whole extra packs into
+  an opening.
 
 ## Development
 
 ```bash
-npm install
 npm test
 npm run test:e2e
 npm run dev
 ```
+
+Design contracts live in `docs/CORE_RULES.md` and `docs/ENGINE_SPEC.md`.
 
 ## Builds
 

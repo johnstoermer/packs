@@ -4,13 +4,10 @@ import "./gameplay-v2.css";
 import "./gameplay-clean.css";
 import "./league-overhaul.css";
 import "./overflow-mode.css";
-import "./card-review.css";
-import "./subset-selector.css";
-import "./mini-sets.css";
 
 export const metadata = {
   title: "PACKWORKS",
-  description: "Open card packs, improve your collection, and sell duplicates.",
+  description: "Open card packs, build the collection, and wire up the display case.",
   applicationName: "PACKWORKS",
 };
 

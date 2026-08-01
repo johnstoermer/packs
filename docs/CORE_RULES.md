@@ -1,47 +1,51 @@
-# Core economy invariants
+# Core rules
 
 Use this checklist for every reward path and system change.
 
-## The pack is the only door
+## The action stack is the engine
 
-- Only `openPack` may put cards in front of the player, and a card joins the binder at the moment it is revealed — never at open time.
-- Purchases and product breaks only change pack inventory.
-- The binder never produces cash on its own.
-- Passive income is the flat 1 cash per second times the Inscription multiplier; every other coin comes from a displayed engine trigger. Balances and prices never use fractional cash.
-- Selling duplicates keeps one best printing of every card.
-- Upgrades only modify duplicate sale value, rarity weight, or purchase price. Everything else flows from the display case.
-- Offline progress only adds time-based cash; threshold cards catch up from their watermarks when the totals are next evaluated.
-- Tutorials, fixes, and future event compensation must use packs or cash.
+- Every player input and every card effect during an opening becomes an
+  action on the opening's queue. Actions resolve strictly one at a time, in
+  the order they were added — nothing ever resolves simultaneously.
+- Rapidly revealing cards stacks reveals; the stack drains in order.
+- Card effects only trigger while a pack is open. When the player exits an
+  opening, the action stack is cleared: pending reveals and effects are
+  gone, and face-down cards are left behind. Revealed cards keep everything
+  they already paid.
+- There is no passive income, no offline progress, and no timer-driven
+  gameplay. The only timers in the app pace animations and autosave.
 
-## Pack inventory stays simple
+## Cash, Scrap, and the collection
 
-- Loose packs and cases are inventory, not investments.
-- Booster boxes do not exist.
-- Breaking a case is one-way and explicit.
-- Packs have no resale value, appreciation, or market simulation.
-- Base product prices stay stable; supplier terms and displayed discount effects are the only discounts (capped at 70% total).
-- Sets unlock along a branching print tree: Neon Circuit fans out into Gilded Frontier, Abyssal Bloom, and Crownfall; mid-game sets open from either of two parent sets; Sunken Signal opens only through Nocturne Harbor (and Nocturne Harbor unlocks nothing else); Unwritten demands every other set.
+- Revealing a card pays Cash by rarity: Common 1, Rare 4, Epic 15,
+  Legendary 60. Foil cards pay double. Foil base odds are 5%.
+- Any card revealed for the first time joins the collection. That is the
+  only door into the binder.
+- Salvage tears up a revealed card: it leaves the pack and pays Scrap by
+  rarity instead — Common 1, Rare 2, Epic 4, Legendary 8. Scrap persists
+  between packs and is spent automatically by displayed effects.
+- Fuse merges two revealed cards of the same rarity into a new card of that
+  rarity, which is revealed again through the queue. Effects can make
+  fusions jump a rarity tier.
+- Packs cost 12 Cash, hold six cards, and are the only product. A new save
+  starts with three sealed packs.
 
-## Manual opening remains the game
+## The collection is exactly 50 cards
 
-- Every pack contains six individually revealed cards.
-- All eighteen base pull rates remain defined in `RARITIES`.
-- Higher rarity printings upgrade the kept binder copy.
-- Hover signals may bluff; the printed card is authoritative.
-- Heat, grade, and anomaly detection remain properties of a witnessed opening.
-- Extra product arrives only as Mystery Packs from the Salvage verb, and their cards merge additively into the reveal in progress — new information never invalidates what is already shown.
+- Four rarities: 24 Common (74%), 14 Rare (20%), 8 Epic (5%), 4 Legendary
+  (1%).
+- Exactly 20 cards carry printed effects; the other 30 are collection cards
+  with no effect. Effect text is player-facing and unique per card.
 
-## The display case is the engine
+## The display case
 
-- Up to six owned cards can be displayed; slots unlock through milestones. Slot 1 is always open.
-- Every chance source stands alone; pure dials modify a verb and stay inert until a source feeds them. Each verb's signature — its biggest chance source or defining rule — anchors a high-rarity slot of its print line; capstones take the Absolute and apex slots.
-- Discover is the universal support mechanic: three options drawn from a five-boon pool, picks stack, the next qualifying event consumes the stack. Autopilot picks automatically and enhances automatic picks.
-- Automation is thresholds, never timers: displayed cards watch coin and pack watermarks and fire when totals cross them, online or idle.
-- Editing the case sells that card's duplicate stack first — displaying is a commitment.
-- Every engine trigger animates; nothing fires silently. Card text is player-facing rules text, never internal jargon.
-- The Rewrite (prestige) opens only by owning What Was Never Named. It resets binder, cash, and shop; Inscriptions persist and multiply income and duplicate sales by +25% each, and Rewriting with the Nameless displayed doubles the Inscriptions earned.
-
-The full verb list, pipeline order, and rejected directions live in `docs/ENGINE_SPEC.md`.
+- Up to six owned cards can be displayed; slots unlock through pack and
+  collection milestones. Slot 1 is always open.
+- Displayed cards fire their printed effects only during pack openings, in
+  slot order, left to right. Slot order is load-bearing: some effects
+  reference "the card to its right" or "the first card in the display
+  case".
+- Every trigger animates its slot; nothing fires silently.
 
 ## Review commands
 
@@ -49,5 +53,3 @@ The full verb list, pipeline order, and rejected directions live in `docs/ENGINE
 npm test
 npm run test:e2e
 ```
-
-The unit suite includes a collection-invariant test for every non-pack action. The browser suite verifies the uncluttered main loop, click and hold-Space reveal flows, responsive card layout, gradual shop disclosure, and high-rarity impact treatment.

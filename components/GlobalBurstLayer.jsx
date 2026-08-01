@@ -4,9 +4,9 @@ import { useEffect } from "react";
 import { RARITIES } from "../lib/gameData";
 
 const BURST_RARITIES = [
-  "common", "uncommon", "rare", "common", "epic", "uncommon", "common",
-  "rare", "common", "legendary", "uncommon", "common", "rare", "epic",
-  "common", "uncommon", "rare", "common",
+  "common", "rare", "common", "epic", "common", "rare", "common",
+  "legendary", "common", "rare", "epic", "common", "rare", "common",
+  "epic", "common", "rare", "common",
 ];
 
 function Burst({ burst, onComplete }) {
@@ -54,7 +54,7 @@ function Burst({ burst, onComplete }) {
       <div className="global-burst-pack">
         <i className="global-burst-half is-left" />
         <i className="global-burst-half is-right" />
-        <b>{fracture ? "FRACTURE / +6 CARDS" : `SALVAGE ×${burst.count || 1}`}</b>
+        <b>{fracture ? "PACK BURST / +6 CARDS" : `SALVAGE ×${burst.count || 1}`}</b>
       </div>
       <div className="global-burst-cards">
         {BURST_RARITIES.map((rarity, index) => (

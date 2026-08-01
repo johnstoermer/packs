@@ -2,10 +2,8 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  ALL_CARDS,
   PACK_TYPES,
   RARITIES,
-  SETS,
   formatNumber,
   getCard,
   getCardArtId,
@@ -17,40 +15,28 @@ import {
   PACK_SIZE,
   SAVE_KEY,
   applyAdminGuarantees,
+  buyPack,
+  clearOpeningQueue,
   createAdminState,
-  breakProduct,
-  buyProduct,
-  canRewrite,
-  chooseDiscoverOptionDetailed,
   createInitialState,
-  dismissDiscoverOfferDetailed,
   displayCard,
-  evaluateIdleThresholds,
-  getCardSaleValue,
+  enqueueReveal,
   getDerived,
-  getInscriptionsEarned,
   getPackPrice,
-  getProductCount,
+  getPendingCardCount,
   hydrateState,
+  isOpeningSettled,
   openPack,
   reorderDisplayed,
-  resolveImmediateFusion,
-  revealAllPackCards,
-  revealPackCard,
-  rewriteState,
-  sellDuplicatesDetailed,
   serializeState,
+  stepOpening,
   storedSaveDominates,
-  tickEconomy,
   undisplayCard,
 } from "../lib/gameLogic";
 import {
   CASE_SIZE,
-  DISCOVER_POOL,
   getCardDef,
   getCardRules,
-  getCaseSlots,
-  tokenizeCardText,
 } from "../lib/engineCards";
 import { createAudioEngine } from "../lib/audio";
 import { createHapticsEngine } from "../lib/haptics";
@@ -59,27 +45,14 @@ import GlobalBurstLayer from "./GlobalBurstLayer";
 
 const ASSET_BASE = process.env.NEXT_PUBLIC_PACKWORKS_BASE || "";
 const PIXEL_ART_VERSION = "20260726-2";
-const PLACE_SUBJECTS = new Set(["stand", "screen", "city", "garden", "coronation"]);
-const RELIC_SUBJECTS = new Set(["relay", "locket", "star"]);
-const MACHINE_SUBJECTS = new Set(["drone", "hopper", "warden", "crawler", "familiar", "ogre", "engine", "colossus"]);
 const MOBILE_REVEAL_COLUMNS = 6;
 const COLLECTION_ANIMATION_MS = 950;
-// Catching up on a long idle can credit several thresholds at once. Two per
-// sweep keeps the parade readable, and because bursts alternate sides by
-// serial, a pair never lands on top of itself.
-const MAX_QUIET_REVEAL_BURSTS = 2;
 // Overflow flight ghosts beyond this land instantly instead of animating.
 const MAX_CONCURRENT_FLIGHTS = 10;
 const FLIGHT_DURATION_MS = 460;
 // Pile cards render at this width and scale down to the solved pile size so
 // their typography shrinks proportionally, like shrunken reveal cards.
 const PILE_BASE_WIDTH = 148;
-
-function countOpeningReveals(events = []) {
-  return events.reduce((count, event) => (
-    count + (event.t === "reveal" || event.t === "duplicateReveal" ? 1 : 0)
-  ), 0);
-}
 
 function countActiveCards(cards = []) {
   let active = 0;
@@ -111,10 +84,7 @@ function findNextRevealIndex(cards = []) {
 function getOverflowFlags(openingValue, cards) {
   const active = countActiveCards(cards);
   const overflow = Boolean(openingValue.overflow) || active > PACK_SIZE;
-  return {
-    overflow,
-    canForceFinish: Boolean(openingValue.canForceFinish) || overflow,
-  };
+  return { overflow };
 }
 
 function money(value) {
@@ -125,26 +95,11 @@ function exactMoney(value) {
   return Math.round(Number(value) || 0).toLocaleString("en-US");
 }
 
-function rate(value) {
-  if (value <= 0) return "0";
-  if (value < 0.01) return value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
-  if (value < 10) return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
-  return formatNumber(value);
-}
-
-function getCardKind(card) {
-  let kind = "Creature";
-  if (PLACE_SUBJECTS.has(card.subject)) kind = "Landmark";
-  else if (RELIC_SUBJECTS.has(card.subject)) kind = "Relic";
-  else if (MACHINE_SUBJECTS.has(card.subject)) kind = "Machine";
-  return kind;
-}
-
 function CardArt({ card, compact = false, animated = false }) {
   const pixelRef = useRef(null);
   const [pixelReady, setPixelReady] = useState(false);
   const set = getSet(card.setId);
-  // Art is filed under the legacy print a card was reprinted from.
+  // Art is filed under the print each card's illustration came from.
   const artKey = getCardArtId(card);
   const artAt = artKey.lastIndexOf("-");
   const artSetId = artKey.slice(0, artAt);
@@ -183,22 +138,8 @@ function CardArt({ card, compact = false, animated = false }) {
   );
 }
 
-function CardRules({
-  cardId,
-  heading = false,
-  reminders = false,
-  className = "",
-  rulesOverride = null,
-}) {
-  const rules = rulesOverride?.text
-    ? {
-      eyebrow: rulesOverride.eyebrow || "Proposal",
-      title: rulesOverride.title || "Proposed Effect",
-      text: rulesOverride.text,
-      tokens: tokenizeCardText(rulesOverride.text),
-      reminders: [],
-    }
-    : getCardRules(cardId);
+function CardRules({ cardId, heading = false, reminders = false, className = "" }) {
+  const rules = getCardRules(cardId);
   if (!rules) return null;
   return (
     <span className={`card-rules ${heading ? "has-heading" : ""} ${className}`.trim()}>
@@ -303,14 +244,10 @@ export const PrintedCard = memo(function PrintedCard({
   foil = false,
   compact = false,
   className = "",
-  preview = null,
 }) {
   const rarity = RARITIES[rarityId];
   const set = getSet(card.setId);
-  const kind = preview?.kind || getCardKind(card);
-  const displayName = preview?.name || card.name;
-  const flavor = preview?.flavor || card.flavor;
-  const rulesLength = preview?.text?.length || getCardRules(card.id)?.text?.length || 0;
+  const rulesLength = getCardRules(card.id)?.text?.length || 0;
   const copyFitClass = rulesLength > 155 ? "copy-very-long" : rulesLength > 105 ? "copy-long" : "";
   return (
     <span
@@ -325,15 +262,15 @@ export const PrintedCard = memo(function PrintedCard({
     >
       <span className="card-head">
         <span className="card-identity">
-          <strong>{displayName}</strong>
+          <strong>{card.name}</strong>
         </span>
         <b>{rarity.short}</b>
       </span>
       <CardArt card={card} compact={compact} animated={foil} />
       <span className="card-copy">
-        <span className="card-type-line">{rarity.label} / {kind}</span>
-        <CardRules cardId={card.id} rulesOverride={preview} />
-        <small className="card-flavor">“{flavor}”</small>
+        <span className="card-type-line">{rarity.label} / Creature</span>
+        <CardRules cardId={card.id} />
+        <small className="card-flavor">“{card.flavor}”</small>
       </span>
       <span className="card-foot">
         <span>{copyLabel}</span>
@@ -363,7 +300,7 @@ const RevealCard = memo(function RevealCard({
 }) {
   const rarity = RARITIES[pull.rarity];
   const set = getSet(pull.card.setId);
-  const dealt = ["ready", "complete", "filing", "collecting"].includes(phase);
+  const dealt = ["ready", "complete", "collecting"].includes(phase);
   const canReveal = phase === "ready" && !revealed;
   const row = Math.floor(position / perRow);
   const colsInRow = Math.min(perRow, count - row * perRow);
@@ -375,8 +312,7 @@ const RevealCard = memo(function RevealCard({
     <button
       type="button"
       data-reveal-index={index}
-      data-mark-stacks={pull.marked && (pull.markStacks || 1) > 1 ? pull.markStacks : undefined}
-      className={`reveal-card count-${count} rarity-${pull.rarity} ${dealt ? "is-dealt" : ""} ${revealed ? "is-revealed" : ""} ${latest ? "is-impacting" : ""} ${canReveal ? "is-revealable" : ""} ${pull.foil ? "is-foil" : ""} ${pull.marked && !revealed ? "is-marked" : ""} ${pull.transmuted && !revealed ? "is-transmuted" : ""} ${pull.fusedAway ? "is-fused-away" : ""} ${pull.fromMystery ? "is-mystery" : ""}`}
+      className={`reveal-card count-${count} rarity-${pull.rarity} ${dealt ? "is-dealt" : ""} ${revealed ? "is-revealed" : ""} ${latest ? "is-impacting" : ""} ${canReveal ? "is-revealable" : ""} ${pull.foil ? "is-foil" : ""} ${pull.fusedAway ? "is-fused-away" : ""} ${pull.fromEffect && !revealed ? "is-mystery" : ""}`}
       style={{
         "--index": index,
         "--spread": spread,
@@ -402,7 +338,7 @@ const RevealCard = memo(function RevealCard({
       {echo && (
         <span key={echo.serial} className="reveal-echo" style={{ "--echo-count": Math.min(4, echo.count) }} aria-hidden="true">
           <i className="reveal-echo-flash" />
-          <b className="reveal-echo-chip">ECHO{echo.count > 1 ? ` ×${echo.count}` : ""}</b>
+          <b className="reveal-echo-chip">{echo.label || "ECHO"}</b>
         </span>
       )}
       <span className="reveal-card-inner">
@@ -563,7 +499,7 @@ export function OpeningImpact({ impact }) {
       </span>
       <span className="impact-name">
         <strong>{rarity.label}</strong>
-        <small>{impact.foil ? "FOIL PULL" : "CARD REVEALED"}</small>
+        <small>{impact.foil ? "FOIL PULL" : impact.label || "CARD REVEALED"}</small>
       </span>
     </div>
   );
@@ -596,27 +532,25 @@ function CashStreamLayer({ streams }) {
     <div className="cash-stream-layer" aria-live="polite">
       {streams.map((stream) => (
         <span
-          className="cash-stream-value"
+          className={`cash-stream-value${stream.kind === "scrap" ? " is-scrap" : ""}`}
           key={stream.id}
           style={{
             "--cash-x": `${stream.x}px`,
             "--cash-delay": `${stream.delay}ms`,
           }}
         >
-          +{money(stream.amount)}
+          +{money(stream.amount)}{stream.kind === "scrap" ? " SCRAP" : ""}
         </span>
       ))}
     </div>
   );
 }
 
-function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
-  const set = getSet(setId);
-  const unlockedSets = SETS.filter((candidate) => game.unlockedSets.includes(candidate.id));
+function BinderDrawer({ game, set, onClose, onCard, displayedIds }) {
   const [query, setQuery] = useState("");
-  const [ownership, setOwnership] = useState("owned");
+  const [ownership, setOwnership] = useState("all");
   const [rarityFilter, setRarityFilter] = useState("all");
-  const [sort, setSort] = useState("rarity-low");
+  const [sort, setSort] = useState("number");
   const found = set.cards.filter((card) => game.collection[card.id]).length;
   const visibleCards = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -648,24 +582,11 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
   }, [game.collection, ownership, query, rarityFilter, set.cards, sort]);
 
   return (
-    <aside className={`clean-drawer clean-binder ${unlockedSets.length > 1 ? "has-set-picker" : ""}`} aria-label="Binder">
+    <aside className="clean-drawer clean-binder" aria-label="Binder">
       <header>
         <div><span>BINDER</span><h2>{set.name}</h2></div>
         <button onClick={onClose} aria-label="Close binder">CLOSE</button>
       </header>
-      {unlockedSets.length > 1 && (
-        <div className="clean-set-picker" aria-label="Binder set">
-          {unlockedSets.map((candidate) => (
-            <button
-              key={candidate.id}
-              className={candidate.id === set.id ? "active" : ""}
-              onClick={() => onSetId(candidate.id)}
-            >
-              {candidate.short}
-            </button>
-          ))}
-        </div>
-      )}
       <div className="clean-binder-tools">
         <label className="clean-binder-search">
           <span>SEARCH CARDS</span>
@@ -680,8 +601,8 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
           <span>COLLECTION</span>
           <select value={ownership} onChange={(event) => setOwnership(event.target.value)}>
             <option value="all">All cards</option>
-            <option value="owned">Unlocked</option>
-            <option value="missing">Not unlocked</option>
+            <option value="owned">Opened</option>
+            <option value="missing">Not opened</option>
           </select>
         </label>
         <label>
@@ -696,15 +617,15 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
         <label>
           <span>SORT</span>
           <select value={sort} onChange={(event) => setSort(event.target.value)}>
+            <option value="number">Card number</option>
             <option value="rarity">Rarity / high first</option>
             <option value="rarity-low">Rarity / low first</option>
-            <option value="number">Card number</option>
             <option value="name">Card name</option>
           </select>
         </label>
         <div className="clean-binder-count">
           <strong>{found}/{set.cards.length}</strong>
-          <span>UNLOCKED</span>
+          <span>COLLECTED</span>
           <small>{visibleCards.length} SHOWN</small>
         </div>
       </div>
@@ -722,14 +643,14 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
                 "--rarity": rarity.color,
                 borderColor: count ? undefined : rarity.color,
               }}
-              aria-label={count ? `${card.name}, ${count} copies` : `Missing card ${card.number}, show rarity`}
+              aria-label={count ? `${card.name}, opened ${count} times` : `Missing card ${card.number}, show rarity`}
             >
               {count ? (
                 <PrintedCard
                   card={card}
                   compact
                   foil={(game.foils?.[card.id] || 0) > 0}
-                  copyLabel={displayedIds?.has(card.id) ? "ON DISPLAY" : "UNLOCKED"}
+                  copyLabel={displayedIds?.has(card.id) ? "ON DISPLAY" : "COLLECTED"}
                 />
               ) : (
                 <span className="card-back back-style-crest">
@@ -739,7 +660,7 @@ function BinderDrawer({ game, setId, onSetId, onClose, onCard, displayedIds }) {
                 </span>
               )}
               <span className="clean-binder-card-state">
-                {count ? rarity.label : `${rarity.label} / NOT UNLOCKED`}
+                {count ? rarity.label : `${rarity.label} / NOT OPENED`}
               </span>
             </button>
           );
@@ -758,9 +679,9 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
   const rarityId = card.rarity;
   const rarity = RARITIES[rarityId];
   const count = game.collection[card.id] || 0;
-  const duplicateValue = Math.ceil(getCardSaleValue(game, card.id) * (1 + (game.upgrades?.shelf || 0) * 0.2));
   const isDisplayed = derived.displayedEntries.some((entry) => entry.id === card.id);
   const caseFull = derived.displayedEntries.length >= derived.caseSlots;
+  const hasEffect = Boolean(getCardDef(card.id));
   return (
     <div className="clean-modal-scrim" onMouseDown={onClose}>
       <article
@@ -774,10 +695,10 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
               card={card}
               rarityId={rarityId}
               foil={(game.foils?.[card.id] || 0) > 0}
-              copyLabel={`${count} ${count === 1 ? "COPY" : "COPIES"}`}
+              copyLabel={`OPENED ${count}×`}
             />
           ) : (
-            <span className="card-back card-zoom-back back-style-crest" aria-label={`Card ${String(card.number).padStart(2, "0")}, not found`}>
+            <span className="card-back card-zoom-back back-style-crest" aria-label={`Card ${String(card.number).padStart(2, "0")}, not opened yet`}>
               <span className="back-set">{getSet(card.setId).short}</span>
               <span className="back-orbit"><i /><i /><i /></span>
               <span className="back-mark"><span><b>PW</b><small>PACKWORKS</small></span></span>
@@ -787,12 +708,12 @@ function CardDetail({ game, derived, cardId, onClose, onDisplay, onUndisplay }) 
         </div>
         <div className="card-zoom-hud">
           <div className="card-zoom-status">
-            <span>{count ? `${rarity.label} / ${rarity.rateLabel} BASE PULL` : "UNDISCOVERED"}</span>
+            <span>{count ? `${rarity.label} / ${rarity.rateLabel} PULL RATE` : "NOT OPENED YET"}</span>
             <strong>{count ? card.name : `Card ${String(card.number).padStart(2, "0")}`}</strong>
             <small>
               {count
-                ? `${count} ${count === 1 ? "copy" : "copies"} / future duplicates auto-sell for ${money(duplicateValue)} cash`
-                : `${rarity.label} / ${rarity.rateLabel} base pull`}
+                ? `Pays ${money(rarity.sellValue)} cash on reveal (foil pays double) / Salvages into ${money(rarity.scrapValue)} Scrap${hasEffect ? " / carries a display effect" : ""}`
+                : `${rarity.label} / ${rarity.rateLabel} pull rate`}
             </small>
           </div>
           {count > 0 && (
@@ -903,12 +824,10 @@ function useCaseDragReorder(filledCount, onReorder) {
   return { drag, registerSlot, onPointerDown, onPointerMove, endDrag };
 }
 
-function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBinder, onRewrite, rewriteArmed, onReorder }) {
-  const rewriteReady = canRewrite(game);
+function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBinder, onReorder }) {
   const filledCount = derived.displayedEntries.length;
   const { drag, registerSlot, onPointerDown, onPointerMove, endDrag } = useCaseDragReorder(filledCount, onReorder);
   const suppressClickRef = useRef(false);
-  const inscriptionsPreview = rewriteReady ? getInscriptionsEarned(game) : 0;
   return (
     <aside className="clean-drawer clean-case" aria-label="Display case">
       <header>
@@ -917,8 +836,9 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
       </header>
       <div className="clean-drawer-scroll">
         <p className="clean-case-note">
-          Displayed cards fire their printed effects while you play.
+          Displayed cards fire their printed effects while a pack is open.
           {" "}{derived.displayedEntries.length}/{derived.caseSlots} available slots filled.
+          {" "}Slot order matters — some effects look at the card to their right.
           {filledCount > 1 && " Drag a card to move it to another slot."}
         </p>
         <div className={`clean-case-slots ${drag?.active ? "is-reordering" : ""}`}>
@@ -926,14 +846,13 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
             const entry = derived.displayedEntries[index];
             if (entry) {
               const card = getCard(entry.id);
-              const def = getCardDef(entry.id);
               const rarity = RARITIES[card.rarity];
               const tally = game.triggerTallies?.[entry.id] || 0;
               const dragging = drag?.active && drag.index === index;
               const dropTarget = drag?.active && drag.over === index && drag.index !== index;
               return (
                 <article
-                  className={`clean-case-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}${filledCount > 1 ? " is-draggable" : ""}${dragging ? " is-dragging" : ""}${dropTarget ? " is-drop-target" : ""}`}
+                  className={`clean-case-slot is-filled rarity-${card.rarity}${filledCount > 1 ? " is-draggable" : ""}${dragging ? " is-dragging" : ""}${dropTarget ? " is-drop-target" : ""}`}
                   key={`slot-${index}`}
                   ref={(node) => registerSlot(index, node)}
                   style={{
@@ -1010,37 +929,12 @@ function CaseDrawer({ game, derived, onClose, onUndisplay, onPickCard, onOpenBin
             );
           })}
         </div>
-
-        <section className="clean-rewrite">
-          <div className="clean-section-title"><h3>Rewrite</h3><span>PRESTIGE LOOP</span></div>
-          {derived.inscriptions > 0 && (
-            <p className="clean-rewrite-status">
-              {formatNumber(derived.inscriptions)} Inscriptions held / all income and duplicate sales ×{derived.prestigeMultiplier.toFixed(2)}.
-            </p>
-          )}
-          {rewriteReady ? (
-            <>
-              <p>
-                What Was Never Named is yours. Rewriting resets your binder, cash,
-                and packs — and inscribes permanent power. Display the Nameless
-                itself to double what you earn.
-              </p>
-              <button className={`clean-rewrite-button ${rewriteArmed ? "is-armed" : ""}`} onClick={onRewrite}>
-                {rewriteArmed ? "CONFIRM REWRITE" : `REWRITE / +${formatNumber(inscriptionsPreview)} INSCRIPTIONS`}
-              </button>
-            </>
-          ) : (
-            <p className="clean-rewrite-hint">
-              Something beyond the binder waits in the final set.
-            </p>
-          )}
-        </section>
       </div>
     </aside>
   );
 }
 
-function CaseStrip({ game, derived, fx, onOpenCase }) {
+function CaseStrip({ derived, fx, onOpenCase }) {
   return (
     <div className="case-strip">
       {Array.from({ length: CASE_SIZE }, (_, index) => {
@@ -1060,13 +954,12 @@ function CaseStrip({ game, derived, fx, onOpenCase }) {
           );
         }
         const card = getCard(entry.id);
-        const def = getCardDef(entry.id);
         const pulse = fx[entry.id];
         return (
           <button
             type="button"
             key={`${entry.id}-${pulse?.serial || "idle"}`}
-            className={`case-strip-slot is-filled rarity-${card.rarity}${def?.sig ? " is-king" : ""}${pulse ? ` is-triggered fx-${pulse.kind}` : ""}`}
+            className={`case-strip-slot is-filled rarity-${card.rarity}${pulse ? ` is-triggered fx-${pulse.kind}` : ""}`}
             style={{ "--rarity": RARITIES[card.rarity].color }}
             data-fx={pulse ? pulse.serial : undefined}
             title={card.name}
@@ -1074,7 +967,6 @@ function CaseStrip({ game, derived, fx, onOpenCase }) {
             aria-label={`${card.name} — open display case`}
           >
             <CardArt card={card} compact />
-            {def?.sig && <i className="case-strip-crown" aria-hidden="true" />}
           </button>
         );
       })}
@@ -1120,8 +1012,8 @@ function SettingsPanel({
   );
 }
 
-// Bottom-center collection meter: one compact progress bar for the active
-// set. Click-through to the binder for per-card detail.
+// Bottom-center collection meter: one compact progress bar for the set.
+// Click-through to the binder for per-card detail.
 function SetTray({ game, set, onOpenBinder }) {
   const found = set.cards.filter((card) => game.collection[card.id]).length;
   const percent = Math.round((found / set.cards.length) * 100);
@@ -1149,36 +1041,30 @@ export default function PackworksGameClean() {
   const gameRef = useRef(createInitialState(0));
   const openingRef = useRef(null);
   const openingTimersRef = useRef([]);
+  const pumpTimerRef = useRef(null);
   const holdRevealTimerRef = useRef(null);
   const spaceHeldRef = useRef(false);
   const mobileAutoPointerRef = useRef(null);
   const swipePointerRef = useRef(null);
-  const revealLocksRef = useRef(new Set());
   const impactSerialRef = useRef(0);
   const globalBurstSerialRef = useRef(0);
   const cashStreamSerialRef = useRef(0);
   const purchaseDenyAtRef = useRef(0);
-  const legacyAutoSoldRef = useRef(false);
+  const adminActiveRef = useRef(false);
+  const fxSerialRef = useRef(0);
 
   const [game, setGame] = useState(() => createInitialState(0));
   const [ready, setReady] = useState(false);
   const [drawer, setDrawer] = useState(null);
-  const [binderSetId, setBinderSetId] = useState(SETS[0].id);
   const [opening, setOpening] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
-  const [packTypeIndex, setPackTypeIndex] = useState(0);
-  const [packRotation, setPackRotation] = useState("right");
-  const selectedPackType = PACK_TYPES[packTypeIndex] || PACK_TYPES[0];
   const [globalBursts, setGlobalBursts] = useState([]);
   const [cashStreams, setCashStreams] = useState([]);
   const [resetArmed, setResetArmed] = useState(false);
-  const [rewriteArmed, setRewriteArmed] = useState(false);
   const [fx, setFx] = useState({});
   const [revealEchoes, setRevealEchoes] = useState({});
   const [viewport, setViewport] = useState({ w: 1200, h: 800, coarse: false });
   const [hapticsAvailable, setHapticsAvailable] = useState(false);
-  const adminActiveRef = useRef(false);
-  const fxSerialRef = useRef(0);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [mobileAutoHeld, setMobileAutoHeld] = useState(false);
   const [swipeRevealing, setSwipeRevealing] = useState(false);
@@ -1202,6 +1088,8 @@ export default function PackworksGameClean() {
   const pileRefCallbacksRef = useRef(new Map());
   const prevPileRectsRef = useRef(new Map());
   const prevUnrevealedRef = useRef(0);
+
+  const packType = PACK_TYPES[0];
 
   // Stable per-card ref callbacks so memoized piles skip re-renders.
   const getPileRefCallback = useCallback((cardId) => {
@@ -1286,14 +1174,14 @@ export default function PackworksGameClean() {
     setHapticsAvailable(getHaptics().supported());
   }, [getHaptics]);
 
-  const playCashGains = useCallback((items) => {
+  const playResourceGains = useCallback((items) => {
     const queued = items
       .filter((item) => item.amount > 0)
       .slice(0, 18)
       .map((item, index) => ({
         id: ++cashStreamSerialRef.current,
         amount: item.amount,
-        cardId: item.cardId || null,
+        kind: item.kind || "cash",
         x: ((index % 7) - 3) * 58,
         delay: index * 55,
       }));
@@ -1317,25 +1205,20 @@ export default function PackworksGameClean() {
 
   const pushFx = useCallback((events) => {
     if (!events?.length) return;
-    const soldItems = events
-      .filter((event) => event.t === "sold")
-      .flatMap((event) => event.items?.length
-        ? event.items
-        : [{ cardId: null, amount: event.value }]);
-    const triggeredCoins = events
-      .filter((event) => event.t === "coins" && (event.source || soldItems.length === 0))
-      .map((event) => ({ cardId: event.source || null, amount: event.amount }));
-    const cashGains = [...soldItems, ...triggeredCoins].filter((item) => item.amount > 0);
-    playCashGains(cashGains);
+    const gains = [];
+    for (const event of events) {
+      if (event.t === "coins" && event.amount > 0) gains.push({ amount: event.amount, kind: "cash" });
+      if (event.t === "scrap" && event.amount > 0) gains.push({ amount: event.amount, kind: "scrap" });
+    }
+    playResourceGains(gains);
     const stamp = {};
     for (const event of events) {
-      const kind = event.t === "trigger" || event.t === "addCards" ? "trigger"
-        : event.t === "echo" ? "echo"
-        : event.t === "relay" ? "relay"
-        : event.t === "mystery" ? "mystery"
-        : ["mark", "mimic", "transmute", "fracture", "fusion", "catalyst"].includes(event.t) ? "pulse"
+      const kind = event.t === "trigger" ? "trigger"
+        : event.t === "encore" ? "echo"
+        : event.t === "salvage" && event.source ? "mystery"
+        : ["fusion", "rareShift", "reroll"].includes(event.t) && event.source ? "pulse"
         : null;
-      const displayCardId = event.t === "addCards" ? event.source : event.cardId;
+      const displayCardId = event.t === "trigger" || event.t === "encore" ? event.cardId : event.source;
       if (kind && displayCardId) {
         stamp[displayCardId] = { kind, serial: ++fxSerialRef.current };
       }
@@ -1350,39 +1233,18 @@ export default function PackworksGameClean() {
         return next;
       }), 900);
     }
-    const mysteries = events.filter((event) => event.t === "mystery").length;
-    if (mysteries > 0) {
-      queueGlobalBurst("salvage", mysteries);
+    const salvages = events.filter((event) => event.t === "salvage").length;
+    if (salvages > 0) {
+      queueGlobalBurst("salvage", salvages);
+      getHaptics().pulse("burst");
+    }
+    const bursts = events.filter((event) => event.t === "addCards" && event.packBurst).length;
+    if (bursts > 0) {
+      queueGlobalBurst("fracture", bursts);
       getAudio().sound("caseBreak");
       getHaptics().pulse("burst");
     }
-    const fractures = events.filter((event) => event.t === "fracture").length;
-    if (fractures > 0) {
-      queueGlobalBurst("fracture", fractures);
-      getHaptics().pulse("burst");
-    }
-    // A card revealed with no pack open — Regalynx crossing a cash threshold
-    // while you idle — otherwise lands in the binder with nothing to see.
-    // When a pack IS open the card spills onto the reveal board instead, and
-    // showing it twice would be the noisier lie.
-    const openingCanShowSpill = openingRef.current
-      && openingRef.current.phase !== "collecting";
-    if (!openingCanShowSpill) {
-      const revealed = events.filter((event) => event.t === "duplicateReveal" && event.cardId);
-      for (const event of revealed.slice(0, MAX_QUIET_REVEAL_BURSTS)) {
-        const card = getCard(event.cardId);
-        if (!card) continue;
-        queueGlobalBurst("reveal", 1, { name: card.name, rarity: card.rarity });
-      }
-      if (revealed.length > 0) {
-        getAudio().sound("reveal", RARITIES[getCard(revealed[0].cardId)?.rarity]?.order || 0);
-        getHaptics().pulse("reveal");
-      }
-    }
-    // Former gameplay-cue banners (Encore, free packs, Fusion lift, boons,
-    // set completion) are gone; each of those moments still needs its own
-    // bespoke notification treatment.
-  }, [getAudio, getHaptics, playCashGains, queueGlobalBurst]);
+  }, [getAudio, getHaptics, playResourceGains, queueGlobalBurst]);
 
   useEffect(() => {
     let adminFlag = false;
@@ -1403,7 +1265,6 @@ export default function PackworksGameClean() {
         : createAdminState(Date.now());
       adminActiveRef.current = true;
       commit(adminState);
-      setBinderSetId(adminState.activeSet);
       setReady(true);
       return;
     }
@@ -1413,11 +1274,10 @@ export default function PackworksGameClean() {
     } catch {
       loaded = null;
     }
-    // The game only runs while it is open: no offline earnings, no away
-    // report.
+    // The game only runs while a pack is open in front of you: no offline
+    // earnings, no away report, nothing ticking in the background.
     const hydrated = hydrateState(loaded, Date.now());
     commit(hydrated);
-    setBinderSetId(hydrated.activeSet);
     setReady(true);
   }, [commit]);
 
@@ -1447,67 +1307,13 @@ export default function PackworksGameClean() {
     };
   }, [ready]);
 
-  useEffect(() => {
-    if (!ready || legacyAutoSoldRef.current) return;
-    legacyAutoSoldRef.current = true;
-    const sale = sellDuplicatesDetailed(gameRef.current, {});
-    if (sale.state === gameRef.current) return;
-    commit(sale.state);
-    pushFx(sale.events);
-  }, [commit, pushFx, ready]);
-
-  useEffect(() => {
-    if (!ready) return undefined;
-    let last = performance.now();
-    const interval = window.setInterval(() => {
-      const now = performance.now();
-      const seconds = Math.min(1, (now - last) / 1000);
-      last = now;
-      commit((current) => tickEconomy(current, seconds));
-    }, 250);
-    return () => window.clearInterval(interval);
-  }, [commit, ready]);
-
-  useEffect(() => {
-    if (!ready) return undefined;
-    const interval = window.setInterval(() => {
-      const currentOpening = openingRef.current;
-      const canSpillIntoOpening = currentOpening
-        && !["filing", "collecting"].includes(currentOpening.phase);
-      const openingCards = canSpillIntoOpening ? currentOpening.result.cards : null;
-      const swept = evaluateIdleThresholds(gameRef.current, {
-        injectCards: openingCards,
-      });
-      if (swept.state !== gameRef.current) {
-        commit(swept.state);
-        pushFx(swept.events);
-      }
-      if (openingCards && swept.cards?.length > openingCards.length) {
-        if (currentOpening.phase === "complete") {
-          openingTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-          openingTimersRef.current = [];
-        }
-        commitOpening((current) => {
-          if (current?.id !== currentOpening.id) return current;
-          return {
-            ...current,
-            result: { ...current.result, cards: swept.cards },
-            phase: current.phase === "complete" ? "ready" : current.phase,
-            ...getOverflowFlags(current, swept.cards),
-            revealed: swept.cards
-              .map((entry, index) => (entry.revealed ? index : -1))
-              .filter((index) => index >= 0),
-            impact: current.phase === "complete" ? null : current.impact,
-          };
-        });
-      }
-    }, 2_000);
-    return () => window.clearInterval(interval);
-  }, [commit, commitOpening, pushFx, ready]);
-
   const clearOpeningTimers = useCallback(() => {
     openingTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     openingTimersRef.current = [];
+    if (pumpTimerRef.current !== null) {
+      window.clearTimeout(pumpTimerRef.current);
+      pumpTimerRef.current = null;
+    }
   }, []);
 
   const clearHoldRevealTimer = useCallback(() => {
@@ -1517,13 +1323,14 @@ export default function PackworksGameClean() {
     }
   }, []);
 
+  // Leaving an opening clears the action stack — pending reveals and queued
+  // effects are gone, revealed cards keep everything they already paid.
   const closeOpening = useCallback(() => {
     clearOpeningTimers();
     clearHoldRevealTimer();
     clearFlights();
     mobileAutoPointerRef.current = null;
     swipePointerRef.current = null;
-    revealLocksRef.current.clear();
     setMobileAutoHeld(false);
     setSwipeRevealing(false);
     commitOpening(null);
@@ -1550,7 +1357,6 @@ export default function PackworksGameClean() {
         closeOpening();
         setDrawer(null);
         commit(adminState);
-        setBinderSetId(adminState.activeSet);
       } else {
         window.localStorage.setItem(ADMIN_SAVE_KEY, serializeState(gameRef.current));
         let real = null;
@@ -1564,7 +1370,6 @@ export default function PackworksGameClean() {
         closeOpening();
         setDrawer(null);
         commit(restored);
-        setBinderSetId(restored.activeSet);
       }
     } catch {
       // Local storage can be unavailable in strict privacy modes.
@@ -1592,8 +1397,7 @@ export default function PackworksGameClean() {
     return () => window.removeEventListener("storage", onStorage);
   }, [ready, applyAdminSwitch]);
 
-
-  const openingCards = opening?.result?.cards;
+  const openingCards = opening?.session?.cards;
   const openingActiveIndices = useMemo(() => getActiveIndices(openingCards), [openingCards]);
   const overflowActive = Boolean(opening?.overflow);
 
@@ -1627,8 +1431,8 @@ export default function PackworksGameClean() {
     }
     if (tracker.waveSize < 0 && tracker.next > 0) tracker.waveSize = tracker.next;
     // Once a card has shown on the board it stays for the rest of the
-    // opening; when effects like Fusion consume every copy, its pile greys
-    // out at zero instead of disappearing.
+    // opening; when effects like Fuse or Salvage consume every copy, its pile
+    // greys out at zero instead of disappearing.
     const entries = [];
     for (const [id, meta] of tracker.seq) {
       const current = live.get(id);
@@ -1644,17 +1448,15 @@ export default function PackworksGameClean() {
   }, [overflowActive, openingCards, opening?.id]);
 
   const overflowUnrevealed = useMemo(() => {
-    if (!overflowActive || !openingCards) return { count: 0, marked: 0, mystery: 0 };
+    if (!overflowActive || !openingCards) return { count: 0, bonus: 0 };
     let count = 0;
-    let marked = 0;
-    let mystery = 0;
+    let bonus = 0;
     for (const pull of openingCards) {
       if (pull.revealed || pull.fusedAway) continue;
       count += 1;
-      if (pull.marked) marked += 1;
-      if (pull.fromMystery) mystery += 1;
+      if (pull.fromEffect) bonus += 1;
     }
-    return { count, marked, mystery };
+    return { count, bonus };
   }, [overflowActive, openingCards]);
 
   // Grid solver: pick the columns-by-rows arrangement that keeps every card
@@ -1744,213 +1546,202 @@ export default function PackworksGameClean() {
       height: viewport.h,
       coarse: viewport.coarse,
       uniqueCount: overflowPiles.length,
-      setSize: opening?.result?.set?.cards?.length || 98,
+      setSize: opening?.set?.cards?.length || 50,
     });
-  }, [overflowActive, overflowPiles.length, opening?.result?.set, viewport]);
+  }, [overflowActive, overflowPiles.length, opening?.set, viewport]);
 
-  const revealCard = useCallback((index) => {
+  // Rarity-scaled pacing between queued actions: commons whip by, premium
+  // reveals get room to breathe, and overflow reveals drain faster.
+  const delayForStep = useCallback((outcome, overflow) => {
+    const action = outcome.action;
+    if (!action) return 220;
+    if (action.type === "reveal") {
+      const pull = outcome.session.cards[action.index];
+      const order = pull ? RARITIES[pull.rarity].order : 0;
+      if (overflow) {
+        return order >= 3 ? 1250 : order === 2 ? 820 : order === 1 ? 520 : 340;
+      }
+      return order >= 3 ? 1250 : order === 2 ? 900 : order === 1 ? 650 : 480;
+    }
+    if (action.type === "fuse") return 700;
+    if (action.type === "salvage") return 520;
+    return 360;
+  }, []);
+
+  const scheduleCompletion = useCallback((openingId, lastRarityOrder = 0) => {
+    const delay = lastRarityOrder >= 3 ? 1550 : lastRarityOrder === 2 ? 1200 : 900;
+    openingTimersRef.current.push(window.setTimeout(() => {
+      if (
+        openingRef.current?.id !== openingId
+        || openingRef.current.phase !== "complete"
+      ) return;
+      const audio = getAudio();
+      audio.sound("packComplete");
+      audio.sound("caseBreak");
+      getHaptics().pulse("open");
+      commitOpening((current) => current?.id === openingId
+        ? { ...current, phase: "collecting", impact: null, fusionNotice: null }
+        : current);
+    }, delay));
+    openingTimersRef.current.push(window.setTimeout(() => {
+      if (
+        openingRef.current?.id !== openingId
+        || openingRef.current.phase !== "collecting"
+      ) return;
+      swipePointerRef.current = null;
+      setSwipeRevealing(false);
+      commitOpening(null);
+    }, delay + COLLECTION_ANIMATION_MS));
+  }, [commitOpening, getAudio, getHaptics]);
+
+  // THE ACTION PUMP. Every queued action — player reveals and card effects
+  // alike — resolves here, strictly one at a time, in the order it was
+  // queued. Rapid clicks stack up; nothing ever resolves simultaneously.
+  const pumpQueue = useCallback(() => {
     const currentOpening = openingRef.current;
     if (!currentOpening || currentOpening.phase !== "ready") return;
-    const pull = currentOpening.result.cards[index];
-    if (!pull || pull.revealed || pull.fusedAway) return;
-    const key = `${currentOpening.id}-${index}`;
-    if (revealLocksRef.current.has(key)) return;
-    revealLocksRef.current.add(key);
+    const session = currentOpening.session;
+    if (!session || session.queue.length === 0) return;
 
-    const revealedOutcome = revealPackCard(gameRef.current, currentOpening.result.cards, index, { manual: true });
-    const revealedPull = revealedOutcome.cards[index];
-    let state = revealedOutcome.state;
-    let cards = revealedOutcome.cards;
-    const events = [...revealedOutcome.events];
-    let fusionNotice = null;
-    let fusionCount = 0;
+    const outcome = stepOpening(gameRef.current, session, {});
+    commit(outcome.state);
+    pushFx(outcome.events);
 
-    const sellRevealedDuplicates = () => {
-      const sale = sellDuplicatesDetailed(state, { injectCards: cards });
-      state = sale.state;
-      cards = sale.cards || cards;
-      events.push(...sale.events);
-    };
-    sellRevealedDuplicates();
+    let impact = currentOpening.impact;
+    let fusionNotice = currentOpening.fusionNotice;
+    const audio = getAudio();
+    let lastRevealOrder = 0;
 
-    // Resolve every newly available pair immediately. Each replacement takes
-    // the earlier slot and is itself revealed through the normal engine path.
-    for (let guard = 0; guard < 32; guard += 1) {
-      const fusion = resolveImmediateFusion(state, cards, { manual: true });
-      if (!fusion.fused) break;
-      state = fusion.state;
-      cards = fusion.cards;
-      events.push(...fusion.events);
-      fusionCount += 1;
-      fusionNotice = {
-        index: fusion.index,
-        cardId: fusion.cardId,
-        count: fusionCount,
-        serial: ++impactSerialRef.current,
-      };
-      sellRevealedDuplicates();
+    for (const event of outcome.events) {
+      if (event.t === "reveal") {
+        const rarity = RARITIES[event.rarity];
+        lastRevealOrder = rarity.order;
+        impact = {
+          index: event.index,
+          rarity: event.rarity,
+          foil: event.foil,
+          serial: ++impactSerialRef.current,
+        };
+        audio.sound("reveal", rarity.order);
+        getHaptics().pulse("reveal", rarity.order);
+        if (rarity.order >= RARITIES.legendary.order) audio.sound("legendary", rarity.order);
+        if (getOverflowFlags(currentOpening, outcome.session.cards).overflow) {
+          const pull = outcome.session.cards[event.index];
+          if (pull) {
+            flightQueueRef.current.push({
+              serial: ++flightSerialRef.current,
+              cardId: pull.card.id,
+              card: pull.card,
+              rarity: pull.rarity,
+              foil: Boolean(pull.foil),
+            });
+            const pending = { ...pendingLandRef.current };
+            pending[pull.card.id] = (pending[pull.card.id] || 0) + 1;
+            pendingLandRef.current = pending;
+            setPendingLand(pending);
+          }
+        }
+      } else if (event.t === "fusion") {
+        fusionNotice = {
+          index: event.index,
+          cardId: event.cardId,
+          serial: ++impactSerialRef.current,
+        };
+        audio.sound("fusion", 4);
+        getHaptics().pulse("fuse");
+      } else if (event.t === "salvage") {
+        audio.sound("caseBreak");
+        const echoSerial = ++fxSerialRef.current;
+        setRevealEchoes((current) => ({
+          ...current,
+          [event.index]: { count: 1, serial: echoSerial, label: "SALVAGED" },
+        }));
+        openingTimersRef.current.push(window.setTimeout(() => {
+          setRevealEchoes((current) => {
+            if (current[event.index]?.serial !== echoSerial) return current;
+            const next = { ...current };
+            delete next[event.index];
+            return next;
+          });
+        }, 1_100));
+      } else if (event.t === "reroll") {
+        audio.sound("switch");
+      } else if (event.t === "encore") {
+        audio.sound("fusion", 2);
+      }
     }
 
-    if (fusionCount > 0) revealLocksRef.current.clear();
-    commit(state);
-    pushFx(events);
-
-    const echoesByIndex = new Map();
-    for (const event of events) {
-      if (event.t !== "echo" || !Number.isInteger(event.index)) continue;
-      echoesByIndex.set(event.index, (echoesByIndex.get(event.index) || 0) + 1);
-    }
-    for (const [echoIndex, echoCount] of echoesByIndex) {
-      const echoSerial = ++fxSerialRef.current;
-      setRevealEchoes((current) => ({ ...current, [echoIndex]: { count: echoCount, serial: echoSerial } }));
-      openingTimersRef.current.push(window.setTimeout(() => {
-        setRevealEchoes((current) => {
-          if (current[echoIndex]?.serial !== echoSerial) return current;
-          const next = { ...current };
-          delete next[echoIndex];
-          return next;
-        });
-      }, 800 + 620 * Math.min(4, echoCount)));
-    }
-
-    const impactIndex = fusionNotice?.index ?? index;
-    const impactPull = cards[impactIndex] || revealedPull;
-    const rarity = RARITIES[impactPull.rarity];
-    const allRevealed = cards.every((entry) => entry.revealed || entry.fusedAway);
-    const overflowFlags = getOverflowFlags(currentOpening, cards);
-    const impact = {
-      index: impactIndex,
-      rarity: impactPull.rarity,
-      foil: impactPull.foil,
-      serial: ++impactSerialRef.current,
-    };
-    commitOpening({
+    const settled = isOpeningSettled(outcome.session);
+    const overflowFlags = getOverflowFlags(currentOpening, outcome.session.cards);
+    const nextOpening = {
       ...currentOpening,
-      result: { ...currentOpening.result, cards },
-      phase: allRevealed ? "complete" : "ready",
+      session: outcome.session,
+      phase: settled ? "complete" : "ready",
       ...overflowFlags,
-      revealed: cards.map((entry, position) => (entry.revealed ? position : -1)).filter((position) => position >= 0),
+      revealed: outcome.session.cards
+        .map((entry, position) => (entry.revealed ? position : -1))
+        .filter((position) => position >= 0),
       impact,
       fusionNotice,
-    });
+    };
+    commitOpening(nextOpening);
 
-    // In Overflow mode every reveal launches a ghost card that flies from the
-    // face-down stack into its pile; the pile counter ticks when it lands.
-    if (overflowFlags.overflow) {
-      flightQueueRef.current.push({
-        serial: ++flightSerialRef.current,
-        cardId: impactPull.card.id,
-        card: impactPull.card,
-        rarity: impactPull.rarity,
-        foil: Boolean(impactPull.foil),
-      });
-      const pending = { ...pendingLandRef.current };
-      pending[impactPull.card.id] = (pending[impactPull.card.id] || 0) + 1;
-      pendingLandRef.current = pending;
-      setPendingLand(pending);
-    }
-
-    const audio = getAudio();
-    const revealedRarity = RARITIES[revealedPull.rarity];
-    audio.sound("reveal", revealedRarity.order);
-    getHaptics().pulse("reveal", revealedRarity.order);
-    if (revealedRarity.order >= RARITIES.legendary.order) {
-      audio.sound("legendary", revealedRarity.order);
-    }
-    if (events.some((event) => event.t === "echo")) audio.sound("fusion", 2);
-    if (fusionNotice) {
-      audio.sound("fusion", 4);
-      getHaptics().pulse("fuse");
+    if (fusionNotice && fusionNotice !== currentOpening.fusionNotice) {
+      const serial = fusionNotice.serial;
       openingTimersRef.current.push(window.setTimeout(() => {
         commitOpening((current) => current?.id === currentOpening.id
-          && current.fusionNotice?.serial === fusionNotice.serial
+          && current.fusionNotice?.serial === serial
           ? { ...current, fusionNotice: null }
           : current);
       }, 1_000));
     }
 
-    if (allRevealed) {
-      const delay = rarity.order >= 4 ? 1550 : rarity.order === 3 ? 1200 : 900;
-      openingTimersRef.current.push(window.setTimeout(() => {
-        if (
-          openingRef.current?.id !== currentOpening.id
-          || openingRef.current.phase !== "complete"
-        ) return;
-        audio.sound("packComplete");
-        audio.sound("caseBreak");
-        getHaptics().pulse("open");
-        commitOpening((current) => current?.id === currentOpening.id
-          ? { ...current, phase: "collecting", impact: null, fusionNotice: null }
-          : current);
-      }, delay));
-      openingTimersRef.current.push(window.setTimeout(() => {
-        if (
-          openingRef.current?.id !== currentOpening.id
-          || openingRef.current.phase !== "collecting"
-        ) return;
-        revealLocksRef.current.clear();
-        swipePointerRef.current = null;
-        setSwipeRevealing(false);
-        commitOpening(null);
-      }, delay + COLLECTION_ANIMATION_MS));
+    if (settled) {
+      scheduleCompletion(currentOpening.id, lastRevealOrder);
+      return;
     }
-  }, [commit, commitOpening, getAudio, getHaptics, pushFx]);
+    if (outcome.session.queue.length > 0) {
+      if (pumpTimerRef.current === null) {
+        pumpTimerRef.current = window.setTimeout(() => {
+          pumpTimerRef.current = null;
+          pumpQueue();
+        }, delayForStep(outcome, overflowFlags.overflow));
+      }
+    }
+  }, [commit, commitOpening, delayForStep, getAudio, getHaptics, pushFx, scheduleCompletion]);
 
-  // Mystery and Fracture cards visibly spill into the current deal, then flip
-  // through the exact same reveal function as a player-clicked card. Resolving
-  // one at a time keeps mobile DOM/animation work bounded and preserves trigger
-  // attribution (including Locklure) for every generated reveal.
-  useEffect(() => {
-    if (opening?.phase !== "ready") return undefined;
-    const generatedIndex = opening.result.cards.findIndex((pull) => (
-      pull
-      && !pull.revealed
-      && !pull.fusedAway
-      && (pull.fromMystery || pull.fromFracture)
-    ));
-    if (generatedIndex < 0) return undefined;
-    const timer = window.setTimeout(() => revealCard(generatedIndex), 180);
-    return () => window.clearTimeout(timer);
-  }, [opening?.phase, opening?.result?.cards, revealCard]);
+  const kickPump = useCallback(() => {
+    if (pumpTimerRef.current !== null) return;
+    pumpTimerRef.current = window.setTimeout(() => {
+      pumpTimerRef.current = null;
+      pumpQueue();
+    }, 0);
+  }, [pumpQueue]);
 
-  const forceFinishOpening = useCallback(() => {
+  // Player input: add one reveal to the action stack.
+  const revealCard = useCallback((index) => {
     const currentOpening = openingRef.current;
-    if (!currentOpening?.canForceFinish || currentOpening.phase === "collecting") return;
+    if (!currentOpening || currentOpening.phase !== "ready") return;
+    const session = currentOpening.session;
+    const nextSession = enqueueReveal(session, index);
+    if (nextSession === session) return;
+    commitOpening({ ...currentOpening, session: nextSession });
+    kickPump();
+  }, [commitOpening, kickPump]);
+
+  // Ending an opening early clears the action stack; face-down cards are
+  // left behind, revealed cards keep everything they paid.
+  const endOpening = useCallback(() => {
+    const currentOpening = openingRef.current;
+    if (!currentOpening || currentOpening.phase === "collecting") return;
     clearOpeningTimers();
     clearHoldRevealTimer();
-    revealLocksRef.current.clear();
     swipePointerRef.current = null;
     mobileAutoPointerRef.current = null;
     spaceHeldRef.current = false;
     setSwipeRevealing(false);
     setMobileAutoHeld(false);
     setSpaceHeld(false);
-
-    // Flooded reveals can hold thousands of cards, so the remaining table is
-    // revealed in single passes and events are concatenated, never spread.
-    let state = gameRef.current;
-    let cards = currentOpening.result.cards;
-    let events = [];
-    const firstPass = revealAllPackCards(state, cards);
-    state = firstPass.state;
-    cards = firstPass.cards;
-    events = events.concat(firstPass.events);
-    const automaticSale = sellDuplicatesDetailed(state, { injectCards: cards });
-    state = automaticSale.state;
-    cards = automaticSale.cards || cards;
-    events = events.concat(automaticSale.events);
-    const secondPass = revealAllPackCards(state, cards);
-    state = secondPass.state;
-    cards = secondPass.cards;
-    events = events.concat(secondPass.events);
-    // FINISH is the hard loop breaker: generated cards still join the table and
-    // are collected, but their resulting duplicate sale cannot start a new
-    // display-effect chain.
-    const cleanupSale = sellDuplicatesDetailed(state, { suppressEffects: true });
-    state = cleanupSale.state;
-    events = events.concat(cleanupSale.events);
-    commit(state);
-    pushFx(events);
 
     flightQueueRef.current = [];
     for (const timer of flightTimersRef.current.values()) window.clearTimeout(timer);
@@ -1962,22 +1753,18 @@ export default function PackworksGameClean() {
     setLandPulse(null);
     commitOpening({
       ...currentOpening,
-      result: { ...currentOpening.result, cards },
+      session: clearOpeningQueue(currentOpening.session),
       phase: "collecting",
-      ...getOverflowFlags(currentOpening, cards),
-      revealed: cards.map((entry, index) => (entry.revealed ? index : -1)).filter((index) => index >= 0),
       impact: null,
       fusionNotice: null,
     });
     getAudio().sound("packComplete");
-    getAudio().sound("caseBreak");
     getHaptics().pulse("open");
     openingTimersRef.current.push(window.setTimeout(() => {
       if (
         openingRef.current?.id !== currentOpening.id
         || openingRef.current.phase !== "collecting"
       ) return;
-      revealLocksRef.current.clear();
       swipePointerRef.current = null;
       setSwipeRevealing(false);
       commitOpening(null);
@@ -1985,26 +1772,19 @@ export default function PackworksGameClean() {
   }, [
     clearHoldRevealTimer,
     clearOpeningTimers,
-    commit,
     commitOpening,
     getAudio,
     getHaptics,
-    pushFx,
   ]);
 
   const beginManualOpen = useCallback(() => {
-    if (!ready || drawer || selectedCard || gameRef.current.discoverOffer) return;
+    if (!ready || drawer || selectedCard) return;
     const currentOpening = openingRef.current;
     if (currentOpening && currentOpening.phase !== "collecting") return;
     let current = gameRef.current;
-    if (getProductCount(current, current.activeSet, selectedPackType.id) <= 0) {
-      if (selectedPackType.id === "loose" && getProductCount(current, current.activeSet, "case") > 0) {
-        current = breakProduct(current, "case");
-      }
-      if (getProductCount(current, current.activeSet, selectedPackType.id) <= 0) {
-        current = buyProduct(current, selectedPackType.id, current.activeSet);
-      }
-      if (getProductCount(current, current.activeSet, selectedPackType.id) <= 0) {
+    if (current.packs <= 0) {
+      current = buyPack(current);
+      if (current.packs <= 0) {
         const now = Date.now();
         if (now - purchaseDenyAtRef.current > 3_500) {
           purchaseDenyAtRef.current = now;
@@ -2014,20 +1794,18 @@ export default function PackworksGameClean() {
       }
     }
     setRevealEchoes({});
-    const rolled = openPack(current, { manual: true, source: selectedPackType.id, now: Date.now() });
-    if (!rolled.result) {
-      if (rolled.error === "MANUAL_RATE_CAP") getAudio().sound("deny");
+    const rolled = openPack(current, {});
+    if (!rolled.session) {
+      getAudio().sound("deny");
       return;
     }
 
     clearOpeningTimers();
     clearFlights();
-    revealLocksRef.current.clear();
     swipePointerRef.current = null;
     setSwipeRevealing(false);
     commitOpening(null);
     commit(rolled.state);
-    setBinderSetId(rolled.state.activeSet);
     const audio = getAudio();
     audio.ensure();
     audio.sound("pack");
@@ -2035,22 +1813,24 @@ export default function PackworksGameClean() {
     haptics.ensure();
     haptics.pulse("open");
 
-    pushFx(rolled.result.events);
+    pushFx(rolled.events);
 
-    const id = `${Date.now()}-${rolled.state.packsOpened}`;
+    const id = rolled.session.id;
+    const activeSet = getSet("core");
     const freshOpening = {
       id,
-      result: rolled.result,
+      session: rolled.session,
+      set: activeSet,
+      packType,
       phase: "sealed",
       revealed: [],
       impact: null,
+      fusionNotice: null,
       overflow: false,
-      canForceFinish: false,
     };
-    commitOpening({ ...freshOpening, ...getOverflowFlags(freshOpening, rolled.result.cards) });
-    const quick = rolled.state.settings.quickOpen;
-    const tearDelay = quick ? 80 : 440;
-    const dealDelay = quick ? 240 : 1250;
+    commitOpening({ ...freshOpening, ...getOverflowFlags(freshOpening, rolled.session.cards) });
+    const tearDelay = 440;
+    const dealDelay = 1250;
     openingTimersRef.current.push(window.setTimeout(() => {
       commitOpening((value) => value?.id === id ? { ...value, phase: "torn" } : value);
       audio.sound("tear");
@@ -2067,10 +1847,10 @@ export default function PackworksGameClean() {
     drawer,
     getAudio,
     getHaptics,
+    packType,
     pushFx,
     ready,
     selectedCard,
-    selectedPackType,
   ]);
 
   const startMobileAuto = useCallback((event) => {
@@ -2106,7 +1886,7 @@ export default function PackworksGameClean() {
       !card
       || !Number.isInteger(index)
       || currentOpening?.phase !== "ready"
-      || currentOpening.result.cards[index]?.revealed
+      || currentOpening.session.cards[index]?.revealed
     ) return;
     event.preventDefault();
     swipePointerRef.current = event.pointerId;
@@ -2138,10 +1918,12 @@ export default function PackworksGameClean() {
     setSwipeRevealing(false);
   }, []);
 
+  // Hold-to-auto: while held, feed the queue one reveal at a time. The pump
+  // still owns pacing — this only tops the queue up when it runs dry.
   useEffect(() => {
     clearHoldRevealTimer();
     const autoOpeningHeld = spaceHeld || mobileAutoHeld;
-    if (!autoOpeningHeld || drawer || selectedCard || game.discoverOffer) return undefined;
+    if (!autoOpeningHeld || drawer || selectedCard) return undefined;
 
     if (!opening || opening.phase === "collecting") {
       const retry = () => {
@@ -2158,25 +1940,13 @@ export default function PackworksGameClean() {
       return clearHoldRevealTimer;
     }
 
-    if (opening.phase === "ready") {
-      const nextIndex = findNextRevealIndex(opening.result.cards);
+    if (opening.phase === "ready" && opening.session.queue.length === 0) {
+      const nextIndex = findNextRevealIndex(opening.session.cards);
       if (nextIndex >= 0) {
-        const lastIndex = opening.revealed.at(-1);
-        const lastPull = Number.isInteger(lastIndex) ? opening.result.cards[lastIndex] : null;
-        const lastOrder = lastPull ? RARITIES[lastPull.rarity].order : 0;
-        // Overflow stacks drain faster: commons whip into their piles while
-        // rare-or-better landings still get room to breathe.
-        const delay = opening.overflow
-          ? (mobileAutoHeld
-            ? lastOrder >= 4 ? 1350 : lastOrder === 3 ? 950 : lastOrder === 2 ? 640 : 460
-            : lastOrder >= 4 ? 1250 : lastOrder === 3 ? 820 : lastOrder === 2 ? 520 : 340)
-          : (mobileAutoHeld
-            ? lastOrder >= 4 ? 1500 : lastOrder === 3 ? 1180 : lastOrder === 2 ? 920 : 720
-            : lastOrder >= 4 ? 1250 : lastOrder === 3 ? 900 : lastOrder === 2 ? 650 : 480);
         holdRevealTimerRef.current = window.setTimeout(() => {
           holdRevealTimerRef.current = null;
           revealCard(nextIndex);
-        }, delay);
+        }, mobileAutoHeld ? 340 : 200);
       }
     }
 
@@ -2190,7 +1960,6 @@ export default function PackworksGameClean() {
     selectedCard,
     mobileAutoHeld,
     spaceHeld,
-    game.discoverOffer,
   ]);
 
   useEffect(() => {
@@ -2215,7 +1984,7 @@ export default function PackworksGameClean() {
   const revealNextFromStack = useCallback(() => {
     const currentOpening = openingRef.current;
     if (!currentOpening || currentOpening.phase !== "ready") return;
-    const nextIndex = findNextRevealIndex(currentOpening.result.cards);
+    const nextIndex = findNextRevealIndex(currentOpening.session.cards);
     if (nextIndex >= 0) revealCard(nextIndex);
   }, [revealCard]);
 
@@ -2329,7 +2098,7 @@ export default function PackworksGameClean() {
     prevPileRectsRef.current = nextSpots;
   }, [overflowActive, overflowPiles]);
 
-  // Stack feedback: swell when spill cards join the face-down pile, squash
+  // Stack feedback: swell when bonus cards join the face-down pile, squash
   // when a card launches out of it.
   useEffect(() => {
     const previous = prevUnrevealedRef.current;
@@ -2362,7 +2131,7 @@ export default function PackworksGameClean() {
   ]);
 
   const handleDisplay = useCallback((cardId) => {
-    const next = displayCard(gameRef.current, cardId, Date.now());
+    const next = displayCard(gameRef.current, cardId);
     if (next === gameRef.current) {
       getAudio().sound("deny");
       return;
@@ -2379,7 +2148,7 @@ export default function PackworksGameClean() {
   }, [commit, getAudio]);
 
   const handleReorderDisplay = useCallback((fromIndex, toIndex) => {
-    const next = reorderDisplayed(gameRef.current, fromIndex, toIndex, Date.now());
+    const next = reorderDisplayed(gameRef.current, fromIndex, toIndex);
     if (next === gameRef.current) return;
     commit(next);
     getAudio().sound("switch");
@@ -2393,52 +2162,25 @@ export default function PackworksGameClean() {
     }
     window.localStorage.removeItem(adminActiveRef.current ? ADMIN_SAVE_KEY : SAVE_KEY);
     const fresh = adminActiveRef.current ? createAdminState(Date.now()) : createInitialState(Date.now());
-    legacyAutoSoldRef.current = false;
     commit(fresh);
-    setBinderSetId(fresh.activeSet);
     setDrawer(null);
     setResetArmed(false);
     closeOpening();
   }, [closeOpening, commit, resetArmed]);
 
-  const handleRewrite = useCallback(() => {
-    if (!rewriteArmed) {
-      setRewriteArmed(true);
-      return;
-    }
-    const earned = getInscriptionsEarned(gameRef.current, Date.now());
-    const next = rewriteState(gameRef.current, Date.now());
-    if (next === gameRef.current) {
-      setRewriteArmed(false);
-      return;
-    }
-    commit(next);
-    setRewriteArmed(false);
-    setBinderSetId(SETS[0].id);
-    setDrawer(null);
-    setSelectedCard(null);
-    closeOpening();
-    getAudio().sound("legendary", 17);
-  }, [closeOpening, commit, getAudio, rewriteArmed]);
-
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.code === "Space" && !drawer && !selectedCard) {
         event.preventDefault();
-        if (gameRef.current.discoverOffer) return;
         if (event.repeat || spaceHeldRef.current) return;
         spaceHeldRef.current = true;
         setSpaceHeld(true);
         if (!opening || opening.phase === "collecting") beginManualOpen();
       } else if (event.key === "Escape") {
-        if (gameRef.current.discoverOffer) {
-          const outcome = dismissDiscoverOfferDetailed(gameRef.current);
-          commit(outcome.state);
-          pushFx(outcome.events);
-        }
-        else if (selectedCard) setSelectedCard(null);
+        if (selectedCard) setSelectedCard(null);
+        else if (drawer) setDrawer(null);
+        else if (opening && opening.phase !== "collecting") endOpening();
         else if (opening?.phase === "collecting") closeOpening();
-        else setDrawer(null);
       }
     };
     const stopHoldingSpace = (event) => {
@@ -2461,8 +2203,8 @@ export default function PackworksGameClean() {
     clearHoldRevealTimer,
     closeOpening,
     drawer,
+    endOpening,
     opening,
-    pushFx,
     selectedCard,
   ]);
 
@@ -2479,18 +2221,11 @@ export default function PackworksGameClean() {
     flightTimersRef.current.clear();
   }, [clearHoldRevealTimer, clearOpeningTimers]);
 
-  const rotatePackType = useCallback((step) => {
-    if (openingRef.current) return;
-    setPackRotation(step < 0 ? "left" : "right");
-    setPackTypeIndex((current) => (current + step + PACK_TYPES.length) % PACK_TYPES.length);
-    getAudio().sound("switch");
-  }, [getAudio]);
-
   const derived = useMemo(() => getDerived(game), [game]);
-  const activeSet = getSet(game.activeSet);
-  const selectedPackStock = getProductCount(game, game.activeSet, selectedPackType.id);
-  const nextPackPrice = getPackPrice(game, selectedPackType.id, game.activeSet);
-  const packAffordable = selectedPackStock > 0 || game.coins >= nextPackPrice;
+  const activeSet = getSet("core");
+  const nextPackPrice = getPackPrice();
+  const packAffordable = game.packs > 0 || game.cash >= nextPackPrice;
+  const openingPendingCount = opening ? getPendingCardCount(opening.session.cards) : 0;
   const mobileAutoTitle = mobileAutoHeld
     ? "AUTO-OPENING"
     : "HOLD TO AUTO-OPEN";
@@ -2519,10 +2254,10 @@ export default function PackworksGameClean() {
           <strong>PACKWORKS</strong>
         </button>
         <div className={`clean-wallet ${cashStreams.length ? "is-cash-receiving" : ""}`}>
-          <strong>{money(game.coins)}</strong>
+          <strong>{money(game.cash)}</strong>
           <span>
-            CASH / +{rate(derived.passiveRate)} PER SECOND
-            {derived.inscriptions > 0 ? ` / ${formatNumber(derived.inscriptions)} INSCRIPTIONS` : ""}
+            CASH / {money(game.scrap)} SCRAP
+            {game.packs > 0 ? ` / ${money(game.packs)} ${game.packs === 1 ? "PACK" : "PACKS"}` : ""}
           </span>
         </div>
       </header>
@@ -2532,45 +2267,29 @@ export default function PackworksGameClean() {
         <div className="clean-floor"><i /><i /><i /><i /><i /></div>
         <div className={`stage-case-dock${opening ? " is-opening" : ""}`}>
           <div className="case-dock-row">
-            {opening?.canForceFinish && !["complete", "collecting"].includes(opening.phase) && (
+            {opening && !["complete", "collecting"].includes(opening.phase) && (
               <button
                 type="button"
                 className="opening-back-button"
-                onClick={forceFinishOpening}
-                aria-label="Finish opening and collect every card"
+                onClick={endOpening}
+                aria-label={openingPendingCount > 0
+                  ? `End the opening — ${openingPendingCount} face-down ${openingPendingCount === 1 ? "card is" : "cards are"} left behind`
+                  : "End the opening"}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M15.5 4.5 8 12l7.5 7.5" />
                 </svg>
               </button>
             )}
-            <CaseStrip game={game} derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
+            <CaseStrip derived={derived} fx={fx} onOpenCase={() => setDrawer("case")} />
           </div>
-          {Object.keys(game.discoverStack || {}).length > 0 && (
-            <div className="discover-stack" aria-label="Pending Discover stacks">
-              {Object.entries(game.discoverStack).map(([id, count]) => {
-                const option = DISCOVER_POOL.find((candidate) => candidate.id === id);
-                return <span key={id}>{option?.name || id} ×{count}</span>;
-              })}
-            </div>
-          )}
         </div>
 
         <div
           className={`clean-pack-station ${packAffordable ? "" : "is-unaffordable"}`}
-          data-pack-type={selectedPackType.id}
+          data-pack-type={packType.id}
         >
           <div className="pack-rotunda">
-            <button
-              type="button"
-              className="pack-rotunda-arrow is-previous"
-              onClick={() => rotatePackType(-1)}
-              aria-label="Previous pack type"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M15.5 4.5 8 12l7.5 7.5" />
-              </svg>
-            </button>
             <button
               className="clean-pack-clicker"
               onPointerDown={(event) => {
@@ -2583,45 +2302,29 @@ export default function PackworksGameClean() {
               onContextMenu={(event) => event.preventDefault()}
               onClick={beginManualOpen}
               aria-disabled={packAffordable ? undefined : true}
-              aria-label={selectedPackStock
-                ? `Open a pack: ${selectedPackType.name}. ${selectedPackStock} ready.`
-                : `Buy and open a pack: ${selectedPackType.name} for ${exactMoney(nextPackPrice)} cash.${
-                  packAffordable ? "" : ` Not enough cash — you have ${exactMoney(game.coins)}.`
+              aria-label={game.packs > 0
+                ? `Open a pack: ${packType.name}. ${game.packs} ready.`
+                : `Buy and open a pack: ${packType.name} for ${exactMoney(nextPackPrice)} cash.${
+                  packAffordable ? "" : ` Not enough cash — you have ${exactMoney(game.cash)}.`
                 }`}
             >
               <span className="clean-pack-shadow" />
-              <span
-                className={`clean-pack-stack rotates-${packRotation}`}
-                key={selectedPackType.id}
-              >
+              <span className="clean-pack-stack rotates-right" key={packType.id}>
                 <i /><i />
-                <PackFace set={activeSet} packType={selectedPackType} />
+                <PackFace set={activeSet} packType={packType} />
               </span>
-            </button>
-            <button
-              type="button"
-              className="pack-rotunda-arrow is-next"
-              onClick={() => rotatePackType(1)}
-              aria-label="Next pack type"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m8.5 4.5 7.5 7.5-7.5 7.5" />
-              </svg>
             </button>
           </div>
           <div className="pack-type-copy" aria-live="polite">
-            <strong>{exactMoney(nextPackPrice)} CASH</strong>
-            <small>{packAffordable ? selectedPackType.description : "NOT ENOUGH CASH"}</small>
+            <strong>{game.packs > 0 ? `${money(game.packs)} SEALED` : `${exactMoney(nextPackPrice)} CASH`}</strong>
+            <small>{packAffordable ? packType.description : "NOT ENOUGH CASH"}</small>
           </div>
         </div>
 
         <SetTray
           game={game}
           set={activeSet}
-          onOpenBinder={() => {
-            setBinderSetId(game.activeSet);
-            setDrawer("binder");
-          }}
+          onOpenBinder={() => setDrawer("binder")}
         />
       </section>
 
@@ -2639,20 +2342,17 @@ export default function PackworksGameClean() {
         <CaseDrawer
           game={game}
           derived={derived}
-          onClose={() => { setRewriteArmed(false); setDrawer(null); }}
+          onClose={() => setDrawer(null)}
           onUndisplay={handleUndisplay}
           onPickCard={setSelectedCard}
           onOpenBinder={() => setDrawer("binder")}
-          onRewrite={handleRewrite}
-          rewriteArmed={rewriteArmed}
           onReorder={handleReorderDisplay}
         />
       )}
       {drawer === "binder" && (
         <BinderDrawer
           game={game}
-          setId={binderSetId}
-          onSetId={setBinderSetId}
+          set={activeSet}
           onClose={() => setDrawer(null)}
           onCard={setSelectedCard}
           displayedIds={new Set(derived.displayedEntries.map((entry) => entry.id))}
@@ -2686,15 +2386,15 @@ export default function PackworksGameClean() {
         <div
           className={`opening-layer phase-${opening.phase} clean-opening ${overflowActive ? "is-overflow" : ""} ${opening.impact ? `screen-impact-${opening.impact.rarity}` : ""}`}
           style={{
-            "--set-a": opening.result.set.colors[0],
-            "--set-b": opening.result.set.colors[1],
-            "--set-c": opening.result.set.colors[2],
+            "--set-a": opening.set.colors[0],
+            "--set-b": opening.set.colors[1],
+            "--set-c": opening.set.colors[2],
           }}
         >
           <div className="opening-haze" />
           <div className="foil-pack-wrap">
-            <div className="foil-half foil-top"><PackFace set={opening.result.set} packType={opening.result.packType} /></div>
-            <div className="foil-half foil-bottom"><PackFace set={opening.result.set} packType={opening.result.packType} /></div>
+            <div className="foil-half foil-top"><PackFace set={opening.set} packType={opening.packType} /></div>
+            <div className="foil-half foil-bottom"><PackFace set={opening.set} packType={opening.packType} /></div>
             <span className="tear-ribbon">PACKWORKS / FACTORY WRAPPED</span>
             <span className="tear-shockwave" />
             <PackDebris />
@@ -2712,7 +2412,7 @@ export default function PackworksGameClean() {
               onPointerCancel={stopSwipeReveal}
             >
               {openingActiveIndices.map((index, position) => {
-                const pull = opening.result.cards[index];
+                const pull = opening.session.cards[index];
                 return (
                   <RevealCard
                     key={`${opening.id}-${index}`}
@@ -2760,9 +2460,9 @@ export default function PackworksGameClean() {
                   className={`overflow-stack-inner ${stackPulse ? `pulse-${stackPulse.kind}` : ""}`.trim()}
                 >
                   <span className="overflow-stack-cards" ref={overflowStackRef} aria-hidden="true">
-                    <CrestBack label={opening.result.set.short} />
-                    <CrestBack label={opening.result.set.short} />
-                    <CrestBack label={opening.result.set.short} />
+                    <CrestBack label={opening.set.short} />
+                    <CrestBack label={opening.set.short} />
+                    <CrestBack label={opening.set.short} />
                   </span>
                   <span className="overflow-stack-meta">
                     <b className="overflow-stack-count" key={overflowUnrevealed.count}>
@@ -2771,11 +2471,8 @@ export default function PackworksGameClean() {
                     <small className="overflow-stack-label">
                       {overflowUnrevealed.count ? "UNREVEALED" : "ALL REVEALED"}
                     </small>
-                    {overflowUnrevealed.marked > 0 && (
-                      <i className="overflow-stack-chip is-marked">{overflowUnrevealed.marked} MARKED</i>
-                    )}
-                    {overflowUnrevealed.mystery > 0 && (
-                      <i className="overflow-stack-chip is-mystery">{overflowUnrevealed.mystery} MYSTERY</i>
+                    {overflowUnrevealed.bonus > 0 && (
+                      <i className="overflow-stack-chip is-mystery">{overflowUnrevealed.bonus} BONUS</i>
                     )}
                   </span>
                 </span>
@@ -2820,9 +2517,9 @@ export default function PackworksGameClean() {
               className="opening-fusion-notice"
               aria-live="polite"
             >
-              <span>FUSION</span>
+              <span>FUSED</span>
               <strong>{getCard(opening.fusionNotice.cardId)?.name || "UPGRADED CARD"}</strong>
-              <small>REVEALED</small>
+              <small>JOINS THE PACK</small>
             </div>
           )}
           <button
@@ -2840,56 +2537,6 @@ export default function PackworksGameClean() {
             <strong>{mobileAutoTitle}</strong>
             <small>{mobileAutoDetail}</small>
           </button>
-        </div>
-      )}
-
-      {game.discoverOffer && (
-        <div className="clean-modal-scrim discover-scrim">
-          <div className="discover-stage" onMouseDown={(event) => event.stopPropagation()}>
-            <header className="discover-head">
-              <b>DISCOVER</b>
-              <p>Pick a card. Picks stack, and the stack spends on the next matching moment.</p>
-            </header>
-            <div className={`discover-fan count-${game.discoverOffer.length}`}>
-              {game.discoverOffer.map((id, index) => {
-                const option = DISCOVER_POOL.find((candidate) => candidate.id === id);
-                const spread = index - (game.discoverOffer.length - 1) / 2;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`discover-card option-${id}`}
-                    style={{ "--spread": spread, "--deal": `${index * 95}ms` }}
-                    onClick={() => {
-                      const outcome = chooseDiscoverOptionDetailed(gameRef.current, id);
-                      commit(outcome.state);
-                      pushFx(outcome.events);
-                      getAudio().sound("switch");
-                    }}
-                  >
-                    <span className="discover-card-head">
-                      <span>DISCOVER</span>
-                      <b>{"I".repeat(index + 1)}</b>
-                    </span>
-                    <span className="discover-card-glyph" aria-hidden="true"><i /><i /><i /></span>
-                    <strong>{option?.name}</strong>
-                    <span className="discover-card-text">{option?.text}</span>
-                    <span className="discover-card-foot">TAKE THIS</span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              className="discover-skip"
-              onClick={() => {
-                const outcome = dismissDiscoverOfferDetailed(gameRef.current);
-                commit(outcome.state);
-                pushFx(outcome.events);
-              }}
-            >
-              SKIP
-            </button>
-          </div>
         </div>
       )}
 
