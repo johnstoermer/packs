@@ -5,9 +5,12 @@ Use this checklist for every reward path and system change.
 ## The action stack is the engine
 
 - Every player input and every card effect during an opening becomes an
-  action on the opening's queue. Actions resolve strictly one at a time, in
-  the order they were added — nothing ever resolves simultaneously.
+  action on the opening's queue. Actions resolve strictly one at a time —
+  nothing ever resolves simultaneously.
 - Rapidly revealing cards stacks reveals; the stack drains in order.
+- Resolution is depth-first: everything spawned by resolving an action cuts
+  to the front of the queue, so a reveal's entire cascade (salvages, fuses,
+  added cards, chained reveals) resolves before the next queued reveal.
 - Card effects only trigger while a pack is open. When the player exits an
   opening, the action stack is cleared: pending reveals and effects are
   gone, and face-down cards are left behind. Revealed cards keep everything

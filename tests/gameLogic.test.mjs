@@ -121,6 +121,26 @@ test("rapidly queued reveals process strictly one at a time, in order", () => {
   assert.ok(isOpeningSettled(outcome.session));
 });
 
+test("a reveal's cascade resolves before the next queued reveal", () => {
+  const state = makeState({ caseNames: ["Scrapactus"] });
+  let session = makeSession([pullOf("common"), pullOf("common")]);
+  session = enqueueReveal(session, 0);
+  session = enqueueReveal(session, 1);
+
+  // Reveal 0 procs Scrapactus (0.1 < 25%): its salvage cuts in FRONT of the
+  // already-queued reveal of card 1.
+  let outcome = stepOpening(state, session, { rng: rngSeq([0.1]) });
+  assert.deepEqual(outcome.session.queue.map((action) => action.type), ["salvage", "reveal"]);
+
+  outcome = stepOpening(outcome.state, outcome.session, { rng: rngSeq([0.99]) });
+  assert.equal(outcome.action.type, "salvage");
+  assert.equal(outcome.session.cards[0].salvaged, true);
+  assert.equal(outcome.session.cards[1].revealed, false, "next reveal waits for the cascade");
+
+  outcome = stepOpening(outcome.state, outcome.session, { rng: rngSeq([0.99]) });
+  assert.deepEqual(outcome.action, { type: "reveal", index: 1 });
+});
+
 test("enqueueReveal ignores duplicates and already-revealed cards", () => {
   let session = makeSession([pullOf("common"), pullOf("common", { revealed: true })]);
   session = enqueueReveal(session, 0);

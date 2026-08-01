@@ -1,0 +1,157 @@
+/* Salvage tear — adapted from the mini-set Scrapyard Economy demo.
+   A salvaged card rips into two jagged halves, flashes along the tear,
+   scatters paper scraps, and the scraps vacuum into the wallet. The ghost
+   plays at the card's last board position; timings are compressed from the
+   3.6s demo loop to one 1.3s in-game beat. */
+
+.salvage-tear-layer {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.salvage-tear {
+  position: absolute;
+  filter: drop-shadow(0 14px 12px rgba(0, 0, 0, 0.45));
+}
+
+.salvage-tear-half {
+  position: absolute;
+  inset: 0;
+}
+
+.salvage-tear-half .card-front {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: none;
+}
+
+.salvage-tear-half.is-left {
+  clip-path: polygon(0 0, 55% 0, 47% 9%, 57% 17%, 45% 25%, 56% 34%, 46% 44%, 55% 53%, 44% 63%, 54% 73%, 45% 82%, 55% 91%, 50% 100%, 0 100%);
+  animation: salvage-tear-left 1.3s cubic-bezier(0.16, 0.8, 0.2, 1) both;
+}
+
+.salvage-tear-half.is-right {
+  clip-path: polygon(55% 0, 100% 0, 100% 100%, 50% 100%, 55% 91%, 45% 82%, 54% 73%, 44% 63%, 55% 53%, 46% 44%, 56% 34%, 45% 25%, 57% 17%, 47% 9%);
+  animation: salvage-tear-right 1.3s cubic-bezier(0.16, 0.8, 0.2, 1) both;
+}
+
+.salvage-tear-flash {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: 14%;
+  height: 96%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: salvage-tear-flash 1.3s ease both;
+}
+
+.salvage-tear-flash::before {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #fff6c7, transparent);
+  content: "";
+  filter: blur(2px);
+}
+
+.salvage-tear-flash i {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff7ca;
+  box-shadow: 0 0 12px #ffba68;
+}
+
+.salvage-tear-flash i:nth-child(1) { top: 18%; }
+.salvage-tear-flash i:nth-child(2) { top: 49%; }
+.salvage-tear-flash i:nth-child(3) { top: 77%; }
+
+.salvage-tear-fragments {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+}
+
+.salvage-tear-fragments i {
+  position: absolute;
+  width: 18px;
+  height: 22px;
+  border: 2px solid #6a4528;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), transparent 38%),
+    #d9995c;
+  box-shadow: 0 2px 0 #2e1b14;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+  animation: salvage-fragment-flight 1.3s cubic-bezier(0.25, 0.7, 0.2, 1) calc(var(--fragment-index) * 12ms) both;
+}
+
+.salvage-tear-fragments i:nth-child(3n) {
+  width: 12px;
+  height: 16px;
+  background-color: #8dc9d9;
+}
+
+.salvage-tear-fragments i:nth-child(4n) {
+  width: 20px;
+  height: 12px;
+  background-color: #f4d26b;
+}
+
+@keyframes salvage-tear-left {
+  0%, 8% { opacity: 1; transform: translate(0, 0); }
+  22% { transform: translate(-10px, 0) rotate(-4deg); }
+  40% { opacity: 1; transform: translate(-34px, 5px) rotate(-14deg); }
+  58%, 100% { opacity: 0; transform: translate(-66px, 16px) rotate(-28deg) scale(0.82); }
+}
+
+@keyframes salvage-tear-right {
+  0%, 8% { opacity: 1; transform: translate(0, 0); }
+  22% { transform: translate(10px, 0) rotate(4deg); }
+  40% { opacity: 1; transform: translate(34px, -5px) rotate(14deg); }
+  58%, 100% { opacity: 0; transform: translate(66px, -16px) rotate(28deg) scale(0.82); }
+}
+
+@keyframes salvage-tear-flash {
+  0%, 6% { opacity: 0; filter: brightness(1); }
+  12% { opacity: 1; filter: brightness(2); }
+  30%, 100% { opacity: 0; filter: brightness(1); }
+}
+
+@keyframes salvage-fragment-flight {
+  0%, 14% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  30% {
+    opacity: 1;
+    transform:
+      translate(calc(-50% + var(--scatter-x)), calc(-50% + var(--scatter-y)))
+      rotate(var(--fragment-rotation))
+      scale(1);
+  }
+  48% {
+    opacity: 1;
+    transform:
+      translate(calc(-50% + var(--scatter-x)), calc(-50% + var(--scatter-y)))
+      rotate(var(--fragment-rotation))
+      scale(0.9);
+  }
+  88% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--vac-x)), calc(-50% + var(--vac-y))) rotate(200deg) scale(0.32);
+  }
+  94%, 100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--vac-x)), calc(-50% + var(--vac-y))) rotate(230deg) scale(0.1);
+  }
+}

@@ -15,10 +15,12 @@ richer.
 Everything that happens during a pack opening is an **action**: reveal a
 card, salvage a card, fuse two cards, reroll a card, add cards to the pack.
 
-- Actions are added to the opening's stack and popped strictly in order,
-  one at a time. A rapid burst of player clicks queues that many reveals;
-  they never process simultaneously.
-- Card effects react to actions and push new actions onto the same stack
+- Actions are added to the opening's stack and popped strictly one at a
+  time. A rapid burst of player clicks queues that many reveals; they never
+  process simultaneously.
+- Resolution is depth-first: actions spawned while resolving the current
+  action cut to the front of the queue (keeping their own order), so
+  everything a reveal sets off resolves before the next queued reveal
   (`lib/gameLogic.js` → `stepOpening`). The UI paces the pump; the logic
   layer never schedules time.
 - Stale actions (a card that has since fused away, an invalidated pair) are

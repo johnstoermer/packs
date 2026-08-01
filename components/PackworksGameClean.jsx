@@ -526,6 +526,77 @@ function PackDebris() {
   );
 }
 
+// Scatter offsets for the salvage tear's paper scraps, carried over from the
+// mini-set Scrapyard Economy demo.
+const SALVAGE_FRAGMENT_SCATTER = [
+  ["-62px", "-62px", "-18deg"],
+  ["-30px", "-86px", "24deg"],
+  ["12px", "-74px", "48deg"],
+  ["54px", "-52px", "-32deg"],
+  ["-74px", "-18px", "35deg"],
+  ["-38px", "17px", "-45deg"],
+  ["8px", "24px", "62deg"],
+  ["61px", "12px", "18deg"],
+  ["-54px", "58px", "52deg"],
+  ["-8px", "72px", "-26deg"],
+  ["38px", "64px", "38deg"],
+  ["76px", "44px", "-58deg"],
+];
+
+// A salvaged card rips apart at its last board position: jagged halves fly
+// off, the tear flashes, and the scraps vacuum into the wallet.
+function SalvageTearLayer({ tears }) {
+  if (!tears.length) return null;
+  return (
+    <div className="salvage-tear-layer" aria-hidden="true">
+      {tears.map((tear) => {
+        const rarity = RARITIES[tear.card.rarity];
+        const set = getSet(tear.card.setId);
+        return (
+          <div
+            key={tear.serial}
+            className={`salvage-tear rarity-${tear.card.rarity}`}
+            style={{
+              left: `${tear.x}px`,
+              top: `${tear.y}px`,
+              width: `${tear.w}px`,
+              height: `${tear.h}px`,
+              "--vac-x": `${tear.vacX}px`,
+              "--vac-y": `${tear.vacY}px`,
+              "--rarity": rarity.color,
+              "--rarity-deep": rarity.deep,
+              "--set-a": set.colors[0],
+              "--set-b": set.colors[1],
+              "--set-c": set.colors[2],
+            }}
+          >
+            <div className="salvage-tear-half is-left">
+              <PrintedCard card={tear.card} compact foil={tear.foil} copyLabel="SALVAGED" />
+            </div>
+            <div className="salvage-tear-half is-right">
+              <PrintedCard card={tear.card} compact foil={tear.foil} copyLabel="SALVAGED" />
+            </div>
+            <span className="salvage-tear-flash"><i /><i /><i /></span>
+            <div className="salvage-tear-fragments">
+              {SALVAGE_FRAGMENT_SCATTER.map(([x, y, rotation], index) => (
+                <i
+                  key={`${x}-${y}`}
+                  style={{
+                    "--fragment-index": index,
+                    "--scatter-x": x,
+                    "--scatter-y": y,
+                    "--fragment-rotation": rotation,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function CashStreamLayer({ streams }) {
   if (!streams.length) return null;
   return (
@@ -1072,6 +1143,8 @@ export default function PackworksGameClean() {
   // Overflow mode: flight ghosts travelling from the face-down stack to their
   // pile, plus the per-pile landing bookkeeping that keeps counters in sync
   // with the moment a ghost actually arrives.
+  const [salvageTears, setSalvageTears] = useState([]);
+  const salvageTearSerialRef = useRef(0);
   const [flights, setFlights] = useState([]);
   const [pendingLand, setPendingLand] = useState({});
   const [landPulse, setLandPulse] = useState(null);
@@ -1550,26 +1623,26 @@ export default function PackworksGameClean() {
     });
   }, [overflowActive, overflowPiles.length, opening?.set, viewport]);
 
-  // Rarity-scaled pacing between queued actions: commons whip by, premium
-  // reveals get room to breathe, and overflow reveals drain faster.
+  // Rarity-scaled pacing between queued actions. The stack drains fast —
+  // commons whip by; only premium reveals hold the stage for a beat.
   const delayForStep = useCallback((outcome, overflow) => {
     const action = outcome.action;
-    if (!action) return 220;
+    if (!action) return 110;
     if (action.type === "reveal") {
       const pull = outcome.session.cards[action.index];
       const order = pull ? RARITIES[pull.rarity].order : 0;
       if (overflow) {
-        return order >= 3 ? 1250 : order === 2 ? 820 : order === 1 ? 520 : 340;
+        return order >= 3 ? 700 : order === 2 ? 440 : order === 1 ? 260 : 140;
       }
-      return order >= 3 ? 1250 : order === 2 ? 900 : order === 1 ? 650 : 480;
+      return order >= 3 ? 750 : order === 2 ? 500 : order === 1 ? 320 : 180;
     }
-    if (action.type === "fuse") return 700;
-    if (action.type === "salvage") return 520;
-    return 360;
+    if (action.type === "fuse") return 320;
+    if (action.type === "salvage") return 300;
+    return 150;
   }, []);
 
   const scheduleCompletion = useCallback((openingId, lastRarityOrder = 0) => {
-    const delay = lastRarityOrder >= 3 ? 1550 : lastRarityOrder === 2 ? 1200 : 900;
+    const delay = lastRarityOrder >= 3 ? 1100 : lastRarityOrder === 2 ? 850 : 650;
     openingTimersRef.current.push(window.setTimeout(() => {
       if (
         openingRef.current?.id !== openingId
@@ -1593,6 +1666,44 @@ export default function PackworksGameClean() {
       commitOpening(null);
     }, delay + COLLECTION_ANIMATION_MS));
   }, [commitOpening, getAudio, getHaptics]);
+
+  // Spawn the salvage tear ghost at the card's current board (or pile)
+  // position. Measured before React flushes the commit, so the node the
+  // salvaged card occupied is still in the DOM.
+  const spawnSalvageTear = useCallback((event) => {
+    const card = getCard(event.cardId);
+    if (!card) return;
+    const node = document.querySelector(`[data-reveal-index="${event.index}"]`)
+      || pileRefs.current.get(event.cardId);
+    let rect = node?.getBoundingClientRect();
+    if (!rect || rect.width < 10) {
+      rect = {
+        left: window.innerWidth / 2 - 74,
+        top: window.innerHeight / 2 - 105,
+        width: 148,
+        height: 210,
+      };
+    }
+    const wallet = document.querySelector(".clean-wallet")?.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const serial = ++salvageTearSerialRef.current;
+    const tear = {
+      serial,
+      card,
+      foil: Boolean(event.foil),
+      x: rect.left,
+      y: rect.top,
+      w: rect.width,
+      h: rect.height,
+      vacX: wallet ? wallet.left + wallet.width / 2 - centerX : 0,
+      vacY: wallet ? wallet.top + wallet.height / 2 - centerY : -centerY,
+    };
+    setSalvageTears((current) => [...current.slice(-5), tear]);
+    window.setTimeout(() => {
+      setSalvageTears((current) => current.filter((entry) => entry.serial !== serial));
+    }, 1_400);
+  }, []);
 
   // THE ACTION PUMP. Every queued action — player reveals and card effects
   // alike — resolves here, strictly one at a time, in the order it was
@@ -1650,20 +1761,8 @@ export default function PackworksGameClean() {
         audio.sound("fusion", 4);
         getHaptics().pulse("fuse");
       } else if (event.t === "salvage") {
-        audio.sound("caseBreak");
-        const echoSerial = ++fxSerialRef.current;
-        setRevealEchoes((current) => ({
-          ...current,
-          [event.index]: { count: 1, serial: echoSerial, label: "SALVAGED" },
-        }));
-        openingTimersRef.current.push(window.setTimeout(() => {
-          setRevealEchoes((current) => {
-            if (current[event.index]?.serial !== echoSerial) return current;
-            const next = { ...current };
-            delete next[event.index];
-            return next;
-          });
-        }, 1_100));
+        audio.sound("tear");
+        spawnSalvageTear(event);
       } else if (event.t === "reroll") {
         audio.sound("switch");
       } else if (event.t === "encore") {
@@ -1708,7 +1807,7 @@ export default function PackworksGameClean() {
         }, delayForStep(outcome, overflowFlags.overflow));
       }
     }
-  }, [commit, commitOpening, delayForStep, getAudio, getHaptics, pushFx, scheduleCompletion]);
+  }, [commit, commitOpening, delayForStep, getAudio, getHaptics, pushFx, scheduleCompletion, spawnSalvageTear]);
 
   const kickPump = useCallback(() => {
     if (pumpTimerRef.current !== null) return;
@@ -2550,6 +2649,8 @@ export default function PackworksGameClean() {
           onUndisplay={handleUndisplay}
         />
       )}
+
+      <SalvageTearLayer tears={salvageTears} />
 
       <CashStreamLayer streams={cashStreams} />
 

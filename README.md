@@ -20,10 +20,10 @@ Scrap.
 
 The engine's one structural rule: **nothing resolves simultaneously.**
 Every input and every card effect becomes an action on the opening's stack,
-and the stack pops strictly in order, one action at a time. Rapidly
-clicking five cards queues five reveals; a Firstseer flip queues the whole
-pack; a Heartmerge fusion queues the fused card's reveal behind everything
-already waiting.
+and the stack pops strictly one action at a time. Resolution is
+depth-first: whatever a reveal sets off — salvages, fuses, added cards,
+chained reveals — cuts to the front of the stack and fully resolves before
+the next queued reveal gets its turn.
 
 Effects only trigger while you are inside a pack opening. Leaving an
 opening clears the stack — pending effects die, face-down cards are left
